@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+*.egg-info/
+build/
+dist/
+
+# Pipeline inputs/outputs (large, regenerated each run, never versioned)
+# The /input dir holds the VIIRS GeoTIFFs and OSM extracts (large, ephemeral).
+# The /spots dir is the local staging area for step 7 to push to the data repo.
+/input/
+/output/
+/spots/
+
+# Validation fixtures (large)
+/validation/*.tif
+/validation/*.geojson
+/validation/*.pbf
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Secrets (if any local-only credentials are ever staged)
+.env
+.env.local
