@@ -1,0 +1,30 @@
+[
+  {
+    "lat": 44.2,
+    "lon": 3.6,
+    "expected_bortle": 2,
+    "name": "Parc National des Cévennes",
+    "note": "Dark-sky park, Bortle ~2 (reference: lightpollutionmap.info)"
+  },
+  {
+    "lat": 45.5,
+    "lon": 3.0,
+    "expected_bortle": 4,
+    "name": "Massif Central rural",
+    "note": "Rural area, Bortle ~3-4"
+  },
+  {
+    "lat": 43.6,
+    "lon": 1.4,
+    "expected_bortle": 6,
+    "name": "Toulouse outskirts",
+    "note": "Peri-urban, Bortle ~5-6"
+  },
+  {
+    "lat": 48.8566,
+    "lon": 2.3522,
+    "expected_bortle": 8,
+    "name": "Paris centre",
+    "note": "City centre, Bortle 8-9"
+  }
+]
