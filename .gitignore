@@ -37,6 +37,9 @@ Thumbs.db
 *.swo
 *~
 
+# OpenCode session transcripts (dropped in cwd by opencode, never project content)
+session-*.md
+
 # Secrets (if any local-only credentials are ever staged)
 .env
 .env.local
