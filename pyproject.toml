@@ -4,3 +4,12 @@ version = "0.1.0"
 description = "VIIRS radiance → per-tile dark-sky spot JSON pipeline"
 requires-python = ">=3.10"
 readme = "README.md"
+
+[tool.semantic_release]
+version_toml = ["pyproject.toml:project.version"]
+branch = "main"
+build_command = false
+upload_to_pypi = false
+upload_to_vcs_release = true
+commit_parser = "conventional"
+major_on_zero = true
