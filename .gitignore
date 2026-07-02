@@ -23,6 +23,10 @@ dist/
 /output/
 /spots/
 
+# Design and planning docs (ephemeral, regenerated each feature)
+/docs/designs/
+/docs/plans/
+
 # Validation fixtures (large)
 /validation/*.tif
 /validation/*.geojson
