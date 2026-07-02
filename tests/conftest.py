@@ -41,6 +41,34 @@ def sample_alr_data() -> np.ndarray:
 
 
 @pytest.fixture
+def wide_geotiff(tmp_path: Path) -> Path:
+    """Create a 2000x2000 EPSG:3035 GeoTIFF (~464m/px) for overlap slicing tests.
+
+    The image must be > 2 * ALR_R_px (~1332 px) on each side to have valid
+    interior pixels after the nightskyquality NaN halo is applied.
+    """
+    path = tmp_path / "wide_test.tif"
+    data = np.arange(2000 * 2000, dtype=np.float64).reshape(2000, 2000)
+    transform = rasterio.Affine(
+        464.0, 0.0, 3_500_000.0, 0.0, -464.0, 3_000_000.0
+    )
+    profile = {
+        "driver": "GTiff",
+        "height": 2000,
+        "width": 2000,
+        "count": 1,
+        "dtype": "float64",
+        "crs": "EPSG:3035",
+        "transform": transform,
+        "compress": "lzw",
+        "tiled": False,
+    }
+    with rasterio.open(path, "w", **profile) as dst:
+        dst.write(data, 1)
+    return path
+
+
+@pytest.fixture
 def mock_region() -> dict:
     return {
         "bbox": [-5, 41, 10, 51],
