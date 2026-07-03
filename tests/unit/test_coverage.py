@@ -91,7 +91,8 @@ def test_ensure_coverage_no_duplicates():
 
 
 def test_load_communes_mocked(mock_region):
-    """Mock requests.get to return a fake Overpass response, verify parsing."""
+    """Mock requests.get to return a fake Overpass response, verify parsing,
+    headers, and bbox query."""
     from src.coverage import load_communes
     mock_response = MagicMock()
     mock_response.json.return_value = {
@@ -119,8 +120,16 @@ def test_load_communes_mocked(mock_region):
         ]
     }
     mock_response.raise_for_status = MagicMock()
-    with patch("src.coverage.requests.get", return_value=mock_response):
+    with patch("src.coverage.requests.get") as mock_get:
+        mock_get.return_value = mock_response
         communes = load_communes(mock_region)
+
+    mock_get.assert_called_once()
+    kwargs = mock_get.call_args.kwargs
+    assert kwargs["headers"]["User-Agent"] == "darkskyspots-pipeline/1.0"
+    # bbox [-5, 41, 10, 51] -> Overpass order (lat_min, lon_min, lat_max, lon_max) = (41, -5, 51, 10)
+    assert "(41,-5,51,10)" in kwargs["params"]["data"]
+
     assert len(communes) == 3
     assert communes[0]["name"] == "Paris"
     assert communes[0]["population"] == 2100000
@@ -162,3 +171,44 @@ def test_attach_near_town_preserves_existing_near():
     communes = [{"name": "Paris", "lat": 48.5, "lon": 2.0}]
     out = attach_near_town(spots, communes)
     assert out[0]["near"] == "CustomName"
+
+
+def test_load_communes_retries_on_failure(mock_region):
+    """2 failures then success; verify 3 calls made and result is parsed."""
+    from src.coverage import load_communes
+    import requests
+    from unittest.mock import MagicMock, patch
+
+    success_response = MagicMock()
+    success_response.json.return_value = {"elements": [
+        {"type": "node", "id": 1, "lat": 48.5, "lon": 2.0,
+         "tags": {"name": "Paris", "population": "2100000"}}
+    ]}
+    success_response.raise_for_status = MagicMock()
+
+    fail_resp = requests.ConnectionError("fail")
+    mock_get = MagicMock(side_effect=[fail_resp, fail_resp, success_response])
+
+    with patch("src.coverage.requests.get", mock_get), patch("src.coverage.time.sleep") as mock_sleep:
+        communes = load_communes(mock_region)
+
+    assert len(communes) == 1
+    assert communes[0]["name"] == "Paris"
+    assert mock_get.call_count == 3
+    assert mock_sleep.call_count == 2  # verify backoff was invoked
+
+
+def test_load_communes_raises_after_all_retries_exhausted(mock_region):
+    """3 failures with no success raises RuntimeError."""
+    from src.coverage import load_communes
+    import requests
+    from unittest.mock import MagicMock, patch
+
+    fail_resp = requests.ConnectionError("fail")
+    mock_get = MagicMock(side_effect=[fail_resp, fail_resp, fail_resp])
+
+    with patch("src.coverage.requests.get", mock_get), patch("src.coverage.time.sleep"):
+        with pytest.raises(RuntimeError, match="3 attempts"):
+            load_communes(mock_region)
+
+    assert mock_get.call_count == 3

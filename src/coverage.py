@@ -1,4 +1,6 @@
 """Step 4: OSM communes loader, coverage guarantee, attach nearest commune."""
+import time
+
 import requests
 
 from .config import COVERAGE_RADIUS_KM, MIN_SPOTS_PER_AREA
@@ -16,15 +18,35 @@ def load_communes(
     For testing, this function can be monkeypatched.
     """
     bbox = region["bbox"]
+    lon_min, lat_min, lon_max, lat_max = bbox
     overpass_query = f"""
-    [out:json][timeout:30];
-    area[admin_level={region["admin_level"]}]["ISO3166-1"="{region["osm_country_code"]}"]->.country;
-    nwr[admin_level={region["admin_level"]}](area.country);
-    out center;
-    """
-    resp = requests.get(overpass_url, params={"data": overpass_query}, timeout=30)
-    resp.raise_for_status()
-    data = resp.json()
+[out:json][timeout:60];
+nwr[admin_level={region["admin_level"]}][boundary=administrative]({lat_min},{lon_min},{lat_max},{lon_max});
+out center;
+"""
+    headers = {"User-Agent": "darkskyspots-pipeline/1.0"}
+    max_attempts = 3
+    backoff = [2, 4]
+    last_exc = None
+    for attempt in range(max_attempts):
+        try:
+            resp = requests.get(
+                overpass_url,
+                params={"data": overpass_query},
+                headers=headers,
+                timeout=60,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            break
+        except requests.RequestException as e:
+            last_exc = e
+            if attempt < max_attempts - 1:
+                time.sleep(backoff[attempt])
+    else:
+        raise RuntimeError(
+            f"Overpass API request failed after {max_attempts} attempts: {last_exc}"
+        )
     communes = []
     for element in data.get("elements", []):
         if "tags" not in element:

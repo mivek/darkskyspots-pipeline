@@ -16,8 +16,16 @@ def test_parser_requires_region():
         parse_args(["--year", "2025", "--data-repo-url", "x"])
 
 
-def test_parser_requires_data_repo_url():
-    """--data-repo-url is required."""
+def test_parser_data_repo_url_optional_with_no_push():
+    """--data-repo-url is NOT required when --no-push is set."""
+    from src.cli import parse_args
+    args = parse_args(["--year", "2025", "--region", "france", "--no-push"])
+    assert args.data_repo_url is None
+    assert args.no_push is True
+
+
+def test_parser_requires_data_repo_url_without_no_push():
+    """--data-repo-url is required when --no-push is not set."""
     from src.cli import parse_args
     with pytest.raises(SystemExit):
         parse_args(["--year", "2025", "--region", "france"])
