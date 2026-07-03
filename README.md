@@ -37,6 +37,14 @@ Output appears in `/output/spots/`. Add `--no-push` to skip the publish step.
 | `--budget-mb` | No | `500.0` | RAM budget for loading the input GeoTIFF (MB). If exceeded, the input is processed in slices. |
 | `--verbose`, `-v` | No | `false` | Verbose logging. |
 
+## Data directory
+
+The `data/` directory contains:
+- **`cities500.zip`** — GeoNames populated places database (versioned in git). Downloaded from [GeoNames](https://download.geonames.org/export/dump/cities500.zip).
+- **`cities500.txt`** — extracted on first pipeline run (gitignored, ~50 MB).
+
+No other data files are required.
+
 ## Input
 
 Place your GeoTIFF at `--input-dir/<region>/<year>.tif` before running. Supported sources: NASA Black Marble (VNP46A4 / VJ146A4) or [lightpollutionmap.info](https://www.lightpollutionmap.info) raw exports.
@@ -59,7 +67,7 @@ The input must be:
 |---------|-------------|------|
 | `Input not found` | GeoTIFF not at expected path | Check `--input-dir` and `<region>/<year>.tif`. |
 | All-NaN output | Input too small (< 666 px per side) | Use a larger GeoTIFF (minimum 700×700 px). |
-| `Overpass API returned error` | OSM rate-limited or wrong region config | Wait, or use a local Overpass instance. |
+| `GeoNames data not found` | Missing `data/cities500.zip` | Download from [GeoNames](https://download.geonames.org/export/dump/cities500.zip) into `data/`. |
 | `git clone` fails in step 7 | SSH key not loaded or bad URL | Run `ssh -T git@github.com` to verify. Use `--no-push`. |
 | Out of memory | GeoTIFF too large for default budget | Reduce `--budget-mb` to force slice-based processing. |
 
@@ -77,3 +85,4 @@ After each run, manually record Bortle estimates for the control points in `vali
 - **VIIRS radiance data:** NASA Black Marble products (VNP46A4 / VJ146A4) — CC0.
 - **Light pollution map redistribution:** Jurij Stare, [lightpollutionmap.info](https://www.lightpollutionmap.info).
 - **Place names and administrative boundaries:** OpenStreetMap contributors (ODbL).
+- **Populated places (GeoNames):** [GeoNames](https://www.geonames.org) data used under the [Creative Commons Attribution 4.0 License](https://creativecommons.org/licenses/by/4.0/). Data is sourced from the [cities500](https://download.geonames.org/export/dump/cities500.zip) export.
