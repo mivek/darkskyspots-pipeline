@@ -11,6 +11,9 @@ COVERAGE_RADIUS_KM = 100
 PLACE_SEARCH_RADIUS_KM = 10
 PLACE_QUERY_TIMEOUT = 30
 
+# Coverage — max distance for nearest commune/place attachment
+MAX_NEAR_DISTANCE_KM = 25
+
 # Tile
 TILE_SIZE_DEG = 1.0
 BORTLE_MIN = 1
