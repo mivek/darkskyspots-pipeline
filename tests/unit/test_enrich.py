@@ -193,22 +193,45 @@ def test_enrich_spot_adds_name():
     places = [{"name": "Pic de Beille", "lat": 48.5, "lon": 2.1}]
     out = enrich_spot(spot, places, max_radius_km=20)
     assert out["name"] == "Pic de Beille"
+    assert "id" in out
+    assert out["id"] == "48.5000_2.0000"
+    assert "row" not in out
+    assert "col" not in out
 
 
 def test_enrich_spot_no_name():
-    """No places returns None for name."""
+    """No places returns None for name, id present, row/col stripped."""
     from src.enrich import enrich_spot
-    spot = {"lat": 48.5, "lon": 2.0, "darkness": 0.9}
+    spot = {"lat": 48.5, "lon": 2.0, "darkness": 0.9, "row": 10, "col": 20}
     out = enrich_spot(spot, [], max_radius_km=10)
     assert out["name"] is None
+    assert "id" in out
+    assert out["id"] == "48.5000_2.0000"
+    assert "row" not in out
+    assert "col" not in out
 
 
 def test_enrich_spot_altitude_null():
-    """Altitude field is present but None (MVP stub)."""
+    """Altitude field is present but None (MVP stub), id present, row/col stripped."""
     from src.enrich import enrich_spot
-    spot = {"lat": 48.5, "lon": 2.0, "darkness": 0.9}
+    spot = {"lat": 48.5, "lon": 2.0, "darkness": 0.9, "row": 10, "col": 20}
     out = enrich_spot(spot, [], max_radius_km=10)
     assert out["altitude"] is None
+    assert "id" in out
+    assert out["id"] == "48.5000_2.0000"
+    assert "row" not in out
+    assert "col" not in out
+
+
+def test_enrich_spot_strips_row_col():
+    """row and col are stripped from the output dict."""
+    from src.enrich import enrich_spot
+    spot = {"lat": 48.5, "lon": 2.0, "darkness": 0.9, "row": 10, "col": 20}
+    places = []
+    out = enrich_spot(spot, places, max_radius_km=10)
+    assert "row" not in out
+    assert "col" not in out
+    assert "id" in out
 
 
 def test_enrich_all_batch(mock_region):
@@ -224,9 +247,10 @@ def test_enrich_all_batch(mock_region):
         out = enrich_all(spots, mock_region)
     assert len(out) == 3
     for s in out:
+        assert "id" in s
         assert "name" in s
         assert "altitude" in s
-        assert s["altitude"] is None  # MVP stub
+        assert s["altitude"] is None
 
 
 def test_enrich_all_makes_one_request(mock_region):
@@ -274,41 +298,46 @@ def test_enrich_all_altitude_none(mock_region):
         assert s["altitude"] is None
 
 
+def test_spec_technique_id_format():
+    """spec-technique.md uses coordinate-based ID format '42.7283_1.6492'."""
+    with open("spec-technique.md") as f:
+        content = f.read()
+    assert '"42.7283_1.6492"' in content
+
+
 # --- spot_id tests ---
 
-def test_spot_id_with_name():
-    """spot_id with name uses slug."""
+def test_spot_id_format():
+    """spot_id returns lat_lon with 4 decimal places."""
     from src.enrich import spot_id
-    assert spot_id(42.7, 1.6, "fr", name="Beille") == "fr-00-beille"
+    assert spot_id(42.7283, 1.6492) == "42.7283_1.6492"
 
 
-def test_spot_id_fallback():
-    """No name -> uses lat/lon encoding."""
+def test_spot_id_negative_lon():
+    """Negative longitude produces negative in output."""
     from src.enrich import spot_id
-    assert spot_id(42.7, 1.6, "fr") == "fr-00-42_001"
+    assert spot_id(48.8566, -2.3522) == "48.8566_-2.3522"
 
 
 def test_spot_id_deterministic():
     """Same inputs twice -> same result."""
     from src.enrich import spot_id
-    a = spot_id(42.7, 1.6, "fr", name="Beille")
-    b = spot_id(42.7, 1.6, "fr", name="Beille")
+    a = spot_id(42.7283, 1.6492)
+    b = spot_id(42.7283, 1.6492)
     assert a == b
 
 
-def test_spot_id_with_dept():
-    """Department is part of the ID."""
+def test_spot_id_uniqueness():
+    """Two nearby but distinct coords produce different IDs."""
     from src.enrich import spot_id
-    assert spot_id(42.7, 1.6, "fr", name="Beille", dept=9) == "fr-09-beille"
+    a = spot_id(42.7283, 1.6492)
+    b = spot_id(42.7284, 1.6493)
+    assert a != b
 
 
-def test_spot_id_slugify_special_chars():
-    """Accents and punctuation get stripped from slug."""
+def test_spot_id_negative_zero_normalized():
+    """-0.0 produces '0.0000' not '-0.0000'."""
     from src.enrich import spot_id
-    assert spot_id(43.3, -1.9, "fr", name="Saint-Jean-de-Luz") == "fr-00-saint-jean-de-luz"
-
-
-def test_spot_id_empty_name_fallback():
-    """Empty name triggers the lat/lon fallback."""
-    from src.enrich import spot_id
-    assert spot_id(42.7, 1.6, "fr", name="") == "fr-00-42_001"
+    assert spot_id(-0.0, 0.0) == "0.0000_0.0000"
+    assert spot_id(0.0, -0.0) == "0.0000_0.0000"
+    assert spot_id(-0.0, -0.0) == "0.0000_0.0000"
