@@ -26,12 +26,17 @@ def haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     return EARTH_RADIUS_KM * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
 
 
-def nearest_commune(spot: dict, communes: list[dict]) -> str | None:
+def nearest_commune(
+    spot: dict, communes: list[dict], max_distance_km: float | None = None
+) -> str | None:
     """
     Return the name of the commune closest to `spot`, or None if no usable commune.
 
     Skips communes with missing coordinates (`lat` is None or `lon` is None),
     so a partially-loaded commune set never crashes the orchestrator.
+
+    If `max_distance_km` is set and the closest commune is farther than that,
+    returns None (indicating the spot is too far from any known place).
     """
     best_name: str | None = None
     best_km = float("inf")
@@ -44,4 +49,6 @@ def nearest_commune(spot: dict, communes: list[dict]) -> str | None:
         if d < best_km:
             best_km = d
             best_name = commune.get("name")
+    if max_distance_km is not None and best_km > max_distance_km:
+        return None
     return best_name

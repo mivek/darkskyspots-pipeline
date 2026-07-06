@@ -20,7 +20,7 @@ from src.config import (
     REDUNDANCY_KM,
     TILE_SIZE_DEG,
 )
-from src.coverage import attach_near_town, ensure_coverage, load_communes
+from src.coverage import attach_near_town, ensure_coverage, load_places
 from src.enrich import enrich_all
 from src.extract import mesh_minima, redundancy_filter
 from src.alr import slice_and_compute
@@ -91,9 +91,10 @@ def run(args) -> int:
         filtered = redundancy_filter(candidates, REDUNDANCY_KM)
         logger.info("  After redundancy filter: %d spots", len(filtered))
 
-        # Step 4: Coverage guarantee via OSM communes
-        logger.info("Step 4: Coverage guarantee via OSM communes")
-        communes = load_communes(region)
+        # Step 4: Coverage guarantee via GeoNames places
+        logger.info("Step 4: Coverage guarantee via GeoNames places")
+        communes = load_places(region)
+        logger.info("  Loaded %d localities (GeoNames)", len(communes))
         covered = ensure_coverage(
             filtered, candidates, communes, MIN_SPOTS_PER_AREA, COVERAGE_RADIUS_KM
         )

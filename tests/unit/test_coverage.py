@@ -1,7 +1,4 @@
-"""Tests for src/coverage.py (OSM communes loader, coverage logic)."""
-from unittest.mock import MagicMock, patch
-
-import numpy as np
+"""Tests for src/coverage.py (GeoNames places loader, coverage logic)."""
 import pytest
 
 
@@ -90,60 +87,68 @@ def test_ensure_coverage_no_duplicates():
     assert len(matching) == 1
 
 
-def test_load_communes_mocked(mock_region):
-    """Mock requests.get to return a fake Overpass response, verify parsing,
-    headers, and bbox query."""
-    from src.coverage import load_communes
-    mock_response = MagicMock()
-    mock_response.json.return_value = {
-        "elements": [
-            {
-                "type": "node",
-                "id": 1,
-                "lat": 48.5,
-                "lon": 2.0,
-                "tags": {"name": "Paris", "population": "2100000"},
-            },
-            {
-                "type": "way",
-                "id": 2,
-                "center": {"lat": 45.5, "lon": 4.0},
-                "tags": {"name": "Lyon"},
-            },
-            {
-                "type": "node",
-                "id": 3,
-                "lat": 43.0,
-                "lon": 1.0,
-                "tags": {},  # no name
-            },
-        ]
-    }
-    mock_response.raise_for_status = MagicMock()
-    with patch("src.coverage.requests.get") as mock_get:
-        mock_get.return_value = mock_response
-        communes = load_communes(mock_region)
+def test_load_places_parses_geonames(tmp_path, mock_region):
+    """Parse a tab-separated GeoNames snippet, verify correct extraction of
+    name, lat, lon, population."""
+    from src.coverage import load_places
+    # Create a fake .txt file with 3 real-looking GeoNames lines
+    # Format: geonameid\tname\tasciiname\talternatenames\tlatitude\tlongitude
+    #         \tfeature class\tfeature code\tcountry code\tcc2\tadmin1 code
+    #         \tadmin2 code\tadmin3 code\tadmin4 code\tpopulation\televation
+    #         \tdem\ttimezone\tmodification date
+    lines = [
+        # Paris
+        "2988507\tParis\tParis\tCity of Light\t48.85341\t2.3488\tP\tPPLC\tFR\t\t11\t75\t\t\t2161000\t33\t33\tEurope/Paris\t2025-01-01\n",
+        # Lyon
+        "2996944\tLyon\tLyon\t\t45.74846\t4.84671\tP\tPPLA\tFR\t\t84\t69\t\t\t513275\t174\t174\tEurope/Paris\t2025-01-01\n",
+        # Small village near Toulouse (no population)
+        "6452033\tCugnaux\tCugnaux\t\t43.5377\t1.3441\tP\tPPL\tFR\t\t31\t31\t\t\t\tnull\t185\tEurope/Paris\t2025-01-01\n",
+    ]
+    txt_path = tmp_path / "cities500.txt"
+    txt_path.write_text("".join(lines), encoding="utf-8")
 
-    mock_get.assert_called_once()
-    kwargs = mock_get.call_args.kwargs
-    assert kwargs["headers"]["User-Agent"] == "darkskyspots-pipeline/1.0"
-    # bbox [-5, 41, 10, 51] -> Overpass order (lat_min, lon_min, lat_max, lon_max) = (41, -5, 51, 10)
-    assert "(41,-5,51,10)" in kwargs["params"]["data"]
+    # Load from the tmp_path directory (not the real data/ dir)
+    places = load_places(mock_region, data_dir=str(tmp_path))
+    assert len(places) == 3
+    assert places[0]["name"] == "Paris"
+    assert places[0]["lat"] == 48.85341
+    assert places[0]["lon"] == 2.3488
+    assert places[0]["population"] == 2161000
+    assert places[1]["name"] == "Lyon"
+    assert places[1]["lat"] == 45.74846
+    assert places[1]["lon"] == 4.84671
+    assert places[2]["name"] == "Cugnaux"
+    assert places[2]["population"] is None  # empty string -> None
 
-    assert len(communes) == 3
-    assert communes[0]["name"] == "Paris"
-    assert communes[0]["population"] == 2100000
-    assert communes[1]["name"] == "Lyon"
-    assert communes[1]["lat"] == 45.5
-    assert communes[2]["name"] == ""  # empty name, not skipped
+
+def test_load_places_filters_by_bbox_margin(tmp_path, mock_region):
+    """Verify places outside the bbox+100km margin are filtered out."""
+    from src.coverage import load_places
+    # Use a narrow bbox and a point far outside
+    tight_region = dict(mock_region, bbox=[2.0, 48.0, 3.0, 49.0])  # tiny box near Paris
+    lines = [
+        # Paris (lon=2.35, lat=48.85) — inside tight bbox
+        "2988507\tParis\tParis\t\t48.85341\t2.3488\tP\tPPLC\tFR\t\t11\t75\t\t\t2161000\t33\t33\tEurope/Paris\t2025-01-01\n",
+        # Moscow (lon=37.62, lat=55.75) — far outside any margin
+        "524901\tMoscow\tMoscow\t\t55.75222\t37.61556\tP\tPPLC\tRU\t\t48\t\t\t\t12678079\t156\t156\tEurope/Moscow\t2025-01-01\n",
+        # London (lon=-0.12, lat=51.51) — ~350 km from tight bbox, outside 100km margin
+        "2643743\tLondon\tLondon\t\t51.50722\t-0.12750\tP\tPPLC\tGB\t\tENG\t\t\t\t8982000\t15\t15\tEurope/London\t2025-01-01\n",
+    ]
+    txt_path = tmp_path / "cities500.txt"
+    txt_path.write_text("".join(lines), encoding="utf-8")
+
+    places = load_places(tight_region, data_dir=str(tmp_path))
+    # Only Paris should be retained
+    assert len(places) == 1
+    assert places[0]["name"] == "Paris"
 
 
 def test_attach_near_town_sets_nearest_commune():
     """2 spots, 3 communes; each spot's near field is set to its closest commune."""
     from src.coverage import attach_near_town
     spots = [
-        {"lat": 48.0, "lon": 2.0, "darkness": 0.9},
-        {"lat": 45.0, "lon": 4.0, "darkness": 0.7},
+        {"lat": 48.4, "lon": 2.1, "darkness": 0.9},  # ~12 km from Paris
+        {"lat": 45.42, "lon": 4.58, "darkness": 0.7},  # ~12 km from Lyon
     ]
     communes = [
         {"name": "Paris", "lat": 48.5, "lon": 2.0},
@@ -156,12 +161,12 @@ def test_attach_near_town_sets_nearest_commune():
 
 
 def test_attach_near_town_skips_when_no_commune():
-    """Empty communes list -> near stays as before (None or unset)."""
+    """Empty communes list -> near becomes empty string (too far from anything)."""
     from src.coverage import attach_near_town
     spots = [{"lat": 48.0, "lon": 2.0, "darkness": 0.9}]
     out = attach_near_town(spots, [])
     assert "near" in out[0]
-    assert out[0]["near"] is None
+    assert out[0]["near"] == ""
 
 
 def test_attach_near_town_preserves_existing_near():
@@ -173,42 +178,25 @@ def test_attach_near_town_preserves_existing_near():
     assert out[0]["near"] == "CustomName"
 
 
-def test_load_communes_retries_on_failure(mock_region):
-    """2 failures then success; verify 3 calls made and result is parsed."""
-    from src.coverage import load_communes
-    import requests
-    from unittest.mock import MagicMock, patch
-
-    success_response = MagicMock()
-    success_response.json.return_value = {"elements": [
-        {"type": "node", "id": 1, "lat": 48.5, "lon": 2.0,
-         "tags": {"name": "Paris", "population": "2100000"}}
-    ]}
-    success_response.raise_for_status = MagicMock()
-
-    fail_resp = requests.ConnectionError("fail")
-    mock_get = MagicMock(side_effect=[fail_resp, fail_resp, success_response])
-
-    with patch("src.coverage.requests.get", mock_get), patch("src.coverage.time.sleep") as mock_sleep:
-        communes = load_communes(mock_region)
-
-    assert len(communes) == 1
-    assert communes[0]["name"] == "Paris"
-    assert mock_get.call_count == 3
-    assert mock_sleep.call_count == 2  # verify backoff was invoked
+def test_attach_near_town_leaves_empty_when_too_far():
+    """All communes > 25 km away → near becomes empty string."""
+    from src.coverage import attach_near_town
+    spots = [{"lat": 44.0, "lon": 2.0, "darkness": 0.9}]  # middle of France
+    communes = [
+        {"name": "Paris", "lat": 48.5, "lon": 2.0},       # ~500 km
+        {"name": "Lyon", "lat": 45.5, "lon": 4.5},         # ~200 km
+        {"name": "Marseille", "lat": 43.0, "lon": 5.0},    # ~250 km
+    ]
+    out = attach_near_town(spots, communes)
+    assert out[0]["near"] == ""
 
 
-def test_load_communes_raises_after_all_retries_exhausted(mock_region):
-    """3 failures with no success raises RuntimeError."""
-    from src.coverage import load_communes
-    import requests
-    from unittest.mock import MagicMock, patch
-
-    fail_resp = requests.ConnectionError("fail")
-    mock_get = MagicMock(side_effect=[fail_resp, fail_resp, fail_resp])
-
-    with patch("src.coverage.requests.get", mock_get), patch("src.coverage.time.sleep"):
-        with pytest.raises(RuntimeError, match="3 attempts"):
-            load_communes(mock_region)
-
-    assert mock_get.call_count == 3
+def test_attach_near_town_sets_near_when_within_range():
+    """Commune within 25 km → near is set."""
+    from src.coverage import attach_near_town
+    spots = [{"lat": 48.45, "lon": 2.05, "darkness": 0.9}]  # ~7 km from Paris center
+    communes = [
+        {"name": "Paris", "lat": 48.5, "lon": 2.0},
+    ]
+    out = attach_near_town(spots, communes)
+    assert out[0]["near"] == "Paris"

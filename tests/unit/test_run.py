@@ -23,7 +23,8 @@ def _make_args(tmp_path, **overrides):
     return parse_args(cmd)
 
 
-def test_run_returns_0_on_success(tmp_path, mock_region):
+@patch("run.load_places", return_value=[])
+def test_run_returns_0_on_success(mock_load_places, tmp_path, mock_region):
     """End-to-end happy path: synthetic input, mocked OSM, returns 0."""
     from run import run
     # Create the input file
@@ -45,8 +46,7 @@ def test_run_returns_0_on_success(tmp_path, mock_region):
     mock_response = MagicMock()
     mock_response.json.return_value = {"elements": []}
     mock_response.raise_for_status = MagicMock()
-    with patch("src.coverage.requests.get", return_value=mock_response), \
-         patch("src.enrich.requests.get", return_value=mock_response):
+    with patch("src.enrich.requests.get", return_value=mock_response):
         args = _make_args(tmp_path)
         rc = run(args)
     assert rc == 0
@@ -127,7 +127,7 @@ def test_run_calls_steps_in_order(tmp_path, mock_region):
         patch("run.alr_to_bortle", side_effect=tracker("alr_to_bortle", np.full((20, 20), 3, dtype=int))), \
         patch("run.mesh_minima", side_effect=tracker("mesh_minima", [])), \
         patch("run.redundancy_filter", side_effect=tracker("redundancy_filter", [])), \
-        patch("run.load_communes", side_effect=tracker("load_communes", [])), \
+        patch("run.load_places", side_effect=tracker("load_places", [])), \
         patch("run.ensure_coverage", side_effect=tracker("ensure_coverage", [])), \
         patch("run.attach_near_town", side_effect=tracker("attach_near_town", [])), \
         patch("run.enrich_all", side_effect=tracker("enrich_all", [])), \
@@ -137,7 +137,6 @@ def test_run_calls_steps_in_order(tmp_path, mock_region):
         patch("run.clone_data_repo"), \
         patch("run.copy_spots_to_repo", side_effect=tracker("copy_spots_to_repo", None)), \
         patch("run.commit_and_push", side_effect=tracker("commit_and_push", None)), \
-        patch("src.coverage.requests.get", return_value=mock_response), \
         patch("src.enrich.requests.get", return_value=mock_response):
         rc = run(args)
 
@@ -148,7 +147,7 @@ def test_run_calls_steps_in_order(tmp_path, mock_region):
         "alr_to_bortle",
         "mesh_minima",
         "redundancy_filter",
-        "load_communes",
+        "load_places",
         "ensure_coverage",
         "attach_near_town",
         "enrich_all",
@@ -160,7 +159,8 @@ def test_run_calls_steps_in_order(tmp_path, mock_region):
     ], f"Unexpected call order: {call_order}"
 
 
-def test_run_skips_step_7_when_no_push(tmp_path, mock_region):
+@patch("run.load_places", return_value=[])
+def test_run_skips_step_7_when_no_push(mock_load_places, tmp_path, mock_region):
     """With --no-push, git-related functions (clone, copy, commit) must NOT be called."""
     from run import run
     import numpy as np
@@ -190,7 +190,6 @@ def test_run_skips_step_7_when_no_push(tmp_path, mock_region):
         patch("run.clone_data_repo") as mock_clone, \
         patch("run.copy_spots_to_repo") as mock_copy, \
         patch("run.commit_and_push") as mock_commit, \
-        patch("src.coverage.requests.get", return_value=mock_response), \
         patch("src.enrich.requests.get", return_value=mock_response):
         rc = run(args)
 
@@ -205,7 +204,8 @@ def test_run_skips_step_7_when_no_push(tmp_path, mock_region):
     assert len(tile_files) > 0, "Expected tile files to be written even with --no-push"
 
 
-def test_orchestrator_attaches_bortle_before_redundancy_filter(tmp_path, mock_region):
+@patch("run.load_places", return_value=[])
+def test_orchestrator_attaches_bortle_before_redundancy_filter(mock_load_places, tmp_path, mock_region):
     """Regression test for the Step 2b bug: candidates must have bortle set
     before redundancy_filter is called. We patch mesh_minima to return
     candidates WITHOUT a bortle field, run through the orchestrator
@@ -255,8 +255,7 @@ def test_orchestrator_attaches_bortle_before_redundancy_filter(tmp_path, mock_re
     # would not affect the already-imported reference in run().
     with patch("run.mesh_minima", side_effect=mock_mesh_minima), \
          patch("run.redundancy_filter", side_effect=mock_filter), \
-         patch("src.coverage.requests.get", return_value=mock_response), \
-         patch("src.enrich.requests.get", return_value=mock_response):
+        patch("src.enrich.requests.get", return_value=mock_response):
         args = _make_args(tmp_path)
         run(args)
 

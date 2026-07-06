@@ -59,3 +59,33 @@ def test_nearest_commune_handles_missing_coords():
         {"name": "Valid", "lat": 44.0, "lon": 2.0},
     ]
     assert nearest_commune(spot, communes) == "Valid"
+
+
+def test_nearest_commune_returns_none_when_beyond_max_distance():
+    """max_distance_km=10 and closest commune is 111 km away → None."""
+    from src.utils import nearest_commune
+    spot = {"lat": 44.0, "lon": 2.0}
+    communes = [
+        {"name": "Far", "lat": 45.0, "lon": 3.0},   # ~111 km away
+    ]
+    assert nearest_commune(spot, communes, max_distance_km=10) is None
+
+
+def test_nearest_commune_returns_name_when_within_max_distance():
+    """max_distance_km=150 and closest commune is ~111 km away → name returned."""
+    from src.utils import nearest_commune
+    spot = {"lat": 44.0, "lon": 2.0}
+    communes = [
+        {"name": "Medium", "lat": 45.0, "lon": 3.0},  # ~111 km away
+    ]
+    assert nearest_commune(spot, communes, max_distance_km=150) == "Medium"
+
+
+def test_nearest_commune_default_max_distance_km_passes_through():
+    """No max_distance_km means the original behavior (return name even if far)."""
+    from src.utils import nearest_commune
+    spot = {"lat": 44.0, "lon": 2.0}
+    communes = [
+        {"name": "Far", "lat": 50.0, "lon": 5.0},
+    ]
+    assert nearest_commune(spot, communes) == "Far"

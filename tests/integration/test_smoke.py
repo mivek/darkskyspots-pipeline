@@ -54,19 +54,22 @@ def large_enough_geotiff(tmp_path: Path) -> Path:
     return path
 
 
+@pytest.fixture
+def test_communes() -> list[dict]:
+    """Return a minimal set of test communes for coverage/enrichment."""
+    return [
+        {"name": "TestVille", "lat": 48.5, "lon": 2.0, "population": 1000},
+    ]
+
+
 @patch("src.enrich.requests.get")
-@patch("src.coverage.requests.get")
 def test_smoke_end_to_end(
-    mock_coverage_get, mock_enrich_get, large_enough_geotiff, tmp_path, mock_region
+    mock_enrich_get, large_enough_geotiff, tmp_path, mock_region, test_communes
 ):
     """Run the full pipeline with synthetic data and verify output JSON(s)."""
     output_dir = str(tmp_path / "output")
 
-    # Mock OSM: return empty results
-    mock_coverage_get.return_value = MagicMock(
-        status_code=200,
-        json=lambda: {"elements": []},
-    )
+    # Mock OSM enrichment: return empty results
     mock_enrich_get.return_value = MagicMock(
         status_code=200,
         json=lambda: {"elements": []},
@@ -99,8 +102,8 @@ def test_smoke_end_to_end(
     filtered = redundancy_filter(points)
     assert len(filtered) <= len(points)
 
-    # Step 4 (coverage — no communes, so no-op)
-    covered = ensure_coverage(filtered, points, communes=[])
+    # Step 4 (coverage — use test communes)
+    covered = ensure_coverage(filtered, points, communes=test_communes)
 
     # Step 5 (enrichment — mocked, so name=None)
     enriched = enrich_all(covered, mock_region)
