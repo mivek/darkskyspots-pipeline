@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.2.0 (2026-07-06)
+
+### Features
+
+- **enrich**: Add coordinate-based spot IDs, strip row/col from output
+  ([`3685145`](https://github.com/mivek/darkskyspots-pipeline/commit/368514509b0e513a90d677e4def82d854462cbf2))
+
+
 ## v1.1.1 (2026-07-06)
 
 ### Bug Fixes
