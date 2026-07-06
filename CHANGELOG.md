@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.1.0 (2026-07-06)
+
+### Features
+
+- **enrich**: Replace per-spot Overpass queries with single batched fetch
+  ([`e75930a`](https://github.com/mivek/darkskyspots-pipeline/commit/e75930ab6e277fcc2797b13f39122ed6cc042652))
+
+
 ## v1.0.1 (2026-07-03)
 
 ### Bug Fixes
