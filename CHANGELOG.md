@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.1.1 (2026-07-06)
+
+### Bug Fixes
+
+- **coverage**: Replace Overpass load_communes with GeoNames load_places
+  ([`e142d55`](https://github.com/mivek/darkskyspots-pipeline/commit/e142d556620eee197e63608fb8182f8bf086ed82))
+
+
 ## v1.1.0 (2026-07-06)
 
 ### Features
