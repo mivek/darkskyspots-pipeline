@@ -10,7 +10,7 @@ from src.alr import compute_alr
 from src.config import MESH_KM
 from src.convert import alr_to_bortle, alr_to_darkness
 from src.coverage import ensure_coverage
-from src.enrich import enrich_all, spot_id
+from src.enrich import enrich_all
 from src.extract import mesh_minima, redundancy_filter
 from src.tile_export import (
     classify_spots_into_tiles,
@@ -62,6 +62,23 @@ def test_communes() -> list[dict]:
     ]
 
 
+@patch("src.enrich._fetch_places")
+def test_enrich_all_produces_ids(mock_fetch, mock_region):
+    """enrich_all assigns id to every spot; no row/col remain; no duplicate IDs."""
+    spots = [
+        {"lat": 48.5, "lon": 2.0, "darkness": 0.9, "bortle": 3, "row": 10, "col": 15},
+        {"lat": 45.5, "lon": 4.0, "darkness": 0.7, "bortle": 4, "row": 20, "col": 25},
+    ]
+    mock_fetch.return_value = []
+    out = enrich_all(spots, mock_region)
+    for s in out:
+        assert isinstance(s["id"], str) and len(s["id"]) > 0
+        assert "row" not in s
+        assert "col" not in s
+    ids = [s["id"] for s in out]
+    assert len(set(ids)) == len(ids), "Duplicate IDs found"
+
+
 @patch("src.enrich.requests.get")
 def test_smoke_end_to_end(
     mock_enrich_get, large_enough_geotiff, tmp_path, mock_region, test_communes
@@ -107,15 +124,6 @@ def test_smoke_end_to_end(
 
     # Step 5 (enrichment — mocked, so name=None)
     enriched = enrich_all(covered, mock_region)
-
-    # Add spot IDs
-    for s in enriched:
-        s["id"] = spot_id(
-            s["lat"],
-            s["lon"],
-            mock_region["osm_country_code"].lower(),
-            s.get("name"),
-        )
 
     # Step 6 (tile export + empty tiles)
     tiles = classify_spots_into_tiles(enriched)
