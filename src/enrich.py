@@ -1,5 +1,4 @@
 """Step 5: OSM place lookup, near-town (preserved), altitude stub, spot ID generation."""
-import re
 import time
 
 import requests
@@ -75,14 +74,19 @@ def _nearest_place(spot: dict, places: list[dict], max_radius_km: float = PLACE_
 
 def enrich_spot(spot: dict, places: list[dict], max_radius_km: float = PLACE_SEARCH_RADIUS_KM) -> dict:
     """
-    Enrich a single spot with the nearest place name, preserve near, set altitude.
+    Enrich a single spot: add id, nearest place name, preserve near, set altitude.
+    Strips transient row/col fields before returning.
 
-    Returns the spot dict augmented with name, near, altitude (or None).
+    Returns the spot dict augmented with id, name, near, altitude (or None).
     """
     enriched = dict(spot)
+    enriched["id"] = spot_id(enriched["lat"], enriched["lon"])
     enriched["name"] = _nearest_place(spot, places, max_radius_km)
     enriched["near"] = spot.get("near")
     enriched["altitude"] = None
+    # Strip transient grid indices (used up to Step 2, not part of output contract)
+    enriched.pop("row", None)
+    enriched.pop("col", None)
     return enriched
 
 
@@ -92,38 +96,13 @@ def enrich_all(spots: list[dict], region: dict) -> list[dict]:
     return [enrich_spot(s, places, PLACE_SEARCH_RADIUS_KM) for s in spots]
 
 
-def _slugify(name: str) -> str:
-    """Lowercase, replace spaces with hyphens, remove non-alphanumeric except hyphens."""
-    s = name.lower().replace(" ", "-")
-    s = re.sub(r"[^a-z0-9-]", "", s)
-    s = re.sub(r"-+", "-", s).strip("-")
-    return s
-
-
-def spot_id(
-    lat: float,
-    lon: float,
-    region_code: str,
-    name: str | None = None,
-    dept: int | None = None,
-) -> str:
+def spot_id(lat: float, lon: float) -> str:
     """
-    Generate a unique, human-readable spot ID.
+    Generate a unique, deterministic spot ID from coordinates.
 
-    Format: {region_code}-{dept:02d}-{slug}
-    Where slug is the sanitized place name, or "{abs(lat_int):02d}_{abs(lon_int):03d}" fallback.
+    Format: "lat_lon" with 4 decimal places.
+    Normalizes -0.0 to 0.0 via adding 0.0 to avoid "-0.0000".
 
-    Spot ID scheme: <iso2>-<dept_or_admin>-<slug>
-    - For French regions: dept is the 2-digit department code (e.g. 09 for Ariège).
-    - For non-French regions, pass dept=None; the default "00" is used. The
-      caller is responsible for adding a more specific admin code if needed.
-    - For unnamed spots, the slug falls back to "{abs(int(lat)):02d}_{abs(int(lon)):03d}".
-
-    Idempotent: same inputs -> same output.
+    Idempotent: same (lat, lon) -> same output.
     """
-    dept_str = f"{dept:02d}" if dept is not None else "00"
-    if name:
-        slug = _slugify(name)
-        if slug:
-            return f"{region_code}-{dept_str}-{slug}"
-    return f"{region_code}-{dept_str}-{abs(int(lat)):02d}_{abs(int(lon)):03d}"
+    return f"{lat + 0.0:.4f}_{lon + 0.0:.4f}"
