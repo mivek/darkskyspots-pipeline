@@ -12,6 +12,8 @@ import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
+import rasterio
+
 from src.cli import parse_args
 from src.config import (
     COVERAGE_RADIUS_KM,
@@ -70,6 +72,24 @@ def run(args) -> int:
         logger.info("Step 1: ALR -> darkness / Bortle")
         darkness = alr_to_darkness(alr_data)
         bortle = alr_to_bortle(alr_data)
+
+        if getattr(args, "debug_raster", False):
+            darkness_path = output_dir / f"debug_darkness_{args.region}_{args.year}.tif"
+            bortle_path = output_dir / f"debug_bortle_{args.region}_{args.year}.tif"
+            profile = {
+                "driver": "GTiff",
+                "height": darkness.shape[0],
+                "width": darkness.shape[1],
+                "count": 1,
+                "dtype": "float32",
+                "crs": crs,
+                "transform": transform,
+            }
+            with rasterio.open(darkness_path, "w", **profile) as dst:
+                dst.write(darkness.astype("float32"), 1)
+            with rasterio.open(bortle_path, "w", **profile) as dst:
+                dst.write(bortle.astype("float32"), 1)
+            logger.info("Debug rasters written to %s", output_dir)
 
         # Step 2: Mesh scan (local minima per cell)
         logger.info("Step 2: Mesh scan (local minima)")
