@@ -1,6 +1,6 @@
 [project]
 name = "darkskyspots-pipeline"
-version = "1.2.0"
+version = "1.2.1"
 description = "VIIRS radiance → per-tile dark-sky spot JSON pipeline"
 requires-python = ">=3.10"
 readme = "README.md"

@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.2.1 (2026-07-08)
+
+### Bug Fixes
+
+- **enrich**: Remove Overpass API calls from step 5, drop name field
+  ([`ac7e67e`](https://github.com/mivek/darkskyspots-pipeline/commit/ac7e67ef39fe089d6811908ae82f82deca6f54a3))
+
+
 ## v1.2.0 (2026-07-06)
 
 ### Features
