@@ -7,10 +7,6 @@ REDUNDANCY_KM = 15
 MIN_SPOTS_PER_AREA = 4
 COVERAGE_RADIUS_KM = 100
 
-# Enrichment — OSM place lookup
-PLACE_SEARCH_RADIUS_KM = 10
-PLACE_QUERY_TIMEOUT = 30
-
 # Coverage — max distance for nearest commune/place attachment
 MAX_NEAR_DISTANCE_KM = 25
 

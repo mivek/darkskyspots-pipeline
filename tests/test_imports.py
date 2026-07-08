@@ -7,7 +7,6 @@ def test_all_deps_importable():
     import rasterio
     import shapely
     import yaml
-    import requests
 
 
 def test_nightskyquality_importable():
