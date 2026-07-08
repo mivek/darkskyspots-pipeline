@@ -42,10 +42,34 @@ def test_parser_defaults():
     assert args.data_repo_url == "git@x"
     assert args.data_repo_branch == "main"
     assert args.no_push is False
+    assert args.debug_raster is False
     assert args.input_dir == "./input"
     assert args.output_dir == "./output"
     assert args.budget_mb == 500.0
     assert args.verbose is False
+
+
+def test_parser_debug_raster_default():
+    """Without --debug-raster, debug_raster is False."""
+    from src.cli import parse_args
+    args = parse_args(
+        ["--year", "2025", "--region", "france", "--data-repo-url", "git@x"]
+    )
+    assert args.debug_raster is False
+
+
+def test_parser_debug_raster_enabled():
+    """With --debug-raster, debug_raster is True."""
+    from src.cli import parse_args
+    args = parse_args(
+        [
+            "--year", "2025",
+            "--region", "france",
+            "--data-repo-url", "git@x",
+            "--debug-raster",
+        ]
+    )
+    assert args.debug_raster is True
 
 
 def test_parser_no_push():

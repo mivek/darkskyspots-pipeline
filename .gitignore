@@ -16,6 +16,10 @@ htmlcov/
 build/
 dist/
 
+# Debug rasters (large, regenerated each run, never versioned)
+debug_darkness_*.tif
+debug_bortle_*.tif
+
 # Pipeline inputs/outputs (large, regenerated each run, never versioned)
 # The /input dir holds the VIIRS GeoTIFFs and OSM extracts (large, ephemeral).
 # The /spots dir is the local staging area for step 7 to push to the data repo.

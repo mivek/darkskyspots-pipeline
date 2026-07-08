@@ -12,6 +12,7 @@ def create_parser() -> argparse.ArgumentParser:
     parser.add_argument("--data-repo-url", type=str, required=False, help="SSH URL of the data repo")
     parser.add_argument("--data-repo-branch", type=str, default="main", help="Data repo branch")
     parser.add_argument("--no-push", action="store_true", help="Skip step 7 (publish)")
+    parser.add_argument("--debug-raster", action="store_true", help="Sauvegarde les rasters intermédiaires darkness et bortle en GeoTIFF dans le dossier de sortie")
     parser.add_argument("--input-dir", type=str, default="./input", help="Directory with input GeoTIFFs")
     parser.add_argument("--output-dir", type=str, default="./output", help="Directory for output JSONs")
     parser.add_argument("--budget-mb", type=float, default=500.0, help="RAM budget for input loading (MB)")
