@@ -159,8 +159,7 @@ def attach_near_town(spots: list[dict], communes: list[dict]) -> list[dict]:
     (or ``""`` if the closest commune is farther than ``MAX_NEAR_DISTANCE_KM``).
 
     Defensive: if a spot already has a non-None `near` value, it is preserved
-    (this lets `enrich.py` keep an OSM-derived "near" if it ever sets one,
-    and it makes the function safe to call twice in a pipeline).
+    (this makes the function safe to call twice in a pipeline).
     """
     for spot in spots:
         if spot.get("near") is not None:

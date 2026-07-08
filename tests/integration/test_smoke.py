@@ -1,7 +1,6 @@
 """Full pipeline smoke test with synthetic data (Phase 12, Task 12.1)."""
 import json
 from pathlib import Path
-from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest
@@ -62,15 +61,13 @@ def test_communes() -> list[dict]:
     ]
 
 
-@patch("src.enrich._fetch_places")
-def test_enrich_all_produces_ids(mock_fetch, mock_region):
+def test_enrich_all_produces_ids():
     """enrich_all assigns id to every spot; no row/col remain; no duplicate IDs."""
     spots = [
         {"lat": 48.5, "lon": 2.0, "darkness": 0.9, "bortle": 3, "row": 10, "col": 15},
         {"lat": 45.5, "lon": 4.0, "darkness": 0.7, "bortle": 4, "row": 20, "col": 25},
     ]
-    mock_fetch.return_value = []
-    out = enrich_all(spots, mock_region)
+    out = enrich_all(spots)
     for s in out:
         assert isinstance(s["id"], str) and len(s["id"]) > 0
         assert "row" not in s
@@ -79,18 +76,11 @@ def test_enrich_all_produces_ids(mock_fetch, mock_region):
     assert len(set(ids)) == len(ids), "Duplicate IDs found"
 
 
-@patch("src.enrich.requests.get")
 def test_smoke_end_to_end(
-    mock_enrich_get, large_enough_geotiff, tmp_path, mock_region, test_communes
+    large_enough_geotiff, tmp_path, mock_region, test_communes
 ):
     """Run the full pipeline with synthetic data and verify output JSON(s)."""
     output_dir = str(tmp_path / "output")
-
-    # Mock OSM enrichment: return empty results
-    mock_enrich_get.return_value = MagicMock(
-        status_code=200,
-        json=lambda: {"elements": []},
-    )
 
     # Step 0
     alr_result = compute_alr(
@@ -122,8 +112,8 @@ def test_smoke_end_to_end(
     # Step 4 (coverage — use test communes)
     covered = ensure_coverage(filtered, points, communes=test_communes)
 
-    # Step 5 (enrichment — mocked, so name=None)
-    enriched = enrich_all(covered, mock_region)
+    # Step 5 (enrichment — local only, id/near/altitude)
+    enriched = enrich_all(covered)
 
     # Step 6 (tile export + empty tiles)
     tiles = classify_spots_into_tiles(enriched)

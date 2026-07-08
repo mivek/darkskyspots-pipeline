@@ -42,13 +42,8 @@ def test_run_returns_0_on_success(mock_load_places, tmp_path, mock_region):
     with rasterio.open(input_path, "w", **profile) as dst:
         dst.write(data, 1)
 
-    # Mock OSM endpoints so we don't hit the network
-    mock_response = MagicMock()
-    mock_response.json.return_value = {"elements": []}
-    mock_response.raise_for_status = MagicMock()
-    with patch("src.enrich.requests.get", return_value=mock_response):
-        args = _make_args(tmp_path)
-        rc = run(args)
+    args = _make_args(tmp_path)
+    rc = run(args)
     assert rc == 0
 
 
@@ -108,13 +103,6 @@ def test_run_calls_steps_in_order(tmp_path, mock_region):
 
     args = _make_args(tmp_path, no_push=False)
 
-    # Mock OSM endpoints (defensive — the mocked step functions below
-    # replace the real implementations, but some real functions from
-    # coverage/enrich might still resolve their imports internally).
-    mock_response = MagicMock()
-    mock_response.json.return_value = {"elements": []}
-    mock_response.raise_for_status = MagicMock()
-
     # Return value for slice_and_compute
     mock_slice_result = MagicMock()
     mock_slice_result.data = np.full((20, 20), 1.0, dtype=np.float64)
@@ -136,8 +124,7 @@ def test_run_calls_steps_in_order(tmp_path, mock_region):
         patch("run.write_tile_file", side_effect=tracker("write_tile_file", "/tmp/dummy.json")), \
         patch("run.clone_data_repo"), \
         patch("run.copy_spots_to_repo", side_effect=tracker("copy_spots_to_repo", None)), \
-        patch("run.commit_and_push", side_effect=tracker("commit_and_push", None)), \
-        patch("src.enrich.requests.get", return_value=mock_response):
+        patch("run.commit_and_push", side_effect=tracker("commit_and_push", None)):
         rc = run(args)
 
     assert rc == 0, f"run() returned {rc}, expected 0"
@@ -180,17 +167,12 @@ def test_run_skips_step_7_when_no_push(mock_load_places, tmp_path, mock_region):
     with rasterio.open(input_path, "w", **profile) as dst:
         dst.write(data, 1)
 
-    mock_response = MagicMock()
-    mock_response.json.return_value = {"elements": []}
-    mock_response.raise_for_status = MagicMock()
-
     args = _make_args(tmp_path)  # default: --no-push is set
 
     with \
         patch("run.clone_data_repo") as mock_clone, \
         patch("run.copy_spots_to_repo") as mock_copy, \
-        patch("run.commit_and_push") as mock_commit, \
-        patch("src.enrich.requests.get", return_value=mock_response):
+        patch("run.commit_and_push") as mock_commit:
         rc = run(args)
 
     assert rc == 0, f"run() returned {rc}, expected 0"
@@ -245,17 +227,12 @@ def test_orchestrator_attaches_bortle_before_redundancy_filter(mock_load_places,
         # Don't actually filter, just return them
         return candidates
 
-    mock_response = MagicMock()
-    mock_response.json.return_value = {"elements": []}
-    mock_response.raise_for_status = MagicMock()
-
     # NOTE: patch run.mesh_minima / run.redundancy_filter, not src.extract.*,
     # because run.py does ``from src.extract import mesh_minima`` at module
     # level, binding a local reference. Patching ``src.extract.mesh_minima``
     # would not affect the already-imported reference in run().
     with patch("run.mesh_minima", side_effect=mock_mesh_minima), \
-         patch("run.redundancy_filter", side_effect=mock_filter), \
-        patch("src.enrich.requests.get", return_value=mock_response):
+         patch("run.redundancy_filter", side_effect=mock_filter):
         args = _make_args(tmp_path)
         run(args)
 

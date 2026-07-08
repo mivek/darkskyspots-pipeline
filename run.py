@@ -100,14 +100,13 @@ def run(args) -> int:
         )
         logger.info("  After coverage guarantee: %d spots", len(covered))
 
-        # Step 4b: Attach the nearest commune name as the "near" field (fallback
-        # display for spots that have no OSM name).
+        # Step 4b: Attach the nearest commune name as the "near" field.
         covered = attach_near_town(covered, communes)
         logger.info("  Attached nearest commune to %d spots", len(covered))
 
-        # Step 5: Enrichment (name, near, altitude)
-        logger.info("Step 5: Enrichment (name, near, altitude)")
-        enriched = enrich_all(covered, region)
+        # Step 5: Enrichment (id, near, altitude)
+        logger.info("Step 5: Enrichment (id, near, altitude)")
+        enriched = enrich_all(covered)
         logger.info("  Enriched %d spots", len(enriched))
 
         # Step 6: Tile export + version
