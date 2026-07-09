@@ -18,7 +18,20 @@ BORTLE_MAX = 9
 # ALR — fork defaults
 ALR_ALPHA_BASE = 2.3
 ALR_ALPHA_EXP = 0.28
-ALR_CALIB_C = 1.0 / 562.72
+# ALR calibration constant.
+# Divides the summed ring-weighted radiance to yield ALR (All-sky Light
+# pollution Ratio). The upstream/US default was 1/562.72 (Duriscoe et al.,
+# calibrated on south-west US skies).
+#
+# Europe calibration (2026-07): the US default over-estimated Bortle by ~1
+# class across the rural-to-urban range on European skies. Recalibrated to
+# 1/1125.44 (US value x2) against 4 lightpollutionmap.info control points in
+# the Massif Central, which brought the mean Bortle delta from +1.25 to +0.25.
+# Three of four points became exact; only a dense-urban point retains +1
+# (acceptable: the app targets dark/rural skies, and the residual is on the
+# conservative side — the pipeline slightly over-estimates urban pollution).
+# Control points and expected values are recorded in validation/checkpoints.json.
+ALR_CALIB_C = 1.0 / 1125.44
 ALR_RINGS = 38
 ALR_MAX_KM = 300
 ALR_NOISE_FLOOR = 0.5
