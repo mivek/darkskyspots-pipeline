@@ -2,6 +2,17 @@
 
 <!-- version list -->
 
+## v1.3.0 (2026-07-09)
+
+### Features
+
+- Update calibration for Europe
+  ([`160a468`](https://github.com/mivek/darkskyspots-pipeline/commit/160a468cd150f5e5bf547e4e484cbbf79797f6c2))
+
+- **cli**: Add --debug-raster option to save intermediate darkness/bortle GeoTIFFs
+  ([`34bd416`](https://github.com/mivek/darkskyspots-pipeline/commit/34bd4161a6e89298acb15aa0a1b5cecf96c48891))
+
+
 ## v1.2.1 (2026-07-08)
 
 ### Bug Fixes
