@@ -167,3 +167,16 @@ def attach_near_town(spots: list[dict], communes: list[dict]) -> list[dict]:
         near = nearest_commune(spot, communes, max_distance_km=MAX_NEAR_DISTANCE_KM)
         spot["near"] = near if near is not None else ""
     return spots
+
+
+def filter_sea_spots(spots: list[dict]) -> list[dict]:
+    """
+    Retain only spots whose ``near`` field is non-empty after stripping whitespace.
+
+    This is a Western-Europe proxy for filtering out sea spots based on the
+    25 km GeoNames commune radius. When expanding beyond Western Europe,
+    replace with a Natural Earth coastline land/sea mask.
+
+    Returns a new list without mutating the input.
+    """
+    return [s for s in spots if (s.get("near") or "").strip()]
