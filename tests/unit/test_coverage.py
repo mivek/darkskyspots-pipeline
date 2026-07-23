@@ -191,6 +191,32 @@ def test_attach_near_town_leaves_empty_when_too_far():
     assert out[0]["near"] == ""
 
 
+def test_filter_sea_spots_removes_basque_coast_sea_spot():
+    """Sea spot with empty near is removed; inland Bayonne-area spot is retained."""
+    from src.coverage import filter_sea_spots
+    spots = [
+        {"id": 1, "lat": 43.5, "lon": -1.8, "near": "", "darkness": 0.3, "bortle": 4, "altitude": 0},
+        {"id": 2, "lat": 43.4, "lon": -1.5, "near": "Bayonne", "darkness": 0.7, "bortle": 3, "altitude": 50},
+    ]
+    result = filter_sea_spots(spots)
+    assert len(result) == 1
+    assert result[0]["near"] == "Bayonne"
+
+
+def test_filter_sea_spots_removes_empty_and_whitespace_near():
+    """Empty, None, and whitespace-only near values are filtered out; non-empty values retained."""
+    from src.coverage import filter_sea_spots
+    spots = [
+        {"id": 1, "lat": 43.5, "lon": -1.8, "near": "", "darkness": 0.3, "bortle": 4, "altitude": 0},
+        {"id": 2, "lat": 43.7, "lon": -2.0, "near": None, "darkness": 0.4, "bortle": 3, "altitude": 5},
+        {"id": 3, "lat": 43.6, "lon": -1.9, "near": "   ", "darkness": 0.5, "bortle": 4, "altitude": 10},
+        {"id": 4, "lat": 43.4, "lon": -1.5, "near": "Bayonne", "darkness": 0.7, "bortle": 3, "altitude": 50},
+    ]
+    result = filter_sea_spots(spots)
+    assert len(result) == 1
+    assert result[0]["near"] == "Bayonne"
+
+
 def test_attach_near_town_sets_near_when_within_range():
     """Commune within 25 km → near is set."""
     from src.coverage import attach_near_town

@@ -22,7 +22,7 @@ from src.config import (
     REDUNDANCY_KM,
     TILE_SIZE_DEG,
 )
-from src.coverage import attach_near_town, ensure_coverage, load_places
+from src.coverage import attach_near_town, ensure_coverage, filter_sea_spots, load_places
 from src.enrich import enrich_all
 from src.extract import mesh_minima, redundancy_filter
 from src.alr import slice_and_compute
@@ -128,6 +128,13 @@ def run(args) -> int:
         logger.info("Step 5: Enrichment (id, near, altitude)")
         enriched = enrich_all(covered)
         logger.info("  Enriched %d spots", len(enriched))
+
+        # Step 5b: Filter out sea spots (no nearby commune).
+        # Limitation: this is a Western-Europe proxy based on the 25 km GeoNames
+        # commune radius. When expanding beyond Western Europe, replace with a
+        # Natural Earth coastline land/sea mask.
+        enriched = filter_sea_spots(enriched)
+        logger.info("  After sea-spot filter: %d spots", len(enriched))
 
         # Step 6: Tile export + version
         logger.info("Step 6: Tile export")

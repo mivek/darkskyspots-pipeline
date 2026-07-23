@@ -119,6 +119,7 @@ def test_run_calls_steps_in_order(tmp_path, mock_region):
         patch("run.ensure_coverage", side_effect=tracker("ensure_coverage", [])), \
         patch("run.attach_near_town", side_effect=tracker("attach_near_town", [])), \
         patch("run.enrich_all", side_effect=tracker("enrich_all", [])), \
+        patch("run.filter_sea_spots", side_effect=tracker("filter_sea_spots", [])), \
         patch("run.classify_spots_into_tiles", side_effect=tracker("classify_spots_into_tiles", {})), \
         patch("run.compute_new_version", side_effect=tracker("compute_new_version", ("2025.1", True))), \
         patch("run.write_tile_file", side_effect=tracker("write_tile_file", "/tmp/dummy.json")), \
@@ -138,6 +139,7 @@ def test_run_calls_steps_in_order(tmp_path, mock_region):
         "ensure_coverage",
         "attach_near_town",
         "enrich_all",
+        "filter_sea_spots",
         "classify_spots_into_tiles",
         "compute_new_version",
         "write_tile_file",
@@ -184,6 +186,54 @@ def test_run_skips_step_7_when_no_push(mock_load_places, tmp_path, mock_region):
     spots_dir = tmp_path / "output" / "spots"
     tile_files = list(spots_dir.glob("*.json"))
     assert len(tile_files) > 0, "Expected tile files to be written even with --no-push"
+
+
+def test_run_filters_unassigned_spots_before_tile_classification(tmp_path, mock_region):
+    """Verify that filter_sea_spots removes empty-near spots before they reach
+    classify_spots_into_tiles."""
+    from run import run
+    import numpy as np
+    import rasterio
+    from rasterio.transform import from_bounds
+
+    input_dir = tmp_path / "input" / "france"
+    input_dir.mkdir(parents=True)
+    data = np.full((20, 20), 1.0, dtype=np.float64)
+    transform = from_bounds(-5, 41, 10, 51, 20, 20)
+    profile = {
+        "driver": "GTiff", "height": 20, "width": 20, "count": 1,
+        "dtype": "float64", "crs": "EPSG:4326", "transform": transform,
+    }
+    input_path = input_dir / "2025.tif"
+    with rasterio.open(input_path, "w", **profile) as dst:
+        dst.write(data, 1)
+
+    sea_spot = {"lat": 43.5, "lon": -1.8, "near": "", "bortle": 4, "darkness": 0.5, "id": "S1", "altitude": None}
+    inland_spot = {"lat": 43.4, "lon": -1.5, "near": "Bayonne", "bortle": 3, "darkness": 0.8, "id": "S2", "altitude": None}
+
+    captured_input = None
+
+    def capture_classify_input(spots, *args, **kwargs):
+        nonlocal captured_input
+        captured_input = list(spots)
+        return {}
+
+    args = _make_args(tmp_path)
+    with \
+        patch("run.enrich_all", return_value=[sea_spot, inland_spot]), \
+        patch("run.classify_spots_into_tiles", side_effect=capture_classify_input), \
+        patch("run.compute_new_version", return_value=("2025.1", True)), \
+        patch("run.write_tile_file"), \
+        patch("run.clone_data_repo"), \
+        patch("run.copy_spots_to_repo"), \
+        patch("run.commit_and_push"):
+        rc = run(args)
+
+    assert rc == 0, f"run() returned {rc}, expected 0"
+    assert captured_input is not None, "classify_spots_into_tiles was never called"
+    # Only the Bayonne spot should reach tile classification
+    assert len(captured_input) == 1, f"Expected 1 spot, got {len(captured_input)}: {captured_input}"
+    assert captured_input[0]["near"] == "Bayonne"
 
 
 @patch("run.load_places", return_value=[])
