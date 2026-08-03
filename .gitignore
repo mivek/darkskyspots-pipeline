@@ -51,3 +51,4 @@ session-*.md
 # Secrets (if any local-only credentials are ever staged)
 .env
 .env.local
+.worktrees/
