@@ -1,7 +1,10 @@
 """Tests for src/publish.py (git operations + version management)."""
 import json
+import logging
 from pathlib import Path
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 
 def test_bump_version_changed():
@@ -80,25 +83,127 @@ def test_clone_data_repo_calls_git():
     assert "/tmp/clone" in args
 
 
-def test_copy_spots_to_repo(tmp_path):
-    """Create source with 2 files, dest with 1 stale file; verify copy + purge."""
+def test_copy_spots_to_repo_only_replaces_owned_tiles(tmp_path, caplog):
+    """Owned tiles are copied/purged while unowned tiles remain byte-for-byte."""
+    caplog.set_level(logging.INFO, logger="src.publish")
     from src.publish import copy_spots_to_repo
     src = tmp_path / "src_spots"
     src.mkdir()
-    (src / "a.json").write_text("{}", encoding="utf-8")
-    (src / "b.json").write_text("{}", encoding="utf-8")
+    (src / "N001E001.json").write_bytes(b"{\"tile\":\"N001E001\",\"spots\":[]}")
+    (src / "N999E999.json").write_bytes(b"must-not-copy")
     dst = tmp_path / "dst_repo"
     (dst / "spots").mkdir(parents=True)
-    (dst / "spots" / "stale.json").write_text("{}", encoding="utf-8")
-    (dst / "spots" / "a.json").write_text("{}", encoding="utf-8")
+    (dst / "spots" / "N001E001.json").write_bytes(b"old-owned")
+    (dst / "spots" / "N001E002.json").write_bytes(b"stale-owned")
+    unowned = dst / "spots" / "N999E999.json"
+    unowned.write_bytes(b"preserve-this-exactly")
 
-    copy_spots_to_repo(str(src), str(dst))
+    copy_spots_to_repo(str(src), str(dst), {"N001E001", "N001E002"})
 
     spots_dst = dst / "spots"
-    names = {p.name for p in spots_dst.iterdir()}
-    assert "a.json" in names
-    assert "b.json" in names
-    assert "stale.json" not in names
+    assert (spots_dst / "N001E001.json").read_bytes() == b"{\"tile\":\"N001E001\",\"spots\":[]}"
+    assert not (spots_dst / "N001E002.json").exists()
+    assert unowned.read_bytes() == b"preserve-this-exactly"
+    assert not (spots_dst / "N999E999.json").read_bytes() == b"must-not-copy"
+    assert "Purged 1 stale owned tile" in caplog.text
+
+
+def _write_envelope(path, tile_id, spots):
+    path.write_text(
+        json.dumps({"version": "2026.1", "tile": tile_id, "spots": spots}),
+        encoding="utf-8",
+    )
+
+
+def test_scan_orphan_tiles_reports_sorted_counts_without_mutating(tmp_path):
+    from src.publish import scan_orphan_tiles
+    spots = tmp_path / "spots"
+    spots.mkdir()
+    _write_envelope(spots / "N051E001.json", "N051E001", [{"id": "a"}, {"id": "b"}])
+    _write_envelope(spots / "N051E000.json", "N051E000", [])
+    _write_envelope(spots / "N048E002.json", "N048E002", [{"id": "owned"}])
+    (spots / "README.txt").write_text("keep", encoding="utf-8")
+    before = (spots / "N051E000.json").read_bytes()
+    regions = {"france": {"bbox": [-6, 41, 8, 51]}}
+
+    assert scan_orphan_tiles(spots, regions) == {"N051E000": 0, "N051E001": 2}
+    assert (spots / "N051E000.json").read_bytes() == before
+
+
+def test_scan_orphan_tiles_names_invalid_envelope_file(tmp_path):
+    from src.publish import scan_orphan_tiles
+
+    spots = tmp_path / "spots"
+    spots.mkdir()
+    (spots / "N051E000.json").write_text(
+        json.dumps({"tile": "N051E000"}), encoding="utf-8"
+    )
+
+    with pytest.raises(ValueError, match=r"N051E000\.json.*spots"):
+        scan_orphan_tiles(spots, {"france": {"bbox": [-6, 41, 8, 51]}})
+
+
+def test_prune_orphan_tiles_removes_only_orphans_and_returns_sorted_counts(tmp_path):
+    from src.publish import prune_orphan_tiles
+    spots = tmp_path / "spots"
+    spots.mkdir()
+    _write_envelope(spots / "N051E001.json", "N051E001", [{"id": "a"}, {"id": "b"}])
+    _write_envelope(spots / "N051E000.json", "N051E000", [])
+    _write_envelope(spots / "N048E002.json", "N048E002", [])
+    (spots / "README.txt").write_bytes(b"keep")
+    regions = {"france": {"bbox": [-6, 41, 8, 51]}}
+
+    assert prune_orphan_tiles(spots, regions) == {"N051E000": 0, "N051E001": 2}
+    assert (spots / "N048E002.json").exists()
+    assert not (spots / "N051E000.json").exists()
+    assert not (spots / "N051E001.json").exists()
+    assert (spots / "README.txt").read_bytes() == b"keep"
+
+
+def test_compute_new_version_compares_merged_envelopes():
+    """Unowned envelopes are retained before comparing the complete dataset."""
+    from src.publish import compute_new_version
+    old_unowned = {"version": "2026.1", "spots": [{"id": "unowned"}]}
+    old_owned = {"version": "2026.1", "spots": [{"id": "owned"}]}
+    new_owned = {"version": "2026.1", "spots": [{"id": "owned"}, {"id": "new"}]}
+
+    assert compute_new_version(
+        {"N001E001": old_owned, "N999E999": old_unowned},
+        {"N001E001": new_owned, "N999E999": old_unowned},
+        2026,
+    ) == ("2026.2", True)
+
+
+def test_compute_new_version_stays_monotone_across_double_digit_minor_versions():
+    """Preserved regional envelopes cannot make 2025.11 regress to 2025.10."""
+    from src.publish import compute_new_version
+
+    preserved_2025_9 = {"version": "2025.9", "spots": [{"id": "preserved-a"}]}
+    preserved_2025_10 = {
+        "version": "2025.10",
+        "spots": [{"id": "preserved-b"}],
+    }
+    old_owned = {"version": "2025.9", "spots": [{"id": "owned"}]}
+    new_owned = {
+        "version": "2025.9",
+        "spots": [{"id": "owned"}, {"id": "new"}],
+    }
+
+    result = compute_new_version(
+        {
+            "N041W006": old_owned,
+            "N042W006": preserved_2025_9,
+            "N043W006": preserved_2025_10,
+        },
+        {
+            "N041W006": new_owned,
+            "N042W006": preserved_2025_9,
+            "N043W006": preserved_2025_10,
+        },
+        2025,
+    )
+
+    assert result == ("2025.11", True)
 
 
 def test_commit_and_push_calls_git():

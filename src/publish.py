@@ -1,9 +1,15 @@
 """Step 7: git operations and version management."""
 import json
+import logging
 import re
 import shutil
+from collections.abc import Collection
 import subprocess
 from pathlib import Path
+
+from .regions import owner_for_tile
+
+logger = logging.getLogger(__name__)
 
 VERSION_PATTERN = re.compile(r'"version":\s*"(\d{4})\.(\d+)"')
 
@@ -19,22 +25,57 @@ def clone_data_repo(url: str, branch: str, target_dir: str) -> str:
     return target_dir
 
 
-def copy_spots_to_repo(local_spots_dir: str, data_repo_dir: str) -> None:
-    """
-    Copy all JSON files from local_spots_dir to {data_repo_dir}/spots/.
-    Removes existing files in the target that are not in source (purge stale tiles).
-    """
+def copy_spots_to_repo(
+    local_spots_dir: str, data_repo_dir: str, owned_tile_ids: Collection[str]
+) -> None:
+    """Replace only owned tile JSONs, purging stale owned tiles."""
     src = Path(local_spots_dir)
     dst = Path(data_repo_dir) / "spots"
     dst.mkdir(parents=True, exist_ok=True)
+    owned_names = {f"{tile_id}.json" for tile_id in owned_tile_ids}
+    src_files = {f.name: f for f in src.glob("*.json") if f.name in owned_names}
 
-    dst_files = set(f.name for f in dst.glob("*.json"))
-    src_files = set(f.name for f in src.glob("*.json"))
-    for stale in dst_files - src_files:
-        (dst / stale).unlink(missing_ok=True)
+    stale_names = sorted(owned_names - src_files.keys())
+    for stale_name in stale_names:
+        (dst / stale_name).unlink(missing_ok=True)
+    logger.info("Purged %d stale owned tile(s)", len(stale_names))
+    for name, source in src_files.items():
+        shutil.copy2(str(source), str(dst / name))
 
-    for f in src.glob("*.json"):
-        shutil.copy2(str(f), str(dst / f.name))
+
+def scan_orphan_tiles(
+    spots_dir: str | Path,
+    regions: dict[str, dict],
+) -> dict[str, int]:
+    """Return sorted orphan tile IDs mapped to their spot counts."""
+    orphan_counts: dict[str, int] = {}
+    for json_path in sorted(Path(spots_dir).glob("*.json")):
+        if owner_for_tile(json_path.stem, regions) is None:
+            with open(json_path, encoding="utf-8") as source:
+                envelope = json.load(source)
+            if not isinstance(envelope, dict) or "spots" not in envelope:
+                raise ValueError(
+                    f"Invalid spot tile {json_path}: missing spots field"
+                )
+            spots = envelope["spots"]
+            if not isinstance(spots, list):
+                raise ValueError(
+                    f"Invalid spot tile {json_path}: spots must be an array"
+                )
+            orphan_counts[json_path.stem] = len(spots)
+    return orphan_counts
+
+
+def prune_orphan_tiles(
+    spots_dir: str | Path,
+    regions: dict[str, dict],
+) -> dict[str, int]:
+    """Delete orphan tile JSONs and return their pre-delete spot counts."""
+    orphan_counts = scan_orphan_tiles(spots_dir, regions)
+    directory = Path(spots_dir)
+    for tile_id in orphan_counts:
+        (directory / f"{tile_id}.json").unlink()
+    return orphan_counts
 
 
 def commit_and_push(data_repo_dir: str, message: str) -> None:
@@ -105,7 +146,7 @@ def compute_new_version(
 
     Logic:
     - If old_envelopes is empty -> first run -> (f"{year}.1", True).
-    - Find max version in old_envelopes (lexicographic on "YYYY.N").
+    - Find max version in old_envelopes by numeric (major, minor) components.
     - Compare `spots` arrays for every tile id. If any tile is added/removed/
       its `spots` differs, set changed=True.
     - If not changed -> (max_old_version, False).
@@ -116,7 +157,10 @@ def compute_new_version(
     if not old_envelopes:
         return f"{year}.1", True
 
-    max_old_version = max(env["version"] for env in old_envelopes.values())
+    max_old_version = max(
+        (env["version"] for env in old_envelopes.values()),
+        key=lambda version: tuple(int(part) for part in version.split(".")),
+    )
     old_year_str, old_minor_str = max_old_version.split(".")
     old_year, old_minor = int(old_year_str), int(old_minor_str)
 
