@@ -1,5 +1,5 @@
 france:
-  bbox: [-5, 41, 10, 51]
+  bbox: [-6, 41, 8, 51]
   equal_area_epsg: 3035
   admin_level: 8
   osm_country_code: "FR"

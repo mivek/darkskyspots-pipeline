@@ -1,4 +1,5 @@
 """Tests for run.py (orchestrator)."""
+from contextlib import ExitStack
 import json
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -20,7 +21,65 @@ def _make_args(tmp_path, **overrides):
     no_push = overrides.get("no_push", True)  # default: skip git ops
     if no_push:
         cmd.append("--no-push")
+    if overrides.get("no_clusters", False):
+        cmd.append("--no-clusters")
+    if overrides.get("prune_orphans", False):
+        cmd.append("--prune-orphans")
     return parse_args(cmd)
+
+
+def _write_input(tmp_path, region="france"):
+    """Create a tiny input file; raster work is mocked by orchestration tests."""
+    input_dir = tmp_path / "input" / region
+    input_dir.mkdir(parents=True, exist_ok=True)
+    (input_dir / "2025.tif").write_bytes(b"input")
+
+
+def _mock_raster_steps(transform):
+    """Return patches that retain orchestration while avoiding raster/OSM work."""
+    slice_result = MagicMock(
+        data=np.full((2, 2), 1.0), transform=transform, crs="EPSG:2154"
+    )
+    return (
+        patch("run.slice_and_compute", return_value=slice_result),
+        patch("run.alr_to_darkness", return_value=np.full((2, 2), 0.5)),
+        patch("run.alr_to_bortle", return_value=np.full((2, 2), 3, dtype=int)),
+        patch("run.mesh_minima", return_value=[]),
+        patch("run.redundancy_filter", return_value=[]),
+        patch("run.load_places", return_value=[]),
+        patch("run.ensure_coverage", return_value=[]),
+        patch("run.attach_near_town", return_value=[]),
+        patch("run.enrich_all", return_value=[]),
+        patch("run.filter_sea_spots", return_value=[]),
+    )
+
+
+def _write_envelope(directory, tile_id, spots):
+    directory.mkdir(parents=True, exist_ok=True)
+    (directory / f"{tile_id}.json").write_text(
+        json.dumps(
+            {
+                "version": "2025.1",
+                "source": "test",
+                "generated": "2026-08-03T00:00:00Z",
+                "tile": tile_id,
+                "spots": spots,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
+def _spot(spot_id, lat, lon):
+    return {
+        "id": spot_id,
+        "lat": lat,
+        "lon": lon,
+        "darkness": 0.8,
+        "bortle": 3,
+        "near": "Test",
+        "altitude": None,
+    }
 
 
 @patch("run.load_places", return_value=[])
@@ -146,6 +205,70 @@ def test_run_calls_steps_in_order(tmp_path, mock_region):
         "copy_spots_to_repo",
         "commit_and_push",
     ], f"Unexpected call order: {call_order}"
+
+
+def test_run_uses_owned_tiles_for_versioning_and_publication(tmp_path):
+    """The clone keeps other regions while only this region is published."""
+    from run import run
+    import rasterio
+    from rasterio.transform import from_bounds
+
+    input_dir = tmp_path / "input" / "france"
+    input_dir.mkdir(parents=True)
+    transform = from_bounds(-5, 41, 10, 51, 20, 20)
+    profile = {
+        "driver": "GTiff", "height": 20, "width": 20, "count": 1,
+        "dtype": "float64", "crs": "EPSG:4326", "transform": transform,
+    }
+    with rasterio.open(input_dir / "2025.tif", "w", **profile) as dst:
+        dst.write(np.full((20, 20), 1.0, dtype=np.float64), 1)
+
+    regions = {"france": {"bbox": [-6, 41, 8, 51]}, "neighbour": {"bbox": [0, 51, 1, 52]}}
+    current_owned_tile_ids = {"N050E001", "N050E002"}
+    old_owned = {"version": "2025.1", "tile": "N050E001", "spots": [{"id": "old"}]}
+    old_non_owned = {"version": "2025.1", "tile": "N051E000", "spots": [{"id": "keep"}]}
+
+    def clone_with_existing_tiles(_url, _branch, target_dir):
+        spots_dir = Path(target_dir) / "spots"
+        spots_dir.mkdir()
+        (spots_dir / "N050E001.json").write_text(json.dumps(old_owned), encoding="utf-8")
+        (spots_dir / "N051E000.json").write_text(json.dumps(old_non_owned), encoding="utf-8")
+
+    args = _make_args(tmp_path, no_push=False)
+    slice_result = MagicMock(
+        data=np.full((20, 20), 1.0), transform=transform, crs="EPSG:2154"
+    )
+    with \
+        patch("run.load_regions", return_value=regions), \
+        patch("run.owned_tile_ids", return_value=current_owned_tile_ids), \
+        patch("run.slice_and_compute", return_value=slice_result), \
+        patch("run.alr_to_darkness", return_value=np.full((20, 20), 0.5)), \
+        patch("run.alr_to_bortle", return_value=np.full((20, 20), 3, dtype=int)), \
+        patch("run.mesh_minima", return_value=[]), \
+        patch("run.redundancy_filter", return_value=[]), \
+        patch("run.load_places", return_value=[]), \
+        patch("run.ensure_coverage", return_value=[]), \
+        patch("run.attach_near_town", return_value=[]), \
+        patch("run.enrich_all", return_value=[]), \
+        patch("run.filter_sea_spots", return_value=[]), \
+        patch("run.classify_spots_into_tiles", return_value={"N050E001": [{"id": "new"}]}), \
+        patch("run.enumerate_tiles_in_bbox", return_value=["N050E001", "N050E002"]), \
+        patch("run.clone_data_repo", side_effect=clone_with_existing_tiles), \
+        patch("run.compute_new_version", return_value=("2025.2", True)) as mock_version, \
+        patch("run.write_tile_file"), \
+        patch("run.write_cluster_files"), \
+        patch("run.copy_spots_to_repo") as mock_copy, \
+        patch("run.commit_and_push"):
+        assert run(args) == 0
+
+    old_arg, new_arg, year_arg = mock_version.call_args.args
+    assert old_arg == {"N050E001": old_owned, "N051E000": old_non_owned}
+    assert set(new_arg) == {"N050E001", "N050E002", "N051E000"}
+    assert new_arg["N050E001"]["spots"] == [{"id": "new"}]
+    assert new_arg["N050E002"]["spots"] == []
+    assert new_arg["N051E000"] == old_non_owned
+    assert year_arg == 2025
+    assert mock_copy.call_args.args[2] == current_owned_tile_ids
 
 
 @patch("run.load_places", return_value=[])
@@ -290,3 +413,158 @@ def test_orchestrator_attaches_bortle_before_redundancy_filter(mock_load_places,
     for cand in captured["filtered_input"]:
         assert cand.get("bortle") is not None, f"Candidate missing bortle: {cand}"
         assert isinstance(cand["bortle"], int)
+
+
+def test_publishing_audits_the_clone_before_raster_work(tmp_path):
+    """A pre-existing orphan aborts before any raster collaborator is used."""
+    from rasterio.transform import from_bounds
+    from run import run
+
+    _write_input(tmp_path)
+    events = []
+    transform = from_bounds(-5, 41, 10, 51, 2, 2)
+    slice_result = MagicMock(data=np.full((2, 2), 1.0), transform=transform, crs="EPSG:2154")
+
+    def clone(_url, _branch, target_dir):
+        events.append("clone")
+        (Path(target_dir) / "spots").mkdir()
+
+    def audit(_spots_dir, _regions):
+        events.append("audit")
+        return {"N051E000": 1}
+
+    def raster(*_args, **_kwargs):
+        events.append("raster")
+        return slice_result
+
+    args = _make_args(tmp_path, no_push=False)
+    with ExitStack() as stack:
+        stack.enter_context(patch("run.clone_data_repo", side_effect=clone))
+        stack.enter_context(patch("run.scan_orphan_tiles", side_effect=audit))
+        stack.enter_context(patch("run.slice_and_compute", side_effect=raster))
+        assert run(args) == 1
+
+    assert events == ["clone", "audit"]
+
+
+def test_publishing_prunes_orphans_before_raster_work_when_explicit(tmp_path):
+    """--prune-orphans applies to the normal run immediately after cloning."""
+    from run import run
+
+    _write_input(tmp_path)
+    events = []
+
+    def clone(_url, _branch, target_dir):
+        events.append("clone")
+        (Path(target_dir) / "spots").mkdir()
+
+    def audit(_spots_dir, _regions):
+        events.append("audit")
+        return {"N051E000": 1}
+
+    def prune(_spots_dir, _regions):
+        events.append("prune")
+        return {"N051E000": 1}
+
+    def raster(*_args, **_kwargs):
+        events.append("raster")
+
+    args = _make_args(tmp_path, no_push=False, prune_orphans=True)
+    with ExitStack() as stack:
+        stack.enter_context(patch("run.clone_data_repo", side_effect=clone))
+        stack.enter_context(patch("run.scan_orphan_tiles", side_effect=audit))
+        stack.enter_context(patch("run.prune_orphan_tiles", side_effect=prune))
+        stack.enter_context(patch("run._legacy_run", side_effect=lambda *_a, **_k: raster() or 0))
+        assert run(args) == 0
+
+    assert events == ["clone", "audit", "prune", "raster"]
+
+
+def test_run_rejects_owned_tile_enumeration_mismatch_before_raster(tmp_path):
+    """A staging/export ownership mismatch cannot trigger mass publication purges."""
+    from run import run
+
+    _write_input(tmp_path)
+    args = _make_args(tmp_path)
+    raster = MagicMock()
+    with ExitStack() as stack:
+        stack.enter_context(patch("run.owned_tile_ids", return_value={"N048E002"}))
+        stack.enter_context(patch("run.enumerate_tiles_in_bbox", return_value=["N048E003"]))
+        stack.enter_context(patch("run.slice_and_compute", raster))
+        assert run(args) == 1
+    raster.assert_not_called()
+
+
+def test_no_push_clusters_filter_out_unowned_staging_tiles(tmp_path):
+    """Local cluster artifacts include only the current region's owned tiles."""
+    from rasterio.transform import from_bounds
+    from run import run
+
+    _write_input(tmp_path)
+    spots_dir = tmp_path / "output" / "spots"
+    _write_envelope(spots_dir, "N048E002", [_spot("inside", 48.2, 2.2)])
+    _write_envelope(spots_dir, "N051E000", [_spot("outside", 51.2, 0.2)])
+    transform = from_bounds(-5, 41, 10, 51, 2, 2)
+
+    args = _make_args(tmp_path)
+    with ExitStack() as stack:
+        for mocked_step in _mock_raster_steps(transform):
+            stack.enter_context(mocked_step)
+        stack.enter_context(patch("run.classify_spots_into_tiles", return_value={}))
+        stack.enter_context(patch("run.owned_tile_ids", return_value={"N048E002"}))
+        stack.enter_context(patch("run.enumerate_tiles_in_bbox", return_value=["N048E002"]))
+        stack.enter_context(patch("run.write_tile_file"))
+        assert run(args) == 0
+
+    clusters = json.loads((tmp_path / "output" / "clusters-local" / "L1.json").read_text())
+    representative_ids = {cluster["rep"]["id"] for cluster in clusters}
+    assert "inside" in representative_ids
+    assert "outside" not in representative_ids
+
+
+def test_published_regeneration_prunes_orphans_before_its_single_commit(tmp_path):
+    """Explicit pruning removes clone-only orphans before the publication commit."""
+    from src.cli import parse_args
+    from run import run_regenerate_clusters
+
+    args = parse_args(["--regenerate-clusters", "--year", "2025", "--data-repo-url", "git@example:data.git", "--prune-orphans"])
+    committed = {}
+
+    def clone(_url, _branch, target_dir):
+        _write_envelope(Path(target_dir) / "spots", "N051E000", [])
+
+    def commit(data_repo_dir, _message):
+        assert not (Path(data_repo_dir) / "spots" / "N051E000.json").exists()
+        committed["called"] = True
+
+    with patch("run.clone_data_repo", side_effect=clone), \
+         patch("run.write_cluster_files"), \
+         patch("run.commit_and_push", side_effect=commit) as mock_commit:
+        assert run_regenerate_clusters(args) == 0
+    mock_commit.assert_called_once()
+    assert committed == {"called": True}
+
+
+def test_no_push_writer_failure_returns_error_status(tmp_path):
+    """Local cluster-write errors stay within the integer-status contract."""
+    from run import run
+
+    args = _make_args(tmp_path)
+    with patch("run.owned_tile_ids", return_value={"N048E002"}) as owned, \
+         patch("run._legacy_run", return_value=0), \
+         patch("run.write_cluster_files", side_effect=OSError("disk full")):
+        assert run(args) == 1
+    owned.assert_called_once()
+
+
+def test_local_regeneration_requires_existing_staged_spots(tmp_path, caplog):
+    """Offline regeneration rejects a missing staging source instead of an empty repo."""
+    from src.cli import parse_args
+    from run import run_regenerate_clusters
+
+    args = parse_args(["--regenerate-clusters", "--year", "2025", "--no-push", "--output-dir", str(tmp_path / "missing-output")])
+    with patch("run.write_cluster_files") as writer:
+        assert run_regenerate_clusters(args) == 1
+    writer.assert_not_called()
+    assert "output/spots" in caplog.text
+    assert "does not exist" in caplog.text
