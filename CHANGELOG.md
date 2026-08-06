@@ -2,6 +2,37 @@
 
 <!-- version list -->
 
+## v1.4.0 (2026-08-06)
+
+### Bug Fixes
+
+- **pipeline**: Filter sea spots with empty GeoNames near before tile export
+  ([`b7073b4`](https://github.com/mivek/darkskyspots-pipeline/commit/b7073b42145c04e44c4aa86c9ad63d0e597cc252))
+
+### Chores
+
+- Ignore local worktrees
+  ([`c9ef9c8`](https://github.com/mivek/darkskyspots-pipeline/commit/c9ef9c8ad8dc8235547c940fd5f3ddac5a8a6a9e))
+
+### Continuous Integration
+
+- Run tests on pull requests and main
+  ([`ea0f53f`](https://github.com/mivek/darkskyspots-pipeline/commit/ea0f53fec5f3a9e211fb23ee5aa9ff42b20864f6))
+
+### Documentation
+
+- Define cluster pipeline and migration contracts
+  ([`48b87a5`](https://github.com/mivek/darkskyspots-pipeline/commit/48b87a56d277ec3f1d3d07d4d162da620b9c6ed3))
+
+### Features
+
+- Generate and publish deterministic spot clusters
+  ([`581ed75`](https://github.com/mivek/darkskyspots-pipeline/commit/581ed756ebba817cc3e98bbf8267c34a471bc582))
+
+- Validate region ownership and migration modes
+  ([`61843c4`](https://github.com/mivek/darkskyspots-pipeline/commit/61843c4a5eb5236f21ee36525d799fea40e07c3a))
+
+
 ## v1.3.0 (2026-07-09)
 
 ### Features
