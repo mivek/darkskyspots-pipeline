@@ -177,17 +177,15 @@ def write_cluster_files(
 ) -> dict[int, Path]:
     """Write all levels and their deterministic manifest.
 
-    Manifest paths are relative to the parent of ``clusters_dir``.  Using the
-    output directory name keeps published output at ``clusters/Ln.json`` and
-    local output at ``clusters-local/Ln.json`` while pointing at the bytes
-    written by this call.
+    Manifest paths are bare filenames relative to the directory containing
+    ``index.json``. Each path points to a level file written beside the
+    manifest by this call.
     """
     output_dir = Path(clusters_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     clusters = aggregate_spot_files(spots_dir, allowed_tile_ids)
     paths: dict[int, Path] = {}
     manifest_levels = []
-    manifest_directory = output_dir.name
 
     for spec in LEVELS:
         path = output_dir / f"L{spec.level}.json"
@@ -201,7 +199,7 @@ def write_cluster_files(
                 "width_km": list(spec.width_km),
                 "files": [
                     {
-                        "path": f"{manifest_directory}/L{spec.level}.json",
+                        "path": path.name,
                         "hash": hashlib.sha256(payload).hexdigest(),
                     }
                 ],

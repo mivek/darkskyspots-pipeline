@@ -150,12 +150,12 @@ def test_empty_input_writes_six_files_and_manifest(tmp_path):
     assert all(isinstance(level["files"], list) for level in manifest["levels"])
     assert all(len(level["files"]) == 1 for level in manifest["levels"])
     assert [level["files"][0]["path"] for level in manifest["levels"]] == [
-        "clusters/L1.json",
-        "clusters/L2.json",
-        "clusters/L3.json",
-        "clusters/L4.json",
-        "clusters/L5.json",
-        "clusters/L6.json",
+        "L1.json",
+        "L2.json",
+        "L3.json",
+        "L4.json",
+        "L5.json",
+        "L6.json",
     ]
 
 
@@ -192,7 +192,7 @@ def test_manifest_hash_matches_exact_level_bytes(tmp_path):
     manifest = json.loads((output / "index.json").read_text())
     for level in manifest["levels"]:
         entry = level["files"][0]
-        payload = (tmp_path / entry["path"]).read_bytes()
+        payload = (output / entry["path"]).read_bytes()
         assert entry["hash"] == hashlib.sha256(payload).hexdigest()
 
 
@@ -240,7 +240,7 @@ def test_manifest_level_hash_can_change_independently(tmp_path):
     }
 
 
-def test_manifest_paths_resolve_from_output_root_for_local_clusters(tmp_path):
+def test_manifest_paths_resolve_from_manifest_directory_for_local_clusters(tmp_path):
     output_root = tmp_path / "output"
     clusters_dir = output_root / "clusters-local"
 
@@ -254,8 +254,9 @@ def test_manifest_paths_resolve_from_output_root_for_local_clusters(tmp_path):
     manifest = json.loads((clusters_dir / "index.json").read_text())
     for level in manifest["levels"]:
         entry = level["files"][0]
-        declared_path = output_root / entry["path"]
+        declared_path = clusters_dir / entry["path"]
         assert declared_path.is_file()
+        assert entry["path"] == f"L{level['level']}.json"
         assert entry["hash"] == hashlib.sha256(declared_path.read_bytes()).hexdigest()
 
 
