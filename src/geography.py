@@ -7,6 +7,7 @@ and foreign-country candidates never participate in redundancy decisions.
 from __future__ import annotations
 
 import logging
+import math
 from numbers import Integral
 from dataclasses import dataclass
 from functools import lru_cache
@@ -102,6 +103,7 @@ def classify_candidates(
     data_dir: str | Path = DEFAULT_DATA_DIR,
     transform=None,
     crs=None,
+    equal_area_epsg: int | str | None = None,
     reject_ambiguous: bool = False,
 ) -> tuple[list[dict], dict[str, int]]:
     """Apply land mask and national clip before redundancy.
@@ -110,7 +112,9 @@ def classify_candidates(
     country polygon.  When mesh row/column and raster transform are available,
     the country occupying the largest portion of that pixel wins. Lexical ISO
     is only the final fallback for legacy point-only records or exact ties.
-    The count is always emitted for verification.
+    The counts are always emitted for verification, including
+    ``lexical_area_ties``: exact equal-area pixel ties that required the
+    lexical ISO fallback.
     """
     allowed = {str(code).upper() for code in country_codes}
     geo = geography or load_geography(data_dir)
@@ -120,6 +124,7 @@ def classify_candidates(
         "sea_rejected": 0,
         "invalid_candidates": 0,
         "ambiguous_country_candidates": 0,
+        "lexical_area_ties": 0,
         "other_country_rejected": 0,
         "country_candidates": 0,
     }
@@ -129,6 +134,9 @@ def classify_candidates(
         except (KeyError, TypeError, ValueError):
             stats["invalid_candidates"] += 1
             continue
+        # Keep the land/sea decision on the dedicated Natural Earth land layer;
+        # the country polygons answer a separate question.  This is important
+        # for coastal admin polygons that include territorial water.
         if not geo.land.covers(point):
             stats["sea_rejected"] += 1
             continue
@@ -143,12 +151,14 @@ def classify_candidates(
             # may use the geographic area rule below.
             if reject_ambiguous and _candidate_pixel_polygon(candidate, transform, crs) is None:
                 continue
-        eligible = [code for code in matches if code in allowed]
-        if not eligible:
+        # Resolve the country globally, before applying the region's allowed
+        # list.  Filtering first would let the same boundary pixel be assigned
+        # to FR in one run and ES in another, depending on the region order.
+        if not matches:
             stats["other_country_rejected"] += 1
             continue
-        if len(eligible) == 1:
-            country = eligible[0]
+        if len(matches) == 1:
+            country = matches[0]
         else:
             # A mesh point exactly on a political boundary is assigned to the
             # country occupying the largest part of its source raster pixel.
@@ -157,15 +167,37 @@ def classify_candidates(
             # exact equal-area tie.
             pixel = _candidate_pixel_polygon(candidate, transform, crs)
             if pixel is None:
-                country = min(eligible)
+                country = min(matches)
+                logger.warning(
+                    "Candidate %s,%s lies on a country boundary without a "
+                    "source pixel; using lexical ISO tie-break (%s)",
+                    candidate["lat"], candidate["lon"], ", ".join(matches),
+                )
             else:
                 areas = {
-                    code: pixel.intersection(geo.countries[code]).area
-                    for code in eligible
+                    code: _intersection_area(
+                        pixel,
+                        geo.countries[code],
+                        equal_area_epsg,
+                    )
+                    for code in matches
                 }
                 largest = max(areas.values())
-                winners = [code for code, area in areas.items() if abs(area - largest) <= 1e-12]
+                winners = [
+                    code for code, area in areas.items()
+                    if math.isclose(area, largest, rel_tol=1e-12, abs_tol=1e-9)
+                ]
+                if len(winners) > 1:
+                    stats["lexical_area_ties"] += 1
+                    logger.warning(
+                        "Candidate %s,%s lies on an equal-area country boundary "
+                        "(%s); using lexical ISO tie-break",
+                        candidate["lat"], candidate["lon"], ", ".join(sorted(winners)),
+                    )
                 country = min(winners)
+        if country not in allowed:
+            stats["other_country_rejected"] += 1
+            continue
         candidate["country"] = country
         kept.append(candidate)
         stats["country_candidates"] += 1
@@ -190,3 +222,39 @@ def _candidate_pixel_polygon(candidate: dict, transform, crs):
     except Exception:
         logger.debug("Unable to derive source raster pixel for candidate", exc_info=True)
         return None
+
+
+def _intersection_area(pixel, country, equal_area_epsg):
+    """Return an intersection area in a metre-based equal-area CRS."""
+    target = f"EPSG:{equal_area_epsg}" if isinstance(equal_area_epsg, int) else (
+        equal_area_epsg or "EPSG:6933"
+    )
+    try:
+        from rasterio.warp import transform_geom
+        from shapely.geometry import mapping
+
+        pixel_area = shape(transform_geom("EPSG:4326", target, mapping(pixel)))
+        country_area = shape(transform_geom("EPSG:4326", target, mapping(country)))
+        return pixel_area.intersection(country_area).area
+    except Exception:
+        # A malformed optional CRS should not make point-only legacy callers
+        # fail.  The fallback is still deterministic, while production runs
+        # always provide the configured equal-area EPSG.
+        logger.debug("Unable to project country intersection", exc_info=True)
+        return pixel.intersection(country).area
+
+
+def validate_country_codes(
+    country_codes,
+    *,
+    geography: Geography | None = None,
+    data_dir: str | Path = DEFAULT_DATA_DIR,
+) -> None:
+    """Reject codes absent from the versioned Natural Earth country set."""
+    geo = geography or load_geography(data_dir)
+    invalid = sorted({str(code).upper() for code in country_codes} - set(geo.countries))
+    if invalid:
+        raise ValueError(
+            "Unknown Natural Earth ISO alpha-2 country code(s): "
+            + ", ".join(invalid)
+        )

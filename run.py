@@ -39,7 +39,7 @@ from src.publish import (
 )
 from src.clusters import write_cluster_files
 from src.regions import get_region, load_regions
-from src.geography import classify_candidates
+from src.geography import classify_candidates, validate_country_codes
 from src.tile_export import (
     classify_spots_into_tiles,
     enumerate_tiles_in_bbox,
@@ -48,11 +48,29 @@ from src.tile_export import (
 
 logger = logging.getLogger("pipeline")
 
+AUDIT_PROBLEM_KEYS = (
+    "missing",
+    "invalid",
+    "unconfigured",
+    "mismatched",
+    "ambiguous",
+    "unassignable",
+)
+
+
+def _audit_count(audit: dict, key: str) -> int:
+    value = audit.get(key, 0)
+    return value if isinstance(value, int) else len(value)
+
+
+def _audit_has_problems(audit: dict) -> bool:
+    return any(_audit_count(audit, key) for key in AUDIT_PROBLEM_KEYS)
+
 
 def _generated_date() -> str:
     return datetime.now(timezone.utc).date().isoformat()
 
-def run(args, current_owned_tile_ids: set[str] | None = None) -> int:
+def run(args) -> int:
     """Execute the 7-step pipeline. Returns 0 on success, 1 on error."""
     try:
         region = get_region(args.region)
@@ -72,6 +90,7 @@ def run(args, current_owned_tile_ids: set[str] | None = None) -> int:
         country_codes = region["osm_country_code"]
         if isinstance(country_codes, str):
             country_codes = [country_codes]
+        validate_country_codes(country_codes)
 
         # Step 0: Radiance -> ALR (returns data + geo metadata)
         logger.info("Step 0: Radiance -> ALR")
@@ -127,7 +146,11 @@ def run(args, current_owned_tile_ids: set[str] | None = None) -> int:
         # can never suppress a published candidate.
         logger.info("Step 2c: Natural Earth land mask and country clip")
         candidates, geography_stats = classify_candidates(
-            candidates, country_codes, transform=transform, crs=crs
+            candidates,
+            country_codes,
+            transform=transform,
+            crs=crs,
+            equal_area_epsg=region["equal_area_epsg"],
         )
         logger.info("  Geographic candidate stats: %s", geography_stats)
 
@@ -243,7 +266,10 @@ def run(args, current_owned_tile_ids: set[str] | None = None) -> int:
             if not getattr(args, "no_push", False):
                 logger.info("Step 7: Publish to data repo")
                 copy_spots_to_repo(
-                    str(output_dir / "spots"), data_repo_dir, country_codes=country_codes
+                    None,
+                    data_repo_dir,
+                    country_codes=country_codes,
+                    envelopes=new_envelopes,
                 )
                 if not getattr(args, "no_clusters", False):
                     write_cluster_files(
@@ -308,23 +334,15 @@ def _ensure_clone_is_not_output(data_repo_dir: Path, output_dir: Path) -> None:
         raise ValueError("The publication clone must not be the local output directory")
 
 
-def _load_tile_counts(spots_dir: Path) -> dict[str, int]:
-    counts: dict[str, int] = {}
-    for json_path in sorted(spots_dir.glob("*.json")):
-        with json_path.open(encoding="utf-8") as source:
-            counts[json_path.stem] = len(json.load(source)["spots"])
-    return counts
-
-
 def _audit_before_write(spots_dir: Path, regions: dict[str, dict]) -> bool:
     """Gate publication on country-level anomalies, without mutating files."""
     audit = audit_country_spots(spots_dir, regions)
-    problems = sum(len(audit[key]) for key in ("missing", "invalid", "unconfigured", "mismatched"))
-    if problems:
+    if _audit_has_problems(audit):
         logger.error(
-            "Country audit failed: missing=%d invalid=%d unconfigured=%d mismatched=%d; "
+            "Country audit failed: missing=%s invalid=%s unconfigured=%s mismatched=%s "
+            "ambiguous=%s unassignable=%s; "
             "run --migrate-country-tags then --prune-orphan-spots explicitly",
-            len(audit["missing"]), len(audit["invalid"]), len(audit["unconfigured"]), len(audit["mismatched"]),
+            *(_audit_count(audit, key) for key in AUDIT_PROBLEM_KEYS),
         )
         return False
     return True
@@ -341,28 +359,9 @@ def run_list_orphans(args) -> int:
         else:
             audit = audit_country_spots(Path(args.output_dir) / "spots", regions)
         print(json.dumps(audit, indent=2, ensure_ascii=False))
-        return 0 if not (audit["missing"] or audit["invalid"] or audit["unconfigured"] or audit["mismatched"]) else 1
+        return 0 if not _audit_has_problems(audit) else 1
     except Exception:
         logger.exception("Orphan audit failed")
-        return 1
-
-
-def run_preview_bbox_migration(args) -> int:
-    try:
-        from src.regions import build_bbox_migration_preview, format_bbox_migration_preview
-
-        regions = load_regions(allow_legacy_geometry=True, validate_partition=False)
-        if args.data_repo_url:
-            with tempfile.TemporaryDirectory() as clone_ctx:
-                clone_dir = Path(clone_ctx)
-                clone_data_repo(args.data_repo_url, args.data_repo_branch, str(clone_dir))
-                counts = _load_tile_counts(clone_dir / "spots")
-        else:
-            counts = _load_tile_counts(Path(args.output_dir) / "spots")
-        print(format_bbox_migration_preview(build_bbox_migration_preview(regions, counts, args.bbox_candidates)))
-        return 0
-    except Exception:
-        logger.exception("BBox migration preview failed")
         return 1
 
 
@@ -432,9 +431,7 @@ def run_country_migration(args) -> int:
                     delete_orphans=getattr(args, "prune_orphan_spots", False),
                 )
                 audit = audit_country_spots(clone_dir / "spots", regions)
-                if not getattr(args, "prune_orphan_spots", False) and (
-                    audit["missing"] or audit["invalid"] or audit["unconfigured"] or audit["mismatched"]
-                ):
+                if not getattr(args, "prune_orphan_spots", False) and _audit_has_problems(audit):
                     logger.error("Migration left unresolved spots; use --prune-orphan-spots explicitly")
                     return 1
                 commit_and_push(str(clone_dir), f"data: migrate country tags ({args.year})")
@@ -455,9 +452,6 @@ def run(args) -> int:
         return run_list_orphans(args)
     if getattr(args, "migrate_country_tags", False) or getattr(args, "prune_orphan_spots", False):
         return run_country_migration(args)
-    if getattr(args, "preview_bbox_migration", False):
-        return run_preview_bbox_migration(args)
-
     if args.no_push:
         try:
             result = _legacy_run(args)

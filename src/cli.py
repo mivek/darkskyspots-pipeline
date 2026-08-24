@@ -1,52 +1,5 @@
 """argparse wrapper for the dark-sky pipeline."""
 import argparse
-import math
-
-
-def parse_bbox_candidate(value: str) -> tuple[str, tuple[float, float, float, float]]:
-    """Parse ``NAME=min_lon,min_lat,max_lon,max_lat`` into a named bbox."""
-    try:
-        name, coordinates = value.split("=", 1)
-    except ValueError as exc:
-        raise argparse.ArgumentTypeError(
-            "--bbox-candidate must use NAME=MIN_LON,MIN_LAT,MAX_LON,MAX_LAT"
-        ) from exc
-    if not name:
-        raise argparse.ArgumentTypeError("--bbox-candidate region name cannot be empty")
-
-    parts = coordinates.split(",")
-    if len(parts) != 4:
-        raise argparse.ArgumentTypeError(
-            "--bbox-candidate must contain exactly four coordinates"
-        )
-    try:
-        bbox = tuple(float(part) for part in parts)
-    except ValueError as exc:
-        raise argparse.ArgumentTypeError(
-            "--bbox-candidate coordinates must be numbers"
-        ) from exc
-    if not all(math.isfinite(coordinate) for coordinate in bbox):
-        raise argparse.ArgumentTypeError(
-            "--bbox-candidate coordinates must be finite"
-        )
-    for index, coordinate in enumerate(bbox):
-        axis = "longitude" if index in (0, 2) else "latitude"
-        lower, upper = (-180, 180) if axis == "longitude" else (-90, 90)
-        if not lower <= coordinate <= upper:
-            raise argparse.ArgumentTypeError(
-                f"--bbox-candidate {axis} coordinate {index} is outside "
-                f"the tile domain [{lower}, {upper}]"
-            )
-        if not coordinate.is_integer():
-            raise argparse.ArgumentTypeError(
-                "--bbox-candidate coordinates must be integers for "
-                "publishable configuration"
-            )
-    if bbox[0] >= bbox[2] or bbox[1] >= bbox[3]:
-        raise argparse.ArgumentTypeError(
-            "--bbox-candidate coordinates must be ordered"
-        )
-    return name, bbox
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -88,21 +41,8 @@ def create_parser() -> argparse.ArgumentParser:
     # Keep the old spelling parseable solely to provide a safe migration error;
     # it is never accepted as an operational alias.
     parser.add_argument("--prune-orphans", action="store_true", help=argparse.SUPPRESS)
-    modes.add_argument(
-        "--preview-bbox-migration",
-        action="store_true",
-        help="Read-only preview of legacy bbox ownership changes",
-    )
     parser.add_argument(
         "--no-clusters", action="store_true", help="Skip cluster generation"
-    )
-    parser.add_argument(
-        "--bbox-candidate",
-        action="append",
-        type=parse_bbox_candidate,
-        default=[],
-        metavar="NAME=MIN_LON,MIN_LAT,MAX_LON,MAX_LAT",
-        help="Proposed bbox for --preview-bbox-migration; repeatable",
     )
     parser.add_argument("--debug-raster", action="store_true", help="Sauvegarde les rasters intermédiaires darkness et bortle en GeoTIFF dans le dossier de sortie")
     parser.add_argument("--input-dir", type=str, default="./input", help="Directory with input GeoTIFFs")
@@ -118,36 +58,14 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     args = parser.parse_args(argv)
 
     if args.prune_orphans:
-        if args.list_orphans or args.audit_country_tags or args.preview_bbox_migration:
-            parser.error("--prune-orphans cannot be used in audit or preview mode")
+        if args.list_orphans or args.audit_country_tags:
+            parser.error("--prune-orphans cannot be used in audit mode")
         parser.error("--prune-orphans was removed; use --migrate-country-tags and, separately, --prune-orphan-spots")
 
-    candidates: dict[str, tuple[float, float, float, float]] = {}
-    if args.bbox_candidate:
-        from .regions import load_regions
-
-        try:
-            regions = load_regions(
-                allow_legacy_geometry=True,
-                validate_partition=False,
-            )
-        except ValueError as exc:
-            parser.error(str(exc))
-        for name, bbox in args.bbox_candidate:
-            if name not in regions:
-                parser.error(f"Unknown --bbox-candidate region {name!r}")
-            if name in candidates:
-                parser.error(f"Duplicate --bbox-candidate for region {name!r}")
-            candidates[name] = bbox
-    args.bbox_candidates = candidates
-    del args.bbox_candidate
-
-    audit_mode = args.list_orphans or args.audit_country_tags or args.preview_bbox_migration
+    audit_mode = args.list_orphans or args.audit_country_tags
     migration_mode = args.migrate_country_tags or args.prune_orphan_spots
     if args.prune_orphan_spots and not args.migrate_country_tags:
         parser.error("--prune-orphan-spots requires --migrate-country-tags")
-    if args.bbox_candidates and not args.preview_bbox_migration:
-        parser.error("--bbox-candidate requires --preview-bbox-migration")
     if migration_mode:
         if args.no_push:
             # Local output migrations are useful in a temporary checkout and

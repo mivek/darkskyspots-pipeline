@@ -27,18 +27,16 @@ Output appears in `/output/spots/`. Publication also generates global clusters a
 
 | Flag | Required | Default | Description |
 |------|----------|---------|-------------|
-| `--year` | Mode-dependent | — | Required for a normal run and cluster regeneration; not used by orphan audits or bbox previews. |
-| `--region` | Mode-dependent | — | Required for a normal run; not used by cluster regeneration, orphan audits, or bbox previews. |
-| `--data-repo-url` | Mode-dependent | — | Required for published runs and published cluster regeneration; optional for local, audit, and preview modes. |
+| `--year` | Mode-dependent | — | Required for a normal run and cluster regeneration; not used by country-tag audits. |
+| `--region` | Mode-dependent | — | Required for a normal run; not used by cluster regeneration or country-tag audits. |
+| `--data-repo-url` | Mode-dependent | — | Required for published runs and published cluster regeneration; optional for local and audit modes. |
 | `--data-repo-branch` | No | `main` | Branch to push to in the data repo. |
 | `--no-push` | No | `false` | Skip step 7 (publish). Output stays in `/output/spots/`. |
 | `--no-clusters` | No | `false` | Skip cluster generation. |
 | `--regenerate-clusters` | No | `false` | Published mode: clone/audit the complete repository, write clusters/, then commit/push; requires --year and --data-repo-url. With --no-push: read output/spots/, write clusters-local/, and perform no clone, audit, commit, or push; requires only --year. |
-| `--audit-country-tags` | No | `false` | Strictly read-only audit of missing, invalid, ambiguous, and unconfigured spot country tags. `--list-orphans` is a deprecated alias. |
+| `--audit-country-tags` | No | `false` | Strictly read-only audit of missing, invalid, unconfigured, mismatched, ambiguous, and unassignable spots, with a projected migration summary. `--list-orphans` is a deprecated alias. |
 | `--migrate-country-tags` | No | `false` | Explicitly reclassify historical spots with Natural Earth geometry. Does not delete unresolved spots. |
 | `--prune-orphan-spots` | No | `false` | Explicitly delete unresolved or unconfigured historical spots; use with `--migrate-country-tags`. |
-| `--preview-bbox-migration` | No | `false` | Read-only preview of bbox ownership changes. |
-| `--bbox-candidate` | No | — | Repeatable named bbox candidate for the preview. |
 | `--input-dir` | No | `./input` | Directory containing per-region subdirectories with GeoTIFFs. |
 | `--output-dir` | No | `./output` | Directory for output JSON files (subdir `spots/` is created). |
 | `--budget-mb` | No | `500.0` | RAM budget for loading the input GeoTIFF (MB). If exceeded, the input is processed in slices. |
@@ -54,19 +52,20 @@ The three input flags are mode-dependent, not globally required:
 - A normal local run with --no-push requires --year and --region; --data-repo-url is optional and is not contacted.
 - Published --regenerate-clusters requires --year and --data-repo-url, but does not require --region.
 - Local --regenerate-clusters --no-push requires only --year and reads output/spots/; it needs neither --region nor --data-repo-url.
-- --preview-bbox-migration and --list-orphans require neither --year nor --region. With an optional --data-repo-url they inspect a cloned published repository; without it they inspect local output/spots/.
-
-For the approved France preview (read-only):
-
-~~~bash
-python run.py --preview-bbox-migration \
-  --bbox-candidate france=-6,41,8,51 \
-  --data-repo-url https://github.com/mivek/darkskyspots-data.git
-~~~
+- --audit-country-tags and --list-orphans require neither --year nor --region. With an optional --data-repo-url they inspect a cloned published repository; without it they inspect local output/spots/.
 
 `--audit-country-tags` and `--list-orphans` are strictly read-only. The former
 `--prune-orphans` spelling is rejected; migration and deletion require the two
 separate explicit flags above.
+
+The audit reports current tag-state counters (`missing`, `invalid`,
+`unconfigured`, `mismatched`, `ambiguous`, and `unassignable`) plus projected
+actions. `reclassifiable_to_configured` counts spots that can receive a unique
+configured country, `resolved_unconfigured` counts spots resolving uniquely to
+a country with no configured producer, and `correctable_mismatched` counts
+valid tags that disagree with their coordinates. The `projection` object
+contains both `migration_only` and `migration_and_prune` summaries, including
+rewritten/deleted files and final spot counts.
 
 ## Generation and publication workflow
 
@@ -78,7 +77,7 @@ publication until an explicit migration has been reviewed.
 
 Clusters must be regenerated only after repository spot tiles are complete. In published mode, --regenerate-clusters clones and audits the repository, writes clusters/ from the complete clone, then commits and pushes. In --no-push mode, --regenerate-clusters reads output/spots/ and writes clusters-local/; it performs no clone, audit, commit, or push and requires only --year.
 
-Normal --no-push also never clones or pushes: it leaves output/spots/ and, unless --no-clusters, writes the partial test artifact output/clusters-local/, filtered to tiles owned by the current region.
+Normal --no-push also never clones or pushes: it leaves output/spots/ and, unless --no-clusters, writes the local output/clusters-local/ artifact.
 
 ## Region bboxes and migrations
 
