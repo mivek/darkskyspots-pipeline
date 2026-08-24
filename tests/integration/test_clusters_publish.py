@@ -10,7 +10,7 @@ from rasterio.transform import from_bounds
 
 
 def _spot(spot_id, lat, lon):
-    return {"id": spot_id, "lat": lat, "lon": lon, "darkness": 0.8, "bortle": 3, "near": "Test", "altitude": None}
+    return {"id": spot_id, "country": "FR", "lat": lat, "lon": lon, "darkness": 0.8, "bortle": 3, "near": "Test", "altitude": None}
 
 
 def _write_envelope(directory, tile_id, spots):
@@ -49,7 +49,10 @@ def test_published_clusters_read_spots_after_current_region_copy(tmp_path):
 
     with ExitStack() as stack:
         stack.enter_context(patch("run.clone_data_repo", side_effect=clone))
-        stack.enter_context(patch("run.scan_orphan_tiles", return_value={}))
+        stack.enter_context(patch("run.audit_country_spots", return_value={
+            "missing": [], "invalid": [], "unconfigured": [], "mismatched": [],
+            "ambiguous": [], "valid": 1,
+        }))
         stack.enter_context(patch("run.slice_and_compute", return_value=slice_result))
         stack.enter_context(patch("run.alr_to_darkness", return_value=np.full((2, 2), 0.5)))
         stack.enter_context(patch("run.alr_to_bortle", return_value=np.full((2, 2), 3, dtype=int)))
@@ -61,7 +64,6 @@ def test_published_clusters_read_spots_after_current_region_copy(tmp_path):
         stack.enter_context(patch("run.enrich_all", return_value=[]))
         stack.enter_context(patch("run.filter_sea_spots", return_value=[]))
         stack.enter_context(patch("run.classify_spots_into_tiles", return_value={"N048E003": [generated]}))
-        stack.enter_context(patch("run.owned_tile_ids", return_value={"N048E003"}))
         stack.enter_context(patch("run.enumerate_tiles_in_bbox", return_value=["N048E003"]))
         stack.enter_context(patch("run.write_cluster_files", side_effect=clusters))
         stack.enter_context(patch("run.commit_and_push"))
@@ -72,19 +74,22 @@ def test_published_clusters_read_spots_after_current_region_copy(tmp_path):
 
 
 def test_a_then_b_scoped_publication_preserves_a_tiles(tmp_path):
-    """A later region copy cannot remove an earlier region's owned tile."""
+    """A later country publication preserves spots from another country."""
     from src.publish import copy_spots_to_repo
 
     staging_a = tmp_path / "staging-a"
     staging_b = tmp_path / "staging-b"
     clone = tmp_path / "clone"
-    _write_envelope(staging_a, "N048E002", [_spot("a", 48.2, 2.2)])
-    _write_envelope(staging_b, "N048E003", [_spot("b", 48.2, 3.2)])
+    spot_a = _spot("a", 48.2, 2.2)
+    spot_a["country"] = "FR"
+    spot_b = _spot("b", 48.2, 3.2)
+    spot_b["country"] = "AD"
+    _write_envelope(staging_a, "N048E002", [spot_a])
+    _write_envelope(staging_b, "N048E002", [spot_b])
 
-    copy_spots_to_repo(staging_a, clone, {"N048E002"})
-    copy_spots_to_repo(staging_b, clone, {"N048E003"})
+    copy_spots_to_repo(staging_a, clone, country_codes=["FR"])
+    copy_spots_to_repo(staging_b, clone, country_codes=["AD"])
 
     a_envelope = json.loads((clone / "spots" / "N048E002.json").read_text())
-    b_envelope = json.loads((clone / "spots" / "N048E003.json").read_text())
-    assert a_envelope["spots"][0]["id"] == "a"
-    assert b_envelope["spots"][0]["id"] == "b"
+    assert {spot["id"] for spot in a_envelope["spots"]} == {"a", "b"}
+    assert [spot["country"] for spot in a_envelope["spots"]] == ["AD", "FR"]

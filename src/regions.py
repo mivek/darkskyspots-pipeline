@@ -1,5 +1,6 @@
 """regions.yaml loader and region resolver."""
 import math
+import re
 from collections.abc import Mapping
 
 import yaml
@@ -13,7 +14,7 @@ def load_regions(
     path: str = "regions.yaml",
     *,
     allow_legacy_geometry: bool = False,
-    validate_partition: bool = True,
+    validate_partition: bool = False,
 ) -> dict[str, dict]:
     """Load regions.yaml and validate its geometry.
 
@@ -31,6 +32,20 @@ def load_regions(
         raise ValueError(f"regions.yaml must be a dict, got {type(data).__name__}")
     for name, region in data.items():
         _validate_region(name, region, allow_legacy_geometry=allow_legacy_geometry)
+        # Accept the former scalar spelling while exposing one canonical list
+        # to all callers.  This permits a gradual migration of local registries
+        # without allowing ownership semantics to leak back into the pipeline.
+        codes = region["osm_country_code"]
+        if isinstance(codes, str):
+            codes = [codes]
+        if not isinstance(codes, (list, tuple)) or not codes:
+            raise ValueError(f"Region {name!r}: osm_country_code must be a non-empty list")
+        normalised = [str(code).upper() for code in codes]
+        if any(not re.fullmatch(r"[A-Z]{2}", code) for code in normalised):
+            raise ValueError(f"Region {name!r}: osm_country_code entries must be ISO alpha-2 codes")
+        if len(set(normalised)) != len(normalised):
+            raise ValueError(f"Region {name!r}: osm_country_code contains duplicates")
+        region["osm_country_code"] = normalised
     if validate_partition:
         validate_bbox_partition(data)
     return data

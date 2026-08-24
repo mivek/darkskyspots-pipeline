@@ -82,7 +82,7 @@ def test_load_regions_rejects_non_integer_bbox(tmp_path):
         load_regions(str(path))
 
 
-def test_load_regions_rejects_positive_area_overlap_with_names(tmp_path):
+def test_load_regions_allows_positive_area_overlap_for_working_envelopes(tmp_path):
     from src.regions import load_regions
 
     path = write_regions(
@@ -92,8 +92,9 @@ def test_load_regions_rejects_positive_area_overlap_with_names(tmp_path):
             "italy": [7, 40, 12, 47],
         },
     )
-    with pytest.raises(ValueError, match="france.*italy|italy.*france"):
-        load_regions(str(path))
+    regions = load_regions(str(path))
+    assert set(regions) == {"france", "italy"}
+    assert regions["france"]["osm_country_code"] == ["AA"]
 
 
 def test_integer_bbox_contains_every_intersecting_tile(tmp_path):

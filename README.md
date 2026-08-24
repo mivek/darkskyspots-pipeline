@@ -34,8 +34,9 @@ Output appears in `/output/spots/`. Publication also generates global clusters a
 | `--no-push` | No | `false` | Skip step 7 (publish). Output stays in `/output/spots/`. |
 | `--no-clusters` | No | `false` | Skip cluster generation. |
 | `--regenerate-clusters` | No | `false` | Published mode: clone/audit the complete repository, write clusters/, then commit/push; requires --year and --data-repo-url. With --no-push: read output/spots/, write clusters-local/, and perform no clone, audit, commit, or push; requires only --year. |
-| `--list-orphans` | No | `false` | Read-only audit of tiles without a region owner. |
-| `--prune-orphans` | No | `false` | Remove orphans in a publication commit; publication-only. |
+| `--audit-country-tags` | No | `false` | Strictly read-only audit of missing, invalid, ambiguous, and unconfigured spot country tags. `--list-orphans` is a deprecated alias. |
+| `--migrate-country-tags` | No | `false` | Explicitly reclassify historical spots with Natural Earth geometry. Does not delete unresolved spots. |
+| `--prune-orphan-spots` | No | `false` | Explicitly delete unresolved or unconfigured historical spots; use with `--migrate-country-tags`. |
 | `--preview-bbox-migration` | No | `false` | Read-only preview of bbox ownership changes. |
 | `--bbox-candidate` | No | — | Repeatable named bbox candidate for the preview. |
 | `--input-dir` | No | `./input` | Directory containing per-region subdirectories with GeoTIFFs. |
@@ -63,11 +64,17 @@ python run.py --preview-bbox-migration \
   --data-repo-url https://github.com/mivek/darkskyspots-data.git
 ~~~
 
---list-orphans is read-only. --prune-orphans is rejected with --no-push and its purge is committed with the publication.
+`--audit-country-tags` and `--list-orphans` are strictly read-only. The former
+`--prune-orphans` spelling is rejected; migration and deletion require the two
+separate explicit flags above.
 
 ## Generation and publication workflow
 
-The data repository is the source of truth for published generation. The order is: clone; audit orphans immediately after clone; process the raster; copy current-region staging tiles; generate clusters from the complete clone; commit and push once. The first audit stops publication unless --prune-orphans explicitly authorizes the purge, whose deletions are included in that one publication commit.
+The data repository is the source of truth for published generation. The order
+is: clone; audit country tags immediately after clone; process the raster;
+merge the current region's country blocks into every affected tile; generate
+clusters from the complete clone; commit and push once. An audit failure stops
+publication until an explicit migration has been reviewed.
 
 Clusters must be regenerated only after repository spot tiles are complete. In published mode, --regenerate-clusters clones and audits the repository, writes clusters/ from the complete clone, then commits and pushes. In --no-push mode, --regenerate-clusters reads output/spots/ and writes clusters-local/; it performs no clone, audit, commit, or push and requires only --year.
 
@@ -75,13 +82,27 @@ Normal --no-push also never clones or pushes: it leaves output/spots/ and, unles
 
 ## Region bboxes and migrations
 
-Bboxes in regions.yaml are a permanent region registry and deliberate coverage decisions. Integer degree boundaries assign complete one-degree tiles deterministically. Adjacent bboxes may touch, but positive-area overlap is rejected. Declaration-order ownership is a defensive fallback for legacy geometry, not permission to overlap.
+Bboxes in regions.yaml remain raster/GeoNames working envelopes, not tile
+ownership. Regions may overlap. `osm_country_code` is a list of ISO alpha-2
+codes; the Natural Earth 1:10m polygons decide which countries can publish.
 
-The 300 km ALR margin avoids raster edge effects; it is not coverage and does not expand published ownership. Tiles are indivisible: N041E008 spans southern Corsica and northern Sardinia, so France or a future Italy region must own and cover the entire tile; no sub-tile merge is attempted.
+The 300 km ALR margin avoids raster edge effects and remains in the luminosity
+calculation, but it never creates candidates. Land masking and country clipping
+happen before redundancy, with no coastal buffer; islands are retained.
 
-Removing, renaming, or changing a published region/bbox is a data migration. Review it with --preview-bbox-migration, then explicitly decide on --prune-orphans. The approved France bbox exposes 11 existing N051 files containing 224 spots, plus empty E008 and E009 tiles. N051 is out of scope: it comes from the unclipped ALR margin, is visible at high zoom, and must be cleaned up before clusters are published.
+Changing a published country configuration is a spot-level migration. Run the
+read-only country audit first, then review `--migrate-country-tags` and (only if
+needed) `--prune-orphan-spots` in a disposable clone. A spot's stable `country`
+field, rather than `source_region`, controls replacement and makes publication
+independent of run order.
 
 Spot schema compatibility is strict for cluster generation: every spot must contain `id`, `lat`, `lon`, `darkness`, `bortle`, `near`, and `altitude`. A missing field is reported with its tile and spot index and aborts generation; it must not be silently ignored. Removing a field from the spot schema is therefore a data migration that must be handled before regenerating clusters. Extra source fields are ignored in the embedded cluster representative, whose contract remains the seven fields above.
+
+Published tile spots additionally carry mandatory producer field `country`
+(ISO alpha-2). The app may treat it as optional while reading historical
+caches; cluster representatives continue to project only the existing seven
+fields. Country is assigned from the Natural Earth clip, not from a region
+name, so splitting or regrouping regions does not orphan published spots.
 
 ## Published cluster files and cache identity
 
@@ -92,6 +113,8 @@ The repository contains clusters/index.json and clusters/L1.json–L6.json. Ever
 The `data/` directory contains:
 - **`cities500.zip`** — GeoNames populated places database (versioned in git). Downloaded from [GeoNames](https://download.geonames.org/export/dump/cities500.zip).
 - **`cities500.txt`** — extracted on first pipeline run (gitignored, ~50 MB).
+- **`natural_earth/`** — versioned Natural Earth v5.1.1 1:10m land and
+  admin-0 country layers. They are loaded locally; runs never download them.
 
 No other data files are required.
 

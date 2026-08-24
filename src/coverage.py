@@ -48,6 +48,7 @@ def _load_places_from_file(path: str | Path) -> list[dict]:
                 "lat": lat,
                 "lon": lon,
                 "population": population,
+                "country": cols[8].strip().upper() if len(cols) > 8 else "",
             })
     return places
 
@@ -97,11 +98,16 @@ def load_places(
     margin_lat = float(margin_km) * _DEG_PER_KM
     margin_lon = float(margin_km) * _DEG_PER_KM / math.cos(math.radians(mid_lat))
 
+    configured_countries = region.get("osm_country_code", [])
+    if isinstance(configured_countries, str):
+        configured_countries = [configured_countries]
+    configured_countries = {str(code).upper() for code in configured_countries}
     filtered = [
         p
         for p in all_places
         if (lat_min - margin_lat) <= p["lat"] <= (lat_max + margin_lat)
         and (lon_min - margin_lon) <= p["lon"] <= (lon_max + margin_lon)
+        and (not configured_countries or p.get("country") in configured_countries)
     ]
 
     logger.info("  Loaded %d places (GeoNames), %d within bbox+%dkm margin", len(all_places), len(filtered), margin_km)

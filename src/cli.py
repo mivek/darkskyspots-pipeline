@@ -68,8 +68,26 @@ def create_parser() -> argparse.ArgumentParser:
     modes.add_argument(
         "--list-orphans",
         action="store_true",
-        help="List published tiles that have no region owner",
+        help="Deprecated alias for the read-only country-tag audit",
     )
+    modes.add_argument(
+        "--audit-country-tags",
+        action="store_true",
+        help="Read-only audit of spot country tags",
+    )
+    modes.add_argument(
+        "--migrate-country-tags",
+        action="store_true",
+        help="Explicitly reclassify historical spots by Natural Earth",
+    )
+    parser.add_argument(
+        "--prune-orphan-spots",
+        action="store_true",
+        help="Explicitly delete unresolved/unconfigured historical spots",
+    )
+    # Keep the old spelling parseable solely to provide a safe migration error;
+    # it is never accepted as an operational alias.
+    parser.add_argument("--prune-orphans", action="store_true", help=argparse.SUPPRESS)
     modes.add_argument(
         "--preview-bbox-migration",
         action="store_true",
@@ -77,11 +95,6 @@ def create_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--no-clusters", action="store_true", help="Skip cluster generation"
-    )
-    parser.add_argument(
-        "--prune-orphans",
-        action="store_true",
-        help="Remove orphan tiles in the publication commit",
     )
     parser.add_argument(
         "--bbox-candidate",
@@ -104,6 +117,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = create_parser()
     args = parser.parse_args(argv)
 
+    if args.prune_orphans:
+        if args.list_orphans or args.audit_country_tags or args.preview_bbox_migration:
+            parser.error("--prune-orphans cannot be used in audit or preview mode")
+        parser.error("--prune-orphans was removed; use --migrate-country-tags and, separately, --prune-orphan-spots")
+
     candidates: dict[str, tuple[float, float, float, float]] = {}
     if args.bbox_candidate:
         from .regions import load_regions
@@ -124,23 +142,28 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     args.bbox_candidates = candidates
     del args.bbox_candidate
 
-    audit_mode = args.list_orphans or args.preview_bbox_migration
+    audit_mode = args.list_orphans or args.audit_country_tags or args.preview_bbox_migration
+    migration_mode = args.migrate_country_tags or args.prune_orphan_spots
+    if args.prune_orphan_spots and not args.migrate_country_tags:
+        parser.error("--prune-orphan-spots requires --migrate-country-tags")
     if args.bbox_candidates and not args.preview_bbox_migration:
         parser.error("--bbox-candidate requires --preview-bbox-migration")
-    if args.prune_orphans:
+    if migration_mode:
         if args.no_push:
-            parser.error("--prune-orphans cannot be used with --no-push")
-        if args.data_repo_url is None:
-            parser.error("--prune-orphans requires --data-repo-url")
+            # Local output migrations are useful in a temporary checkout and
+            # remain explicitly authorized by the migration flag.
+            pass
+        if not args.no_push and args.data_repo_url is None:
+            parser.error("country migration requires --data-repo-url unless --no-push is set")
         if audit_mode:
-            parser.error("--prune-orphans cannot be used in audit or preview mode")
+            parser.error("country migration cannot be combined with audit or preview mode")
 
     if args.regenerate_clusters:
         if args.year is None:
             parser.error("--year is required with --regenerate-clusters")
         if not args.no_push and args.data_repo_url is None:
             parser.error("--regenerate-clusters requires --data-repo-url")
-    elif not audit_mode:
+    elif not audit_mode and not migration_mode:
         if args.year is None:
             parser.error("--year is required for a normal run")
         if args.region is None:

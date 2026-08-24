@@ -6,8 +6,8 @@ import shutil
 from collections.abc import Collection
 import subprocess
 from pathlib import Path
-
 from .regions import owner_for_tile
+
 
 logger = logging.getLogger(__name__)
 
@@ -26,28 +26,101 @@ def clone_data_repo(url: str, branch: str, target_dir: str) -> str:
 
 
 def copy_spots_to_repo(
-    local_spots_dir: str, data_repo_dir: str, owned_tile_ids: Collection[str]
+    local_spots_dir: str, data_repo_dir: str, owned_tile_ids: Collection[str] | None = None,
+    *, country_codes: Collection[str] | None = None,
 ) -> None:
-    """Replace only owned tile JSONs, purging stale owned tiles."""
+    """Merge a region's country block into published tile files.
+
+    ``owned_tile_ids`` is retained as a compatibility parameter for callers
+    from the old bbox-ownership model.  It no longer controls publication.
+    """
     src = Path(local_spots_dir)
     dst = Path(data_repo_dir) / "spots"
     dst.mkdir(parents=True, exist_ok=True)
-    owned_names = {f"{tile_id}.json" for tile_id in owned_tile_ids}
-    src_files = {f.name: f for f in src.glob("*.json") if f.name in owned_names}
+    src_files = {f.name: f for f in src.glob("*.json")}
+    if country_codes is None:
+        # Legacy behavior is useful for external callers, but the pipeline
+        # always passes country_codes and uses the merge path below.
+        names = {f"{tile_id}.json" for tile_id in (owned_tile_ids or ())}
+        src_files = {name: path for name, path in src_files.items() if name in names}
+        for name in sorted(names - src_files.keys()):
+            (dst / name).unlink(missing_ok=True)
+        for name, source in src_files.items():
+            shutil.copy2(str(source), str(dst / name))
+        logger.info("Purged %d stale owned tile(s)", len(names - src_files.keys()))
+        return
 
-    stale_names = sorted(owned_names - src_files.keys())
-    for stale_name in stale_names:
-        (dst / stale_name).unlink(missing_ok=True)
-    logger.info("Purged %d stale owned tile(s)", len(stale_names))
-    for name, source in src_files.items():
-        shutil.copy2(str(source), str(dst / name))
+    codes = {str(code).upper() for code in country_codes}
+    changed = 0
+    names_to_merge = set(src_files)
+    # A country may have historical spots outside today's raster envelope.
+    # Inspect all existing tiles and remove that country's old block even when
+    # the current run has no replacement tile there.
+    for target in dst.glob("*.json"):
+        if target.name in names_to_merge:
+            continue
+        try:
+            existing = json.loads(target.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if any(str(spot.get("country", "")).upper() in codes for spot in existing.get("spots", [])):
+            names_to_merge.add(target.name)
+    for name in sorted(names_to_merge):
+        target = dst / name
+        old_env = {}
+        if target.exists():
+            with target.open(encoding="utf-8") as handle:
+                old_env = json.load(handle)
+        if name in src_files:
+            with src_files[name].open(encoding="utf-8") as handle:
+                new_env = json.load(handle)
+        else:
+            new_env = dict(old_env)
+            new_env["spots"] = []
+        merged = merge_tile_envelopes(old_env, new_env, codes)
+        if not merged["spots"]:
+            if target.exists():
+                target.unlink()
+                changed += 1
+            continue
+        content = json.dumps(merged, indent=4, ensure_ascii=False) + "\n"
+        if not target.exists() or target.read_text(encoding="utf-8") != content:
+            target.write_text(content, encoding="utf-8")
+            changed += 1
+    logger.info("Merged %d country publication tile(s)", changed)
+
+
+def merge_tile_envelopes(
+    old: dict | None,
+    new: dict,
+    country_codes: Collection[str],
+) -> dict:
+    """Return deterministic country-block merge without mutating inputs."""
+    codes = {str(code).upper() for code in country_codes}
+    old_spots = list((old or {}).get("spots", []))
+    new_spots = list(new.get("spots", []))
+    preserved = [spot for spot in old_spots if str(spot.get("country", "")).upper() not in codes]
+    incoming = [spot for spot in new_spots if str(spot.get("country", "")).upper() in codes or not codes]
+    # Country blocks are stable across run order; preserve pipeline order in
+    # each block to avoid a repository-wide reorder during first migration.
+    blocks: dict[str, list[dict]] = {}
+    for spot in preserved + incoming:
+        key = str(spot.get("country", "")).upper()
+        blocks.setdefault(key, []).append(spot)
+    ordered = [spot for key in sorted(blocks) for spot in blocks[key]]
+    envelope = dict(old or new)
+    for key in ("version", "source", "generated", "tile"):
+        if key in new:
+            envelope[key] = new[key]
+    envelope["spots"] = ordered
+    return envelope
 
 
 def scan_orphan_tiles(
     spots_dir: str | Path,
     regions: dict[str, dict],
 ) -> dict[str, int]:
-    """Return sorted orphan tile IDs mapped to their spot counts."""
+    """Legacy tile audit retained for compatibility; not used by pipeline."""
     orphan_counts: dict[str, int] = {}
     for json_path in sorted(Path(spots_dir).glob("*.json")):
         if owner_for_tile(json_path.stem, regions) is None:
@@ -64,6 +137,130 @@ def scan_orphan_tiles(
                 )
             orphan_counts[json_path.stem] = len(spots)
     return orphan_counts
+
+
+def audit_country_spots(spots_dir: str | Path, regions: dict[str, dict], *, geography=None) -> dict:
+    """Read-only audit of country tags and configured-region coverage."""
+    from .geography import load_geography
+    from shapely.geometry import Point
+    geography = geography or load_geography()
+    configured = {
+        str(code).upper()
+        for region in regions.values()
+        for code in (region.get("osm_country_code", []) if isinstance(region.get("osm_country_code", []), (list, tuple, set)) else [region.get("osm_country_code")])
+    }
+    result = {"missing": [], "invalid": [], "unconfigured": [], "mismatched": [], "ambiguous": [], "valid": 0}
+    for path in sorted(Path(spots_dir).glob("*.json")):
+        with path.open(encoding="utf-8") as handle:
+            envelope = json.load(handle)
+        for index, spot in enumerate(envelope.get("spots", [])):
+            country = spot.get("country")
+            ref = {"tile": path.stem, "index": index, "id": spot.get("id")}
+            if not country:
+                result["missing"].append(ref)
+            elif not isinstance(country, str) or len(country) != 2 or not country.isalpha():
+                result["invalid"].append(ref)
+            elif country.upper() not in configured:
+                result["unconfigured"].append({**ref, "country": country.upper()})
+            else:
+                try:
+                    matches = geography.country_candidates(Point(float(spot["lon"]), float(spot["lat"])))
+                except (KeyError, TypeError, ValueError):
+                    matches = []
+                if country.upper() not in matches:
+                    result["mismatched"].append({**ref, "country": country.upper()})
+                elif len(matches) > 1:
+                    result["ambiguous"].append({**ref, "countries": matches})
+                else:
+                    result["valid"] += 1
+    return result
+
+
+def migrate_country_tags(
+    spots_dir: str | Path,
+    *,
+    geography=None,
+    data_dir=None,
+    delete_orphans: bool = False,
+    configured_codes: Collection[str] | None = None,
+) -> dict:
+    """Reclassify legacy spots; optionally delete unresolved country orphans.
+
+    Existing tags are not trusted blindly: a configured tag whose coordinates
+    now resolve to another country is reclassified as well.  Point-only
+    boundary cases remain unresolved, because choosing a country without the
+    source raster pixel would be arbitrary.
+    """
+    from .geography import classify_candidates
+    from shapely.geometry import Point
+
+    configured = {str(code).upper() for code in (configured_codes or ())}
+    if geography is None:
+        from .geography import load_geography
+        geography = load_geography(data_dir) if data_dir else load_geography()
+    all_codes = set(geography.country_codes)
+    report = {"reclassified": 0, "deleted": 0, "ambiguous": 0}
+    for path in sorted(Path(spots_dir).glob("*.json")):
+        with path.open(encoding="utf-8") as handle:
+            envelope = json.load(handle)
+        spots = envelope.get("spots", [])
+        pending = []
+        for spot in spots:
+            country = spot.get("country")
+            try:
+                matches = geography.country_candidates(
+                    Point(float(spot["lon"]), float(spot["lat"]))
+                )
+            except (KeyError, TypeError, ValueError):
+                matches = []
+            if (
+                not isinstance(country, str)
+                or len(country) != 2
+                or country.upper() not in matches
+                or len(matches) != 1
+                or (configured and country.upper() not in configured)
+            ):
+                pending.append(spot)
+        if pending:
+            classified, stats = classify_candidates(
+                pending,
+                all_codes,
+                geography=geography,
+                data_dir=data_dir,
+                reject_ambiguous=True,
+            )
+            report["ambiguous"] += stats["ambiguous_country_candidates"]
+            tagged = {id(spot): spot for spot in classified}
+            pending_ids = {id(spot) for spot in pending}
+            updated = []
+            for spot in spots:
+                if id(spot) in tagged:
+                    resolved = str(spot.get("country", "")).upper()
+                    # A valid but unconfigured country is still an orphan for
+                    # this publication. It is only removed when deletion was
+                    # explicitly authorized.
+                    if configured and resolved not in configured and delete_orphans:
+                        report["deleted"] += 1
+                    else:
+                        spot["country"] = resolved
+                        updated.append(spot)
+                        report["reclassified"] += 1
+                elif id(spot) in pending_ids:
+                    if delete_orphans:
+                        report["deleted"] += 1
+                    else:
+                        updated.append(spot)
+                else:
+                    updated.append(spot)
+            if not updated and delete_orphans:
+                path.unlink()
+                continue
+            envelope["spots"] = updated
+            path.write_text(
+                json.dumps(envelope, indent=4, ensure_ascii=False) + "\n",
+                encoding="utf-8",
+            )
+    return report
 
 
 def prune_orphan_tiles(

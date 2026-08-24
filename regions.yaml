@@ -2,5 +2,5 @@ france:
   bbox: [-6, 41, 8, 51]
   equal_area_epsg: 3035
   admin_level: 8
-  osm_country_code: "FR"
+  osm_country_code: ["FR"]
   name: "France"

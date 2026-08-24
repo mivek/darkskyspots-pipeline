@@ -33,11 +33,13 @@ from src.publish import (
     commit_and_push,
     compute_new_version,
     copy_spots_to_repo,
-    prune_orphan_tiles,
-    scan_orphan_tiles,
+    merge_tile_envelopes,
+    audit_country_spots,
+    migrate_country_tags,
 )
 from src.clusters import write_cluster_files
-from src.regions import get_region, load_regions, owned_tile_ids, owner_for_tile
+from src.regions import get_region, load_regions
+from src.geography import classify_candidates
 from src.tile_export import (
     classify_spots_into_tiles,
     enumerate_tiles_in_bbox,
@@ -54,7 +56,6 @@ def run(args, current_owned_tile_ids: set[str] | None = None) -> int:
     """Execute the 7-step pipeline. Returns 0 on success, 1 on error."""
     try:
         region = get_region(args.region)
-        regions = load_regions()
         logger.info("Region: %s (%s)", region["name"], args.region)
 
         input_path = Path(args.input_dir) / args.region / f"{args.year}.tif"
@@ -65,14 +66,12 @@ def run(args, current_owned_tile_ids: set[str] | None = None) -> int:
         output_dir = Path(args.output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
 
-        current_owned_tile_ids = (
-            owned_tile_ids(args.region, regions)
-            if current_owned_tile_ids is None
-            else current_owned_tile_ids
-        )
-        all_tile_ids = _assert_owned_tile_ids_match(
-            args.region, region["bbox"], current_owned_tile_ids
-        )
+        # Bboxes remain raster/GeoNames envelopes only.  They do not confer
+        # ownership of any tile; country clipping decides what is publishable.
+        all_tile_ids = sorted(enumerate_tiles_in_bbox(tuple(region["bbox"]), TILE_SIZE_DEG))
+        country_codes = region["osm_country_code"]
+        if isinstance(country_codes, str):
+            country_codes = [country_codes]
 
         # Step 0: Radiance -> ALR (returns data + geo metadata)
         logger.info("Step 0: Radiance -> ALR")
@@ -123,6 +122,15 @@ def run(args, current_owned_tile_ids: set[str] | None = None) -> int:
             cand["darkness"] = float(darkness[r, c])
         logger.info("  Attached bortle to %d candidates", len(candidates))
 
+        # The ALR margin is retained above for radiance context, but candidates
+        # are clipped before redundancy so an unpublished foreign/sea minimum
+        # can never suppress a published candidate.
+        logger.info("Step 2c: Natural Earth land mask and country clip")
+        candidates, geography_stats = classify_candidates(
+            candidates, country_codes, transform=transform, crs=crs
+        )
+        logger.info("  Geographic candidate stats: %s", geography_stats)
+
         # Step 3: Redundancy filter
         logger.info("Step 3: Redundancy filter")
         filtered = redundancy_filter(candidates, REDUNDANCY_KM)
@@ -161,8 +169,6 @@ def run(args, current_owned_tile_ids: set[str] | None = None) -> int:
         tiles_dict = classify_spots_into_tiles(enriched, TILE_SIZE_DEG)
         occupied_tile_ids = set(tiles_dict.keys())
 
-        if current_owned_tile_ids is None:
-            raise AssertionError("current_owned_tile_ids must be initialized before tile export")
         empty_tile_ids = [tid for tid in all_tile_ids if tid not in occupied_tile_ids]
 
         placeholder_version = f"{args.year}.0"
@@ -200,16 +206,21 @@ def run(args, current_owned_tile_ids: set[str] | None = None) -> int:
                             env = json.load(f)
                         old_envelopes[env["tile"]] = env
 
-            preserved_old_non_owned = {
-                tile_id_str: envelope
-                for tile_id_str, envelope in old_envelopes.items()
-                if owner_for_tile(tile_id_str, regions) != args.region
+            comparison_envelopes = {
+                tile_id_str: merge_tile_envelopes(
+                    old_envelopes.get(tile_id_str), env, country_codes
+                )
+                for tile_id_str, env in new_envelopes.items()
             }
-            comparison_envelopes = preserved_old_non_owned | {
-                tile_id_str: envelope
-                for tile_id_str, envelope in new_envelopes.items()
-                if tile_id_str in current_owned_tile_ids
-            }
+            for tile_id_str, envelope in old_envelopes.items():
+                if tile_id_str not in comparison_envelopes:
+                    stale = merge_tile_envelopes(
+                        envelope,
+                        {"tile": tile_id_str, "spots": []},
+                        country_codes,
+                    )
+                    if stale.get("spots"):
+                        comparison_envelopes[tile_id_str] = stale
             version, changed = compute_new_version(
                 old_envelopes, comparison_envelopes, args.year
             )
@@ -232,11 +243,8 @@ def run(args, current_owned_tile_ids: set[str] | None = None) -> int:
             if not getattr(args, "no_push", False):
                 logger.info("Step 7: Publish to data repo")
                 copy_spots_to_repo(
-                    str(output_dir / "spots"), data_repo_dir, current_owned_tile_ids
+                    str(output_dir / "spots"), data_repo_dir, country_codes=country_codes
                 )
-                if scan_orphan_tiles(data_repo_dir / "spots", regions):
-                    logger.error("Orphan tiles remain after publication copy")
-                    return 1
                 if not getattr(args, "no_clusters", False):
                     write_cluster_files(
                         data_repo_dir / "spots",
@@ -292,20 +300,6 @@ def _load_envelopes(spots_dir):
     return envelopes
 
 
-def _assert_owned_tile_ids_match(region_name: str, bbox, owned_ids: set[str]) -> list[str]:
-    enumerated = set(enumerate_tiles_in_bbox(tuple(bbox), TILE_SIZE_DEG))
-    owned = set(owned_ids)
-    if enumerated != owned:
-        missing_from_enumeration = sorted(owned - enumerated)
-        unexpected_from_enumeration = sorted(enumerated - owned)
-        raise ValueError(
-            f"Tile ownership invariant failed for {region_name!r}: "
-            f"owned-only={missing_from_enumeration}, "
-            f"enumerated-only={unexpected_from_enumeration}"
-        )
-    return sorted(enumerated)
-
-
 _legacy_run = run
 
 
@@ -322,16 +316,18 @@ def _load_tile_counts(spots_dir: Path) -> dict[str, int]:
     return counts
 
 
-def _audit_before_write(spots_dir: Path, regions: dict[str, dict], prune: bool) -> tuple[bool, dict[str, int]]:
-    orphans = scan_orphan_tiles(spots_dir, regions)
-    if not orphans:
-        return True, {}
-    if not prune:
-        logger.error("Orphan tiles found: %s", ", ".join(sorted(orphans)))
-        return False, {}
-    pruned = prune_orphan_tiles(spots_dir, regions)
-    logger.warning("Pruned orphan tiles: %s", ", ".join(sorted(pruned)))
-    return True, pruned
+def _audit_before_write(spots_dir: Path, regions: dict[str, dict]) -> bool:
+    """Gate publication on country-level anomalies, without mutating files."""
+    audit = audit_country_spots(spots_dir, regions)
+    problems = sum(len(audit[key]) for key in ("missing", "invalid", "unconfigured", "mismatched"))
+    if problems:
+        logger.error(
+            "Country audit failed: missing=%d invalid=%d unconfigured=%d mismatched=%d; "
+            "run --migrate-country-tags then --prune-orphan-spots explicitly",
+            len(audit["missing"]), len(audit["invalid"]), len(audit["unconfigured"]), len(audit["mismatched"]),
+        )
+        return False
+    return True
 
 
 def run_list_orphans(args) -> int:
@@ -341,13 +337,11 @@ def run_list_orphans(args) -> int:
             with tempfile.TemporaryDirectory() as clone_ctx:
                 clone_dir = Path(clone_ctx)
                 clone_data_repo(args.data_repo_url, args.data_repo_branch, str(clone_dir))
-                orphans = scan_orphan_tiles(clone_dir / "spots", regions)
+                audit = audit_country_spots(clone_dir / "spots", regions)
         else:
-            orphans = scan_orphan_tiles(Path(args.output_dir) / "spots", regions)
-        for tile_id_str, count in sorted(orphans.items()):
-            print(f"{tile_id_str}: {count} spots")
-        print(f"Total: {len(orphans)} tiles, {sum(orphans.values())} spots")
-        return 0
+            audit = audit_country_spots(Path(args.output_dir) / "spots", regions)
+        print(json.dumps(audit, indent=2, ensure_ascii=False))
+        return 0 if not (audit["missing"] or audit["invalid"] or audit["unconfigured"] or audit["mismatched"]) else 1
     except Exception:
         logger.exception("Orphan audit failed")
         return 1
@@ -382,32 +376,72 @@ def run_regenerate_clusters(args) -> int:
                 if not spots_dir.is_dir():
                     logger.error("Local cluster regeneration requires output/spots; it does not exist: %s", spots_dir)
                     return 1
-                allowed_tile_ids = set().union(*(owned_tile_ids(name, regions) for name in regions))
                 write_cluster_files(
                     spots_dir,
                     output_dir / "clusters-local",
                     data_year=args.year,
                     generated=_generated_date(),
-                    allowed_tile_ids=allowed_tile_ids,
                 )
             return 0
         with tempfile.TemporaryDirectory() as clone_ctx:
             clone_dir = Path(clone_ctx)
             clone_data_repo(args.data_repo_url, args.data_repo_branch, str(clone_dir))
-            ok, pruned = _audit_before_write(clone_dir / "spots", regions, args.prune_orphans)
-            if not ok:
+            if not _audit_before_write(clone_dir / "spots", regions):
                 return 1
             if not args.no_clusters:
                 write_cluster_files(clone_dir / "spots", clone_dir / "clusters", data_year=args.year, generated=_generated_date())
-            if scan_orphan_tiles(clone_dir / "spots", regions):
-                logger.error("Orphan tiles remain after cluster regeneration")
-                return 1
-            if not args.no_clusters or pruned:
+            if not args.no_clusters:
                 _ensure_clone_is_not_output(clone_dir, output_dir)
                 commit_and_push(str(clone_dir), f"data: regenerate clusters ({args.year})")
         return 0
     except Exception:
         logger.exception("Cluster regeneration failed")
+        return 1
+
+
+def run_country_migration(args) -> int:
+    """Explicitly authorized historical country-tag migration.
+
+    Audit mode never calls this function.  Migration always runs in a cloned
+    repository and commits only after the requested transformation succeeds.
+    """
+    try:
+        regions = load_regions()
+        configured = {
+            code
+            for region in regions.values()
+            for code in (region["osm_country_code"] if isinstance(region["osm_country_code"], (list, tuple)) else [region["osm_country_code"]])
+        }
+        if args.no_push:
+            spots_dir = Path(args.output_dir) / "spots"
+            if not spots_dir.is_dir():
+                logger.error("No local spots directory: %s", spots_dir)
+                return 1
+            report = migrate_country_tags(
+                spots_dir,
+                configured_codes=configured,
+                delete_orphans=getattr(args, "prune_orphan_spots", False),
+            )
+        else:
+            with tempfile.TemporaryDirectory() as clone_ctx:
+                clone_dir = Path(clone_ctx)
+                clone_data_repo(args.data_repo_url, args.data_repo_branch, str(clone_dir))
+                report = migrate_country_tags(
+                    clone_dir / "spots",
+                    configured_codes=configured,
+                    delete_orphans=getattr(args, "prune_orphan_spots", False),
+                )
+                audit = audit_country_spots(clone_dir / "spots", regions)
+                if not getattr(args, "prune_orphan_spots", False) and (
+                    audit["missing"] or audit["invalid"] or audit["unconfigured"] or audit["mismatched"]
+                ):
+                    logger.error("Migration left unresolved spots; use --prune-orphan-spots explicitly")
+                    return 1
+                commit_and_push(str(clone_dir), f"data: migrate country tags ({args.year})")
+        print(json.dumps(report, indent=2, ensure_ascii=False))
+        return 0
+    except Exception:
+        logger.exception("Country migration failed")
         return 1
 
 
@@ -417,14 +451,16 @@ def run(args) -> int:
         return run_regenerate_clusters(args)
     if getattr(args, "list_orphans", False):
         return run_list_orphans(args)
+    if getattr(args, "audit_country_tags", False):
+        return run_list_orphans(args)
+    if getattr(args, "migrate_country_tags", False) or getattr(args, "prune_orphan_spots", False):
+        return run_country_migration(args)
     if getattr(args, "preview_bbox_migration", False):
         return run_preview_bbox_migration(args)
 
     if args.no_push:
         try:
-            regions = load_regions()
-            current_owned_tile_ids = owned_tile_ids(args.region, regions)
-            result = _legacy_run(args, current_owned_tile_ids=current_owned_tile_ids)
+            result = _legacy_run(args)
             if result or args.no_clusters:
                 return result
             output_dir = Path(args.output_dir)
@@ -433,7 +469,6 @@ def run(args) -> int:
                 output_dir / "clusters-local",
                 data_year=args.year,
                 generated=_generated_date(),
-                allowed_tile_ids=current_owned_tile_ids,
             )
             return 0
         except Exception:
@@ -452,10 +487,7 @@ def run(args) -> int:
             clone_dir = Path(clone_ctx)
             clone_data_repo(args.data_repo_url, args.data_repo_branch, str(clone_dir))
             # This audit must stay before _legacy_run: it gates all raster work.
-            ok, _pruned = _audit_before_write(
-                clone_dir / "spots", regions, args.prune_orphans
-            )
-            if not ok:
+            if not _audit_before_write(clone_dir / "spots", regions):
                 return 1
             _PUBLISHED_CLONE = clone_dir
             _PUBLISHED_OLD_ENVELOPES = _load_envelopes(clone_dir / "spots")
