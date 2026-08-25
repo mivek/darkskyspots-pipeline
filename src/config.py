@@ -31,6 +31,11 @@ ALR_ALPHA_EXP = 0.28
 # (acceptable: the app targets dark/rural skies, and the residual is on the
 # conservative side — the pipeline slightly over-estimates urban pollution).
 # Control points and expected values are recorded in validation/checkpoints.json.
+# Cross-check 2026-08-25: lightpollutionmap is not field validation; both chains use
+# the same VIIRS raster and can be wrong together. Residuals are -0.161 mag (dark),
+# -0.214 (rural), and +0.196 (urban), so one constant cannot correct them.
+# Ranking remains Spearman 0.979 / 94.9% of pairs; altitude (France R²=.0015)
+# and latitude do not explain the gap. Details: validation/calibration_crosscheck_2026-08-25.md.
 ALR_CALIB_C = 1.0 / 1125.44
 ALR_RINGS = 38
 ALR_MAX_KM = 300

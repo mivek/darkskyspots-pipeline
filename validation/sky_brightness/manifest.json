@@ -1,0 +1,25 @@
+{
+  "source": {
+    "site": "lightpollutionmap.info",
+    "documentation": "https://www.lightpollutionmap.info/help.html#FAQ31",
+    "endpoint": "https://www.lightpollutionmap.info/api/queryraster",
+    "method": "POST",
+    "layer": "SB_2025",
+    "query_type": "raster",
+    "query_geometry": "LINESTRING(-4.89 42.50,6.00 42.50,6.00 52.00,-4.89 52.00,-4.89 42.50)",
+    "retrieved_at": "2026-08-25",
+    "note": "The current web application exposes this polygon export although the FAQ text still says raw Sky Brightness export is not available. The endpoint is not treated as a stable contract."
+  },
+  "layer_year": 2025,
+  "file": "sb_2025_western_europe.tif",
+  "sha256": "6b6543bbb1b8f5135651c7ff2f25f8f9acbde2e13d5197a0e4d3a36ea7b5741a",
+  "crs": "EPSG:4326",
+  "requested_bbox": [-4.89, 42.50, 6.00, 52.00],
+  "actual_bbox": [-4.891666666666678, 42.5, 5.999999999999988, 52.0],
+  "width": 1307,
+  "height": 1140,
+  "resolution_degrees": 0.008333333333333333,
+  "resolution_arcseconds": 30,
+  "value": "artificial sky brightness used by the site's FAQ31 SQM formula; float32; nodata=-999.9000244140625",
+  "comparison_rule": "Read the exact containing pixel at the same WGS84 coordinate in the pipeline raster and this 30 arcsec raster; do not interpolate or claim sub-pixel precision."
+}

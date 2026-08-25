@@ -159,6 +159,48 @@ python calibrate_exact.py \
 
 The report compares continuous SQM-equivalent values and, secondarily, Bortle. It also reports the displayed integer score under clear sky, new moon, and a complete astronomical night. `SQM_naturel = 22.0` is an explicit conversion assumption, not a pipeline constant; an error of ±0.20 mag shifts absolute SQM deltas uniformly, while relative country comparisons remain comparable. It does not derive or change `ALR_CALIB_C`. The SQM value from lightpollutionmap is a model, not a ground measurement: the comparison measures divergence between models, not which one is correct. This audit is for western Europe; a second raster is required for high-latitude validation such as Scandinavia.
 
+The extended raster cross-check uses the versioned 2025 Sky Brightness export and
+reads the exact containing pixel in both grids:
+
+```bash
+python calibrate_exact.py \
+  --darkness output/crosscheck/debug_darkness_france_2025.tif \
+  --bortle output/crosscheck/debug_bortle_france_2025.tif \
+  --sky-brightness validation/sky_brightness/sb_2025_western_europe.tif \
+  --spots-dir output/crosscheck/spots \
+  --elevation-overrides validation/france_spot_elevations.json \
+  --foreign-samples validation/crosscheck_samples.json \
+  --json-out output/crosscheck/report.json
+```
+
+`validation/sky_brightness/manifest.json` freezes the export provenance and
+`validation/crosscheck_samples.json` contains the deterministic Spain/UK grid
+sample. The Sky Brightness conversion follows lightpollutionmap FAQ31 and its
+22.00 mag/arcsec² natural-sky anchor. Both models still share the same VIIRS
+input, so this is a cross-model divergence measurement, not independent field
+validation; it cannot establish which model is correct or justify changing
+`ALR_CALIB_C` by itself. The latitude span is western Europe only and says
+nothing about Scandinavia or other high latitudes.
+
+The score section reports the distribution of absolute integer differences
+(`0`, `1`, `2`, `3+`), the signed mean/median, and the significant count
+`abs(delta_score) >= 1`. Because the displayed score is already an integer,
+the latter is mathematically the same as any non-zero score difference; the
+distribution gives the useful magnitude. It also reports Spearman correlation
+and discordant continuous SQM pairs to measure whether a systematic bias
+preserves the spot ranking. `validation/france_spot_elevations.json` supplies
+the same modeled ASTER30m/OpenTopoData altitude covariate for the French spots;
+it is provenance-frozen and is not a pipeline input or a calibration
+parameter. The report then gives Pearson/Spearman altitude correlations,
+simple slopes, univariate covariate correlations, and descriptive standardized
+multiple-regression betas for altitude, darkness, Bortle, latitude, and
+longitude. Darkness and Bortle are related pipeline outputs, so these are
+associations rather than causal effects. Foreign and French altitudes are
+modeled elevations, not terrain measurements.
+
+The dated investigation and decision are recorded in
+[`validation/calibration_crosscheck_2026-08-25.md`](validation/calibration_crosscheck_2026-08-25.md).
+
 ## Credits
 
 - **ALR method:** Duriscoe et al. (2018). Implemented in Python by Katy Abbott (NPS) at [github.com/mivek/nightskyquality](https://github.com/mivek/nightskyquality) (MIT).
