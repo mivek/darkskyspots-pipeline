@@ -458,6 +458,60 @@ def test_publishing_audits_the_clone_before_raster_work(tmp_path):
     assert events == ["clone", "audit"]
 
 
+@pytest.mark.parametrize("problem_key", ["ambiguous", "unassignable"])
+def test_audit_modes_reject_new_country_anomaly_categories(tmp_path, problem_key):
+    """Ambiguous and unassignable spots are blocking audit findings."""
+    from run import _audit_before_write, run_list_orphans
+
+    audit = {
+        "missing": 0,
+        "invalid": 0,
+        "unconfigured": 0,
+        "mismatched": 0,
+        "ambiguous": 0,
+        "unassignable": 0,
+    }
+    audit[problem_key] = 1
+    with patch("run.audit_country_spots", return_value=audit):
+        assert _audit_before_write(tmp_path / "spots", {}) is False
+        args = MagicMock(data_repo_url=None, output_dir=str(tmp_path))
+        assert run_list_orphans(args) == 1
+
+
+@pytest.mark.parametrize("problem_key", ["ambiguous", "unassignable"])
+def test_migration_guard_rejects_new_country_anomaly_categories(tmp_path, problem_key):
+    from run import run_country_migration
+
+    audit = {
+        "missing": 0,
+        "invalid": 0,
+        "unconfigured": 0,
+        "mismatched": 0,
+        "ambiguous": 0,
+        "unassignable": 0,
+    }
+    audit[problem_key] = 1
+    regions = {"france": {"osm_country_code": ["FR"]}}
+
+    def clone(_url, _branch, target):
+        (Path(target) / "spots").mkdir()
+
+    args = MagicMock(
+        no_push=False,
+        data_repo_url="git@example.invalid:data.git",
+        data_repo_branch="main",
+        year=2025,
+        prune_orphan_spots=False,
+    )
+    with patch("run.load_regions", return_value=regions), \
+         patch("run.clone_data_repo", side_effect=clone), \
+         patch("run.migrate_country_tags", return_value={}), \
+         patch("run.audit_country_spots", return_value=audit), \
+         patch("run.commit_and_push") as commit:
+        assert run_country_migration(args) == 1
+    commit.assert_not_called()
+
+
 def test_country_pruning_requires_explicit_migration_flag(tmp_path):
     """Deletion is a separate explicit authorization from the read-only audit."""
     from src.cli import parse_args
