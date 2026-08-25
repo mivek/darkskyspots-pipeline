@@ -149,7 +149,15 @@ Tile IDs use **3-digit zero-padded lat/lon**: `N{lat:03d}E{lon:03d}` (e.g. `N042
 
 ## Validation
 
-After each run, manually record Bortle estimates for the control points in `validation/checkpoints.json` against [lightpollutionmap.info](https://www.lightpollutionmap.info) (Sky Brightness layer). Tolerance: ±1 Bortle class. Tune `ALR_CALIB_C` in `src/config.py` if mismatched.
+For a calibration audit, read the SQM values manually from [lightpollutionmap.info](https://www.lightpollutionmap.info) and fill `sqm` in `validation/calibration_points.json`. Then compare the exact raster pixels:
+
+```bash
+python calibrate_exact.py \
+  --darkness output/debug_darkness_france_2025.tif \
+  --bortle output/debug_bortle_france_2025.tif
+```
+
+The report compares continuous SQM-equivalent values and, secondarily, Bortle. It also reports the displayed integer score under clear sky, new moon, and a complete astronomical night. `SQM_naturel = 22.0` is an explicit conversion assumption, not a pipeline constant; an error of ±0.20 mag shifts absolute SQM deltas uniformly, while relative country comparisons remain comparable. It does not derive or change `ALR_CALIB_C`. The SQM value from lightpollutionmap is a model, not a ground measurement: the comparison measures divergence between models, not which one is correct. This audit is for western Europe; a second raster is required for high-latitude validation such as Scandinavia.
 
 ## Credits
 

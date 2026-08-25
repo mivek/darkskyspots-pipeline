@@ -1,0 +1,14 @@
+[
+  {"label": "Sombre (Massif Central)", "country": "FR", "region": "Massif Central", "lat": 45.5319, "lon": 2.63111, "sqm": 21.94, "bortle_ref": 2},
+  {"label": "Rural (Massif Central)", "country": "FR", "region": "Massif Central", "lat": 45.77543, "lon": 3.29274, "sqm": 21.51, "bortle_ref": 4},
+  {"label": "Périurbain (Clermont)", "country": "FR", "region": "Massif Central", "lat": 45.54908, "lon": 3.24947, "sqm": 20.89, "bortle_ref": 4},
+  {"label": "Ville (Clermont)", "country": "FR", "region": "Massif Central", "lat": 45.78652, "lon": 3.10737, "sqm": 19.69, "bortle_ref": 5},
+  {"label": "Navarre ouest", "country": "ES", "region": "Pyrénées occidentales", "lat": 42.9, "lon": -2.0, "sqm": null, "bortle_ref": null},
+  {"label": "Navarre centrale", "country": "ES", "region": "Pyrénées occidentales", "lat": 42.75, "lon": -1.0, "sqm": null, "bortle_ref": null},
+  {"label": "Aragon nord-ouest", "country": "ES", "region": "Pyrénées occidentales", "lat": 42.75, "lon": -0.5, "sqm": null, "bortle_ref": null},
+  {"label": "Navarre nord", "country": "ES", "region": "Pyrénées occidentales", "lat": 42.95, "lon": -1.0, "sqm": null, "bortle_ref": null},
+  {"label": "Dartmoor", "country": "GB", "region": "Sud-Ouest Angleterre", "lat": 50.57, "lon": -3.95, "sqm": null, "bortle_ref": null},
+  {"label": "Exmoor", "country": "GB", "region": "Sud-Ouest Angleterre", "lat": 51.15, "lon": -3.65, "sqm": null, "bortle_ref": null},
+  {"label": "Cranborne Chase", "country": "GB", "region": "Sud-Ouest Angleterre", "lat": 50.95, "lon": -2.0, "sqm": null, "bortle_ref": null},
+  {"label": "New Forest", "country": "GB", "region": "Sud-Angleterre", "lat": 50.85, "lon": -1.65, "sqm": null, "bortle_ref": null}
+]
