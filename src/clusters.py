@@ -4,6 +4,7 @@ from dataclasses import dataclass
 import hashlib
 import json
 import math
+from numbers import Real
 from pathlib import Path
 from typing import Collection
 
@@ -25,7 +26,20 @@ LEVELS: tuple[LevelSpec, ...] = (
 )
 
 
-SPOT_FIELDS = ("id", "lat", "lon", "darkness", "bortle", "near", "altitude")
+# Cluster representatives use the same public spot contract as tile data.
+# ``nameDistanceKm`` is nullable for ADM2/ADM1 fallbacks, but remains required
+# so consumers can distinguish a missing field from an administrative fallback.
+SPOT_FIELDS = (
+    "id",
+    "lat",
+    "lon",
+    "darkness",
+    "bortle",
+    "near",
+    "name",
+    "nameDistanceKm",
+    "altitude",
+)
 
 
 def _normalize_spot(
@@ -50,10 +64,31 @@ def _normalize_spot(
             f"Invalid spot in {tile_path}: spot {spot_index} has non-numeric "
             "lat/lon/darkness"
         ) from exc
+    name = source_spot["name"]
+    if not isinstance(name, str) or not name.strip():
+        raise ValueError(
+            f"Invalid spot in {tile_path}: spot {spot_index} has an empty or non-string name"
+        )
+    name_distance = source_spot["nameDistanceKm"]
+    if name_distance is not None:
+        if (
+            isinstance(name_distance, bool)
+            or not isinstance(name_distance, Real)
+            or not math.isfinite(float(name_distance))
+            or float(name_distance) < 0
+        ):
+            raise ValueError(
+                f"Invalid spot in {tile_path}: spot {spot_index} has an invalid nameDistanceKm"
+            )
     normalized = {field: source_spot[field] for field in SPOT_FIELDS}
     normalized["lat"] = lat
     normalized["lon"] = lon
     normalized["darkness"] = darkness
+    # Keep the wire value JSON-compatible even when callers pass a numeric
+    # scalar from NumPy or another Real implementation.
+    normalized["nameDistanceKm"] = (
+        None if name_distance is None else float(name_distance)
+    )
     return normalized, lat, lon
 
 

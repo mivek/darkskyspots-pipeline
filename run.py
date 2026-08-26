@@ -23,8 +23,9 @@ from src.config import (
     REDUNDANCY_KM,
     TILE_SIZE_DEG,
 )
-from src.coverage import attach_near_town, ensure_coverage, filter_sea_spots, load_places
+from src.coverage import attach_near_town, ensure_coverage, load_places
 from src.enrich import enrich_all
+from src.geonames import GeoNamesIndex
 from src.extract import mesh_minima, redundancy_filter
 from src.alr import slice_and_compute
 from src.convert import alr_to_bortle, alr_to_darkness
@@ -47,6 +48,21 @@ from src.tile_export import (
 )
 
 logger = logging.getLogger("pipeline")
+
+# Product parameter for the naming cascade.  Keep this list at the call site
+# (rather than hiding it in the GeoNames loader) so measurement runs and future
+# regions can inject a reviewed list without changing the index implementation.
+# The list is intentionally code-granular: whole GeoNames classes contain
+# noisy linear features such as streams and micro-reliefs.
+NAMING_FEATURE_CODES = (
+    "PPL", "PPLA", "PPLA2", "PPLA3", "PPLA4", "PPLA5", "PPLC", "PPLF",
+    "PPLG", "PPLL", "PPLR", "PPLS",
+    "LK", "LKC", "LKN", "LKS", "RSV",
+    "CAPE", "CLDA", "CNYN", "GRGE", "HDLD", "ISL", "ISLS", "MT", "MTS",
+    "PASS", "PK", "PKS", "PLAT", "PROM", "SDL", "UPLD", "VLC",
+    "FRST", "HTH", "TUND",
+    "LCTY", "PRK", "RESF", "RESN", "RESW", "RGN", "RGNL",
+)
 
 AUDIT_PROBLEM_KEYS = (
     "missing",
@@ -172,17 +188,23 @@ def run(args) -> int:
         covered = attach_near_town(covered, communes)
         logger.info("  Attached nearest commune to %d spots", len(covered))
 
-        # Step 5: Enrichment (id, near, altitude)
-        logger.info("Step 5: Enrichment (id, near, altitude)")
-        enriched = enrich_all(covered)
+        # Step 5: Naming cascade + enrichment.  ``near`` remains the nearest
+        # cities500 locality and may be empty; name is supplied independently
+        # by the country-scoped GeoNames feature-code index and is guaranteed
+        # before tile export.
+        logger.info("Step 5: GeoNames naming cascade + enrichment")
+        naming_index = GeoNamesIndex.from_archives(
+            data_dir="data",
+            countries=country_codes,
+            feature_codes=NAMING_FEATURE_CODES,
+            bbox=region["bbox"],
+            margin_km=40,
+        )
+        named = naming_index.enrich_spots(covered)
+        if any(not isinstance(spot.get("name"), str) or not spot["name"].strip() for spot in named):
+            raise ValueError("GeoNames naming cascade produced an empty name")
+        enriched = enrich_all(named)
         logger.info("  Enriched %d spots", len(enriched))
-
-        # Step 5b: Filter out sea spots (no nearby commune).
-        # Limitation: this is a Western-Europe proxy based on the 25 km GeoNames
-        # commune radius. When expanding beyond Western Europe, replace with a
-        # Natural Earth coastline land/sea mask.
-        enriched = filter_sea_spots(enriched)
-        logger.info("  After sea-spot filter: %d spots", len(enriched))
 
         # Step 6: Tile export + version
         logger.info("Step 6: Tile export")

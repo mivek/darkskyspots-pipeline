@@ -15,6 +15,8 @@ def spot(identifier, lat, lon, darkness, altitude=120):
         "darkness": darkness,
         "bortle": 3,
         "near": "A commune",
+        "name": "A landmark",
+        "nameDistanceKm": 2.5,
         "altitude": altitude,
     }
 
@@ -82,7 +84,10 @@ def test_representative_uses_darkness_then_id(tmp_path):
 
     assert cluster["rep"]["id"] == "a"
     assert cluster["rep"]["altitude"] == 120
-    assert set(cluster["rep"]) == {"id", "lat", "lon", "darkness", "bortle", "near", "altitude"}
+    assert set(cluster["rep"]) == {
+        "id", "lat", "lon", "darkness", "bortle", "near", "name",
+        "nameDistanceKm", "altitude",
+    }
 
 
 def test_missing_cluster_spot_field_names_tile_and_spot(tmp_path):
@@ -94,6 +99,38 @@ def test_missing_cluster_spot_field_names_tile_and_spot(tmp_path):
 
     with pytest.raises(ValueError, match=r"N048E002\.json.*spot 0.*darkness"):
         aggregate_spot_files(tmp_path)
+
+
+@pytest.mark.parametrize("invalid_name", [None, "", "   ", 42, False])
+def test_cluster_rejects_empty_or_non_string_name(tmp_path, invalid_name):
+    source = spot("bad-name", 48.1, 2.1, 0.8)
+    source["name"] = invalid_name
+    write_tile(tmp_path, "N048E002", [source])
+
+    with pytest.raises(ValueError, match=r"N048E002\.json.*spot 0.*name"):
+        aggregate_spot_files(tmp_path)
+
+
+@pytest.mark.parametrize(
+    "invalid_distance", [True, False, -1, float("nan"), float("inf"), "2.5", {}]
+)
+def test_cluster_rejects_invalid_name_distance(tmp_path, invalid_distance):
+    source = spot("bad-distance", 48.1, 2.1, 0.8)
+    source["nameDistanceKm"] = invalid_distance
+    write_tile(tmp_path, "N048E002", [source])
+
+    with pytest.raises(ValueError, match=r"N048E002\.json.*spot 0.*nameDistanceKm"):
+        aggregate_spot_files(tmp_path)
+
+
+@pytest.mark.parametrize("distance", [None, 0, 2.5])
+def test_cluster_accepts_valid_name_distances(tmp_path, distance):
+    source = spot("valid-distance", 48.1, 2.1, 0.8)
+    source["nameDistanceKm"] = distance
+    write_tile(tmp_path, "N048E002", [source])
+
+    cluster = aggregate_spot_files(tmp_path)[1][0]
+    assert cluster["rep"]["nameDistanceKm"] == distance
 
 
 def test_centroid_bbox_and_singleton(tmp_path):
