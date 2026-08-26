@@ -52,7 +52,6 @@ def _mock_raster_steps(transform):
         patch("run.ensure_coverage", return_value=[]),
         patch("run.attach_near_town", return_value=[]),
         patch("run.enrich_all", return_value=[]),
-        patch("run.filter_sea_spots", return_value=[]),
     )
 
 
@@ -80,6 +79,8 @@ def _spot(spot_id, lat, lon):
         "darkness": 0.8,
         "bortle": 3,
         "near": "Test",
+        "name": "Test landmark",
+        "nameDistanceKm": 1.0,
         "altitude": None,
     }
 
@@ -180,7 +181,6 @@ def test_run_calls_steps_in_order(tmp_path, mock_region):
         patch("run.ensure_coverage", side_effect=tracker("ensure_coverage", [])), \
         patch("run.attach_near_town", side_effect=tracker("attach_near_town", [])), \
         patch("run.enrich_all", side_effect=tracker("enrich_all", [])), \
-        patch("run.filter_sea_spots", side_effect=tracker("filter_sea_spots", [])), \
         patch("run.classify_spots_into_tiles", side_effect=tracker("classify_spots_into_tiles", {})), \
         patch("run.compute_new_version", side_effect=tracker("compute_new_version", ("2025.1", True))), \
         patch("run.write_tile_file", side_effect=tracker("write_tile_file", "/tmp/dummy.json")), \
@@ -200,7 +200,6 @@ def test_run_calls_steps_in_order(tmp_path, mock_region):
         "ensure_coverage",
         "attach_near_town",
         "enrich_all",
-        "filter_sea_spots",
         "classify_spots_into_tiles",
         "compute_new_version",
         "write_tile_file",
@@ -257,7 +256,6 @@ def test_run_merges_current_country_and_preserves_other_countries(tmp_path):
         patch("run.ensure_coverage", return_value=[]), \
         patch("run.attach_near_town", return_value=[]), \
         patch("run.enrich_all", return_value=[]), \
-        patch("run.filter_sea_spots", return_value=[]), \
         patch("run.classify_spots_into_tiles", return_value={"N050E001": [{"id": "new", "country": "FR"}]}), \
         patch("run.enumerate_tiles_in_bbox", return_value=["N050E001", "N050E002"]), \
         patch("run.clone_data_repo", side_effect=clone_with_existing_tiles), \
@@ -318,9 +316,8 @@ def test_run_skips_step_7_when_no_push(mock_load_places, tmp_path, mock_region):
     assert len(tile_files) > 0, "Expected tile files to be written even with --no-push"
 
 
-def test_run_filters_unassigned_spots_before_tile_classification(tmp_path, mock_region):
-    """Verify that filter_sea_spots removes empty-near spots before they reach
-    classify_spots_into_tiles."""
+def test_run_keeps_unassigned_spots_before_tile_classification(tmp_path, mock_region):
+    """An empty ``near`` does not remove a valid land spot anymore."""
     from run import run
     import numpy as np
     import rasterio
@@ -361,9 +358,8 @@ def test_run_filters_unassigned_spots_before_tile_classification(tmp_path, mock_
 
     assert rc == 0, f"run() returned {rc}, expected 0"
     assert captured_input is not None, "classify_spots_into_tiles was never called"
-    # Only the Bayonne spot should reach tile classification
-    assert len(captured_input) == 1, f"Expected 1 spot, got {len(captured_input)}: {captured_input}"
-    assert captured_input[0]["near"] == "Bayonne"
+    assert len(captured_input) == 2, f"Expected 2 spots, got {len(captured_input)}: {captured_input}"
+    assert {spot["near"] for spot in captured_input} == {"", "Bayonne"}
 
 
 @patch("run.load_places", return_value=[])

@@ -7,6 +7,7 @@ __pycache__/
 .venv/
 venv/
 env/
+/darkspots/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
@@ -30,6 +31,7 @@ debug_bortle_*.tif
 # Design and planning docs (ephemeral, regenerated each feature)
 /docs/designs/
 /docs/plans/
+/.superpowers/
 
 # Validation fixtures (large)
 /validation/*.tif

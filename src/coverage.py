@@ -92,11 +92,14 @@ def load_places(
     # Bbox filtering with margin_km margin
     margin_km = 100
     lon_min, lat_min, lon_max, lat_max = region["bbox"]
-    mid_lat = (lat_min + lat_max) / 2.0
     # Degree-based margin (approximate): sufficient for pre-filtering.
     # Not haversine-exact — may be off by ~1 km at high latitudes, but generous margin covers it.
     margin_lat = float(margin_km) * _DEG_PER_KM
-    margin_lon = float(margin_km) * _DEG_PER_KM / math.cos(math.radians(mid_lat))
+    expanded_lat_min = max(-90.0, lat_min - margin_lat)
+    expanded_lat_max = min(90.0, lat_max + margin_lat)
+    poleward_lat = min(89.9, max(abs(expanded_lat_min), abs(expanded_lat_max)))
+    cos_lat = max(math.cos(math.radians(poleward_lat)), 0.01)
+    margin_lon = float(margin_km) * _DEG_PER_KM / cos_lat
 
     configured_countries = region.get("osm_country_code", [])
     if isinstance(configured_countries, str):
@@ -173,16 +176,3 @@ def attach_near_town(spots: list[dict], communes: list[dict]) -> list[dict]:
         near = nearest_commune(spot, communes, max_distance_km=MAX_NEAR_DISTANCE_KM)
         spot["near"] = near if near is not None else ""
     return spots
-
-
-def filter_sea_spots(spots: list[dict]) -> list[dict]:
-    """
-    Retain only spots whose ``near`` field is non-empty after stripping whitespace.
-
-    This is a Western-Europe proxy for filtering out sea spots based on the
-    25 km GeoNames commune radius. When expanding beyond Western Europe,
-    replace with a Natural Earth coastline land/sea mask.
-
-    Returns a new list without mutating the input.
-    """
-    return [s for s in spots if (s.get("near") or "").strip()]

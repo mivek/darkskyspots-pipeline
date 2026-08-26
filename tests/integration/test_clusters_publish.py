@@ -10,7 +10,11 @@ from rasterio.transform import from_bounds
 
 
 def _spot(spot_id, lat, lon):
-    return {"id": spot_id, "country": "FR", "lat": lat, "lon": lon, "darkness": 0.8, "bortle": 3, "near": "Test", "altitude": None}
+    return {
+        "id": spot_id, "country": "FR", "lat": lat, "lon": lon,
+        "darkness": 0.8, "bortle": 3, "near": "Test",
+        "name": "Test landmark", "nameDistanceKm": 1.0, "altitude": None,
+    }
 
 
 def _write_envelope(directory, tile_id, spots):
@@ -62,7 +66,6 @@ def test_published_clusters_read_spots_after_current_region_copy(tmp_path):
         stack.enter_context(patch("run.ensure_coverage", return_value=[]))
         stack.enter_context(patch("run.attach_near_town", return_value=[]))
         stack.enter_context(patch("run.enrich_all", return_value=[]))
-        stack.enter_context(patch("run.filter_sea_spots", return_value=[]))
         stack.enter_context(patch("run.classify_spots_into_tiles", return_value={"N048E003": [generated]}))
         stack.enter_context(patch("run.enumerate_tiles_in_bbox", return_value=["N048E003"]))
         stack.enter_context(patch("run.write_cluster_files", side_effect=clusters))

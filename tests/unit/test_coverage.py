@@ -143,6 +143,21 @@ def test_load_places_filters_by_bbox_margin(tmp_path, mock_region):
     assert places[0]["name"] == "Paris"
 
 
+def test_load_places_uses_poleward_latitude_for_longitude_margin(tmp_path, mock_region):
+    """A valid place near the northern edge is not lost by the bbox prefilter."""
+    from src.coverage import load_places
+
+    northern_region = dict(mock_region, bbox=[2.0, 40.0, 3.0, 51.0])
+    line = (
+        "1\tNorth edge\tNorth edge\t\t51.0\t4.37\tP\tPPL\tFR\t\t11\t75\t\t\t100\t0\t0\tEurope/Paris\t2025-01-01\n"
+    )
+    (tmp_path / "cities500.txt").write_text(line, encoding="utf-8")
+
+    places = load_places(northern_region, data_dir=str(tmp_path))
+
+    assert [place["name"] for place in places] == ["North edge"]
+
+
 def test_attach_near_town_sets_nearest_commune():
     """2 spots, 3 communes; each spot's near field is set to its closest commune."""
     from src.coverage import attach_near_town
@@ -189,32 +204,6 @@ def test_attach_near_town_leaves_empty_when_too_far():
     ]
     out = attach_near_town(spots, communes)
     assert out[0]["near"] == ""
-
-
-def test_filter_sea_spots_removes_basque_coast_sea_spot():
-    """Sea spot with empty near is removed; inland Bayonne-area spot is retained."""
-    from src.coverage import filter_sea_spots
-    spots = [
-        {"id": 1, "lat": 43.5, "lon": -1.8, "near": "", "darkness": 0.3, "bortle": 4, "altitude": 0},
-        {"id": 2, "lat": 43.4, "lon": -1.5, "near": "Bayonne", "darkness": 0.7, "bortle": 3, "altitude": 50},
-    ]
-    result = filter_sea_spots(spots)
-    assert len(result) == 1
-    assert result[0]["near"] == "Bayonne"
-
-
-def test_filter_sea_spots_removes_empty_and_whitespace_near():
-    """Empty, None, and whitespace-only near values are filtered out; non-empty values retained."""
-    from src.coverage import filter_sea_spots
-    spots = [
-        {"id": 1, "lat": 43.5, "lon": -1.8, "near": "", "darkness": 0.3, "bortle": 4, "altitude": 0},
-        {"id": 2, "lat": 43.7, "lon": -2.0, "near": None, "darkness": 0.4, "bortle": 3, "altitude": 5},
-        {"id": 3, "lat": 43.6, "lon": -1.9, "near": "   ", "darkness": 0.5, "bortle": 4, "altitude": 10},
-        {"id": 4, "lat": 43.4, "lon": -1.5, "near": "Bayonne", "darkness": 0.7, "bortle": 3, "altitude": 50},
-    ]
-    result = filter_sea_spots(spots)
-    assert len(result) == 1
-    assert result[0]["near"] == "Bayonne"
 
 
 def test_attach_near_town_sets_near_when_within_range():
