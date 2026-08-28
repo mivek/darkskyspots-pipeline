@@ -33,6 +33,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Iterator, Sequence
 
+from src.geonames import (
+    FILTERED_FEATURE_CODES,
+    GeoNamesIndex,
+    NAMING_FEATURE_CODES,
+    validate_geonames_manifest,
+)
+
 try:
     from scipy.spatial import cKDTree
 except ImportError:  # pragma: no cover - project environment includes SciPy
@@ -43,20 +50,25 @@ ORDINARY_MAX_KM = 40.0
 EXPECTED_FR_SPOTS = 2139
 DEFAULT_BBOX = (-6.0, 41.0, 8.0, 51.0)
 
-# A code list, deliberately not ``feature_class in {T,V,L}``.
-CANDIDATE_CODES: tuple[str, ...] = tuple(sorted({
-    # Populated places, including administrative seats.
-    "PPL", "PPLA", "PPLA2", "PPLA3", "PPLA4", "PPLA5", "PPLC",
-    "PPLF", "PPLG", "PPLL", "PPLR", "PPLS",
-    # Named, point-like natural features.
-    "CAPE", "CLDA", "CNYN", "GRGE", "HDLD", "ISL", "ISLS", "MT",
-    "MTS", "PASS", "PK", "PKS", "PLAT", "PROM", "SDL", "UPLD", "VLC",
-    # Broad vegetation and named areas/protected areas.
-    "FRST", "HTH", "TUND", "LCTY", "PRK", "RESF", "RESN", "RESW",
-    "RGN", "RGNL",
-    # Standing water and reservoirs; streams remain excluded.
-    "LK", "LKC", "LKN", "LKS", "RSV",
-}))
+NAMED_ISLANDS: tuple[dict[str, object], ...] = (
+    {"name": "Isle of Wight", "lat": 50.68, "lon": -1.30, "country": "GB"},
+    {"name": "Anglesey", "lat": 53.27, "lon": -4.35, "country": "GB"},
+    {"name": "Isles of Scilly", "lat": 49.92, "lon": -6.30, "country": "GB"},
+    {"name": "Lundy", "lat": 51.18, "lon": -4.67, "country": "GB"},
+    {"name": "Isle of Sheppey", "lat": 51.40, "lon": 0.75, "country": "GB"},
+    {"name": "Achill Island", "lat": 53.96, "lon": -10.00, "country": "IE"},
+    {"name": "Valentia Island", "lat": 51.93, "lon": -10.35, "country": "IE"},
+    {"name": "Arranmore", "lat": 55.00, "lon": -8.30, "country": "IE"},
+)
+CROWN_DEPENDENCIES: tuple[dict[str, object], ...] = (
+    {"name": "Isle of Man", "lat": 54.23, "lon": -4.50, "country": "IM"},
+    {"name": "Jersey", "lat": 49.19, "lon": -2.10, "country": "JE"},
+    {"name": "Guernsey", "lat": 49.45, "lon": -2.58, "country": "GG"},
+)
+
+# A code list, deliberately not ``feature_class in {T,V,L}``.  It is shared
+# with the runtime and the extraction utility from ``src.geonames``.
+CANDIDATE_CODES = NAMING_FEATURE_CODES
 
 CODE_REASONS: dict[str, str] = {
     "PPL": "Localité peuplée; repère lisible et comparable à near.",
@@ -322,6 +334,22 @@ def load_spots(spots_dir: str | Path) -> list[dict]:
     return sorted(spots, key=lambda s: (str(s.get("id", "")), s["lat"], s["lon"]))
 
 
+def spot_extent(spots: Sequence[dict]) -> list[float] | None:
+    """Return the WGS84 extent of spots with finite coordinates."""
+    coordinates: list[tuple[float, float]] = []
+    for spot in spots:
+        try:
+            lat, lon = float(spot["lat"]), float(spot["lon"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        if math.isfinite(lat) and math.isfinite(lon):
+            coordinates.append((lat, lon))
+    if not coordinates:
+        return None
+    lats, lons = zip(*coordinates)
+    return [min(lons), min(lats), max(lons), max(lats)]
+
+
 def _sample_matches(rows: list[dict], count: int = 100) -> list[dict]:
     """Cover every winning code, then take 20 examples per tier.
 
@@ -335,27 +363,31 @@ def _sample_matches(rows: list[dict], count: int = 100) -> list[dict]:
     for row in rows:
         by_tier.setdefault(row["tier"], []).append(row)
     sample: list[dict] = []
-    used: set[tuple[str, str]] = set()
-    by_code: dict[str, list[dict]] = {}
+    used: set[tuple[str, str, str]] = set()
+    by_code: dict[tuple[str, str], list[dict]] = {}
     for row in rows:
-        by_code.setdefault(row["code"], []).append(row)
-    for code in sorted(by_code):
-        row = by_code[code][0]
-        key = (row["tier"], str(row.get("id", "")))
+        by_code.setdefault((str(row.get("country", "")), row["code"]), []).append(row)
+    for country, code in sorted(by_code):
+        row = by_code[(country, code)][0]
+        key = (country, row["tier"], str(row.get("id", "")))
         used.add(key)
         sample.append(row)
-    for tier in tiers:
-        for row in by_tier.get(tier, [])[:20]:
-            key = (tier, str(row.get("id", "")))
-            if key not in used:
-                used.add(key)
-                sample.append(row)
+    countries = sorted({str(row.get("country", "")) for row in rows})
+    for country in countries:
+        for tier in tiers:
+            country_rows = [row for row in by_tier.get(tier, [])
+                            if str(row.get("country", "")) == country]
+            for row in country_rows[:20]:
+                key = (country, tier, str(row.get("id", "")))
+                if key not in used:
+                    used.add(key)
+                    sample.append(row)
     if len(sample) < count:
         for row in rows:
-            key = (row["tier"], str(row.get("id", "")))
+            key = (str(row.get("country", "")), row["tier"], str(row.get("id", "")))
             if key not in used:
-                sample.append(row)
                 used.add(key)
+                sample.append(row)
                 if len(sample) == count:
                     break
     return sample[:count]
@@ -376,11 +408,22 @@ def analyse(
     for spot in spots:
         match = choose_match(float(spot["lat"]), float(spot["lon"]), ordinary_index,
                              admin2_index, admin1_index)
+        runtime_distance = spot.get("nameDistanceKm")
+        try:
+            runtime_distance = None if runtime_distance is None else round(float(runtime_distance), 3)
+        except (TypeError, ValueError):
+            pass
+        audit_distance = None if match.distance_km is None else round(match.distance_km, 3)
         rows.append({
             "id": str(spot.get("id", "")), "lat": float(spot["lat"]), "lon": float(spot["lon"]),
             "near": spot.get("near", ""), "darkness": spot.get("darkness"),
             "name": match.name, "code": match.code, "tier": match.tier,
-            "distance_km": None if match.distance_km is None else round(match.distance_km, 3),
+            "distance_km": audit_distance,
+            "displayed_name": spot.get("name"),
+            "audit_name": match.name, "audit_code": match.code,
+            "audit_distance_km": audit_distance,
+            "runtime_name": spot.get("name"), "runtime_code": spot.get("nameFeatureCode"),
+            "runtime_distance_km": runtime_distance,
         })
     tier_counts = Counter(row["tier"] for row in rows)
     code_counts = Counter(row["code"] for row in rows)
@@ -412,6 +455,427 @@ def analyse(
     }
 
 
+def _round_number(value: float | int | None) -> float | None:
+    return None if value is None else round(float(value), 6)
+
+
+def darkness_statistics(values: Iterable[object]) -> dict[str, object]:
+    """Return stable summary statistics for spot darkness values."""
+    valid: list[float] = []
+    invalid = 0
+    for value in values:
+        try:
+            number = float(value)
+        except (TypeError, ValueError):
+            invalid += 1
+            continue
+        if math.isfinite(number):
+            valid.append(number)
+        else:
+            invalid += 1
+    valid.sort()
+    quartiles = statistics.quantiles(valid, n=4, method="inclusive") if len(valid) >= 2 else []
+    bins = {f"{index / 10:.1f}-{(index + 1) / 10:.1f}": 0 for index in range(10)}
+    outside = 0
+    for value in valid:
+        if 0.0 <= value <= 1.0:
+            index = min(9, int(value * 10))
+            bins[f"{index / 10:.1f}-{(index + 1) / 10:.1f}"] += 1
+        else:
+            outside += 1
+    return {
+        "count": len(valid),
+        "invalid": invalid,
+        "min": _round_number(min(valid) if valid else None),
+        "p25": _round_number(quartiles[0] if quartiles else (valid[0] if valid else None)),
+        "median": _round_number(statistics.median(valid) if valid else None),
+        "p75": _round_number(quartiles[2] if quartiles else (valid[-1] if valid else None)),
+        "max": _round_number(max(valid) if valid else None),
+        "bins_0_1": bins,
+        "outside_0_1": outside,
+    }
+
+
+def _tier_for_distance(distance: object) -> str:
+    if distance is None:
+        return "ADM1"
+    value = float(distance)
+    if value < 5:
+        return "under_5"
+    if value < 25:
+        return "5_to_25"
+    return "25_to_40"
+
+
+def _distance_summary(rows: Sequence[dict]) -> dict[str, object]:
+    counts = Counter(str(row["tier"]) for row in rows)
+    return {
+        "under_5": counts.get("under_5", 0),
+        "5_to_25": counts.get("5_to_25", 0),
+        "25_to_40": counts.get("25_to_40", 0),
+        "ADM2": counts.get("ADM2", 0),
+        "ADM1": counts.get("ADM1", 0),
+    }
+
+
+def _country_rows_report(rows: Sequence[dict]) -> dict[str, object]:
+    winners = Counter(str(row["audit_code"]) for row in rows)
+    return {
+        "spot_count": len(rows),
+        "darkness": darkness_statistics(row.get("darkness") for row in rows),
+        "distance_tiers": _distance_summary(rows),
+        "winner_by_code": dict(sorted(winners.items())),
+        "samples": _sample_matches(list(rows)),
+    }
+
+
+def _runtime_fields(spot: dict) -> dict[str, object]:
+    distance = spot.get("nameDistanceKm")
+    try:
+        distance = None if distance is None else round(float(distance), 3)
+    except (TypeError, ValueError):
+        distance = distance
+    return {
+        "name": spot.get("name"),
+        "code": spot.get("nameFeatureCode"),
+        "distance_km": distance,
+    }
+
+
+def audit_named_islands(
+    spots: Sequence[dict],
+    country_codes: Iterable[str],
+    *,
+    geography=None,
+    spot_radius_km: float = 15.0,
+) -> dict[str, object]:
+    """Audit named islands against Natural Earth and the generated spots.
+
+    The anchor points are intentionally versioned in this source file.  A
+    Natural Earth miss is reported as a resolution loss, while a configured
+    country with no nearby spot is reported separately as a generation gap.
+    Crown dependencies are always reported as out of scope, even when their
+    Natural Earth geometry exists.  ``forbidden_spatial_spots`` contains spot
+    identifiers only; the corresponding ``*_count`` fields are the counts.
+    """
+    from shapely.geometry import Point
+    from src.geography import load_geography
+
+    configured = {str(code).strip().upper() for code in country_codes}
+    geo = geography or load_geography()
+    all_spots = []
+    for spot in spots:
+        try:
+            spot_id = str(spot.get("id", ""))
+            all_spots.append((float(spot["lat"]), float(spot["lon"]),
+                              str(spot.get("country", "")).upper(), spot_id))
+        except (KeyError, TypeError, ValueError):
+            continue
+
+    def one_island(item: dict[str, object], *, crown: bool = False) -> dict[str, object]:
+        lat, lon = float(item["lat"]), float(item["lon"])
+        point = Point(lon, lat)
+        natural_earth_covered = bool(geo.land.covers(point))
+        country = str(item["country"])
+        attributed = country in geo.country_candidates(point)
+        nearby_spot_ids = [
+            spot_id for spot_lat, spot_lon, spot_country, spot_id in all_spots
+            if (crown or spot_country == country)
+            and haversine_km(lat, lon, spot_lat, spot_lon) <= spot_radius_km
+        ]
+        spot_count = len(nearby_spot_ids)
+        forbidden_spatial_spots = nearby_spot_ids if crown else []
+        if crown:
+            status = "out_of_scope_crown_dependency"
+        elif not natural_earth_covered or not attributed:
+            status = "resolution_loss"
+        elif spot_count:
+            status = "covered_with_spots"
+        else:
+            status = "covered_by_natural_earth_no_spot"
+        return {
+            "name": item["name"], "country": country,
+            "anchor": [lat, lon], "natural_earth_covered": natural_earth_covered,
+            "natural_earth_country_match": attributed,
+            "spot_count_within_km": spot_count, "spot_radius_km": spot_radius_km,
+            "configured": country in configured, "status": status,
+            "forbidden_spatial_spots": forbidden_spatial_spots,
+            "forbidden_spatial_spot_count": len(forbidden_spatial_spots),
+        }
+
+    crown_dependencies = [one_island(item, crown=True) for item in CROWN_DEPENDENCIES]
+    return {
+        "named_islands": [one_island(item) for item in NAMED_ISLANDS],
+        "crown_dependencies": crown_dependencies,
+        "forbidden_spatial_spots": {
+            item["country"]: item["forbidden_spatial_spots"] for item in crown_dependencies
+        },
+        "forbidden_spatial_spot_count": {
+            item["country"]: item["forbidden_spatial_spot_count"] for item in crown_dependencies
+        },
+        "resolution_loss_count": sum(
+            1 for item in NAMED_ISLANDS
+            if not geo.land.covers(Point(float(item["lon"]), float(item["lat"])))
+        ),
+        "crown_dependencies_out_of_scope": ["IM", "JE", "GG"],
+    }
+
+
+def _divergence(runtime: dict[str, object], audit: dict[str, object]) -> dict[str, object] | None:
+    fields = {
+        "name": (runtime.get("name"), audit.get("name")),
+        "code": (runtime.get("code"), audit.get("code")),
+        "distance_km": (runtime.get("distance_km"), audit.get("distance_km")),
+    }
+    different = [key for key, (actual, expected) in fields.items()
+                 if actual != expected]
+    if not different:
+        return None
+    return {"fields": different, "runtime": runtime, "audit": audit}
+
+
+def analyse_multi_country(
+    spots: Sequence[dict],
+    naming_index: GeoNamesIndex,
+    country_codes: Iterable[str],
+    *,
+    manifest: dict | None = None,
+    bbox: Sequence[float] | None = None,
+    raster_path: str | Path | None = None,
+    expected_spots: int | None = None,
+    islands: dict[str, object] | None = None,
+) -> dict[str, object]:
+    """Audit runtime names and recomputed names for a multi-country corpus."""
+    configured = tuple(dict.fromkeys(str(code).strip().upper() for code in country_codes))
+    configured_set = set(configured)
+    rows_by_country: dict[str, list[dict]] = {code: [] for code in configured}
+    unexpected: Counter[str] = Counter()
+    divergences: list[dict[str, object]] = []
+    all_rows: list[dict] = []
+    for spot in spots:
+        country = str(spot.get("country", "")).strip().upper()
+        if country not in configured_set:
+            unexpected[country or "<missing>"] += 1
+            continue
+        result = naming_index.resolve(spot, country=country)
+        audit = {
+            "name": result.name,
+            "code": result.feature_code,
+            "distance_km": result.name_distance_km,
+            "tier": result.feature_code if result.administrative_fallback else _tier_for_distance(result.name_distance_km),
+        }
+        runtime = _runtime_fields(spot)
+        row = {
+            "id": str(spot.get("id", "")),
+            "country": country,
+            "lat": float(spot["lat"]),
+            "lon": float(spot["lon"]),
+            "near": spot.get("near", ""),
+            "darkness": spot.get("darkness"),
+            "name": result.name,
+            "code": result.feature_code,
+            "tier": audit["tier"],
+            "distance_km": result.name_distance_km,
+            "displayed_name": runtime["name"],
+            "audit_name": result.name,
+            "audit_code": result.feature_code,
+            "audit_distance_km": result.name_distance_km,
+            "runtime_name": runtime["name"],
+            "runtime_code": runtime["code"],
+            "runtime_distance_km": runtime["distance_km"],
+        }
+        mismatch = _divergence(runtime, {
+            "name": result.name, "code": result.feature_code,
+            "distance_km": result.name_distance_km,
+        })
+        if mismatch is not None:
+            divergences.append({"id": row["id"], "country": country, **mismatch})
+        rows_by_country[country].append(row)
+        all_rows.append(row)
+
+    countries_report = {
+        country: _country_rows_report(rows_by_country[country])
+        for country in configured
+    }
+    report: dict[str, object] = {
+        "schema_version": 2,
+        "country_codes": list(configured),
+        "spot_count": len(all_rows),
+        "spot_count_input": len(spots),
+        "spot_bbox": spot_extent(spots),
+        "spot_count_warning": (
+            None if expected_spots is None or len(all_rows) == expected_spots else
+            f"Corpus contient {len(all_rows)} spots, référence indicative {expected_spots} "
+            f"(écart {len(all_rows) - expected_spots:+d})."
+        ),
+        "countries": countries_report,
+        "darkness": darkness_statistics(row.get("darkness") for row in all_rows),
+        "distance_tiers": _distance_summary(all_rows),
+        "winner_by_code": dict(sorted(Counter(row["audit_code"] for row in all_rows).items())),
+        "winner_by_country": {
+            country: countries_report[country]["winner_by_code"] for country in configured
+        },
+        "candidate_codes": list(NAMING_FEATURE_CODES),
+        "unexpected_country_codes": dict(sorted(unexpected.items())),
+        "unexpected_spot_count": sum(unexpected.values()),
+        "forbidden_crown_codes": {code: unexpected.get(code, 0) for code in ("IM", "JE", "GG")},
+        "naming_divergences": {"count": len(divergences), "details": divergences},
+        "samples": _sample_matches(all_rows, 100),
+        "manifest": (manifest or {}).get("countries", {}) if isinstance(manifest, dict) else {},
+        "islands": islands or {},
+    }
+    if bbox is not None:
+        region_bbox = list(map(float, bbox))
+        report["region_bbox"] = region_bbox
+        lon_min, lat_min, lon_max, lat_max = region_bbox
+        valid_coordinates = []
+        for spot in spots:
+            try:
+                lat, lon = float(spot["lat"]), float(spot["lon"])
+            except (KeyError, TypeError, ValueError):
+                continue
+            if math.isfinite(lat) and math.isfinite(lon):
+                valid_coordinates.append((lat, lon))
+        report["spots_outside_bbox"] = sum(
+            not (lon_min <= lon <= lon_max and lat_min <= lat <= lat_max)
+            for lat, lon in valid_coordinates
+        )
+        report["spots_bbox_ok"] = all(
+            lon_min <= lon <= lon_max and lat_min <= lat <= lat_max
+            for lat, lon in valid_coordinates
+        )
+    if raster_path is not None:
+        report["raster"] = raster_finite_extent(raster_path, bbox)
+    return report
+
+
+def raster_finite_extent(raster_path: str | Path, bbox: Sequence[float] | None = None) -> dict[str, object]:
+    """Measure the WGS84 extent of finite pixels in a debug raster."""
+    import numpy as np
+    import rasterio
+    from rasterio.warp import transform
+
+    with rasterio.open(raster_path) as dataset:
+        data = dataset.read(1, masked=False)
+        finite = np.isfinite(data)
+        if not finite.any():
+            result: dict[str, object] = {
+                "path": str(raster_path), "finite_pixels": 0, "total_pixels": int(data.size),
+                "valid_bounds": None, "edge_coverage": None,
+            }
+            return result
+        rows, cols = np.where(finite)
+        row_min, row_max = int(rows.min()), int(rows.max())
+        col_min, col_max = int(cols.min()), int(cols.max())
+        corners = []
+        for row in (row_min, row_max + 1):
+            for col in (col_min, col_max + 1):
+                x, y = dataset.transform * (col, row)
+                corners.append((x, y))
+        xs, ys = zip(*corners)
+        if dataset.crs is not None and str(dataset.crs).upper() not in {"EPSG:4326", "OGC:CRS84"}:
+            lon, lat = transform(dataset.crs, "EPSG:4326", list(xs), list(ys))
+        else:
+            lon, lat = list(xs), list(ys)
+        valid_bounds = [min(lon), min(lat), max(lon), max(lat)]
+        edge_coverage = None
+        if bbox is not None:
+            requested = list(map(float, bbox))
+            tolerance = 1e-8
+            edge_coverage = {
+                "west": valid_bounds[0] <= requested[0] + tolerance,
+                "south": valid_bounds[1] <= requested[1] + tolerance,
+                "east": valid_bounds[2] >= requested[2] - tolerance,
+                "north": valid_bounds[3] >= requested[3] - tolerance,
+                "all": (
+                    valid_bounds[0] <= requested[0] + tolerance and
+                    valid_bounds[1] <= requested[1] + tolerance and
+                    valid_bounds[2] >= requested[2] - tolerance and
+                    valid_bounds[3] >= requested[3] - tolerance
+                ),
+            }
+        return {
+            "path": str(raster_path), "crs": str(dataset.crs),
+            "raster_bounds": [float(value) for value in dataset.bounds],
+            "finite_pixels": int(finite.sum()), "total_pixels": int(data.size),
+            "valid_bounds": [float(value) for value in valid_bounds],
+            "edge_coverage": edge_coverage,
+        }
+
+
+def compare_context_rasters(
+    raster_300: str | Path,
+    raster_350: str | Path,
+    *,
+    bortle_300: str | Path | None = None,
+    bortle_350: str | Path | None = None,
+    threshold: float = 0.1,
+) -> dict[str, object]:
+    """Compare two supplied context runs over their common finite pixels."""
+    import numpy as np
+    import rasterio
+    from rasterio.windows import from_bounds
+    from rasterio.warp import reproject, transform_bounds
+    from rasterio.enums import Resampling
+
+    with rasterio.open(raster_300) as first, rasterio.open(raster_350) as second:
+        if first.crs is None or second.crs is None:
+            raise ValueError("Both context rasters must declare a CRS")
+        second_bounds = transform_bounds(second.crs, first.crs, *second.bounds)
+        overlap = (
+            max(first.bounds.left, second_bounds[0]), max(first.bounds.bottom, second_bounds[1]),
+            min(first.bounds.right, second_bounds[2]), min(first.bounds.top, second_bounds[3]),
+        )
+        if overlap[0] >= overlap[2] or overlap[1] >= overlap[3]:
+            raise ValueError("Context rasters have no spatial overlap")
+        window = from_bounds(*overlap, transform=first.transform).round_offsets().round_lengths()
+        first_data = first.read(1, window=window, masked=False).astype(float)
+        destination = np.full(first_data.shape, np.nan, dtype=float)
+        reproject(
+            source=rasterio.band(second, 1), destination=destination,
+            src_transform=second.transform, src_crs=second.crs,
+            dst_transform=first.window_transform(window), dst_crs=first.crs,
+            src_nodata=np.nan, dst_nodata=np.nan, resampling=Resampling.nearest,
+        )
+        common = np.isfinite(first_data) & np.isfinite(destination)
+        if not common.any():
+            raise ValueError("Context rasters have no common finite pixels")
+        deltas = np.abs(first_data[common] - destination[common])
+        result: dict[str, object] = {
+            "raster_300": str(raster_300), "raster_350": str(raster_350),
+            "intersection_bounds_crs": [float(value) for value in overlap],
+            "common_finite_pixels": int(common.sum()),
+            "mean_absolute_delta_darkness": _round_number(float(np.mean(deltas))),
+            "median_delta_darkness": _round_number(float(np.median(deltas))),
+            "p95_delta_darkness": _round_number(float(np.percentile(deltas, 95))),
+            "max_delta_darkness": _round_number(float(np.max(deltas))),
+            "threshold": float(threshold),
+            "rate_above_threshold": float(np.mean(deltas > threshold)),
+            "bortle_changes": None,
+        }
+        if (bortle_300 is None) != (bortle_350 is None):
+            raise ValueError("Provide both Bortle rasters or neither")
+        if bortle_300 is not None and bortle_350 is not None:
+            with rasterio.open(bortle_300) as b_first, rasterio.open(bortle_350) as b_second:
+                b_second_bounds = transform_bounds(b_second.crs, b_first.crs, *b_second.bounds)
+                b_overlap = (max(b_first.bounds.left, b_second_bounds[0]), max(b_first.bounds.bottom, b_second_bounds[1]),
+                              min(b_first.bounds.right, b_second_bounds[2]), min(b_first.bounds.top, b_second_bounds[3]))
+                b_window = from_bounds(*b_overlap, transform=b_first.transform).round_offsets().round_lengths()
+                b_data = b_first.read(1, window=b_window, masked=False).astype(float)
+                b_other = np.full(b_data.shape, np.nan, dtype=float)
+                reproject(source=rasterio.band(b_second, 1), destination=b_other,
+                           src_transform=b_second.transform, src_crs=b_second.crs,
+                           dst_transform=b_first.window_transform(b_window), dst_crs=b_first.crs,
+                           src_nodata=np.nan, dst_nodata=np.nan, resampling=Resampling.nearest)
+                b_common = np.isfinite(b_data) & np.isfinite(b_other)
+                result["bortle_changes"] = {
+                    "common_finite_pixels": int(b_common.sum()),
+                    "changed_pixels": int(np.count_nonzero(b_data[b_common] != b_other[b_common])),
+                    "rate": float(np.mean(b_data[b_common] != b_other[b_common])) if b_common.any() else None,
+                }
+        return result
+
+
 def _archive_metadata(geonames_dir: Path, country_codes: Sequence[str]) -> dict:
     archives = {}
     for code in country_codes:
@@ -423,7 +887,7 @@ def _archive_metadata(geonames_dir: Path, country_codes: Sequence[str]) -> dict:
     return archives
 
 
-def markdown_report(report: dict, *, country_code: str, bbox: Sequence[float], archives: dict) -> str:
+def _legacy_markdown_report(report: dict, *, country_code: str, bbox: Sequence[float], archives: dict) -> str:
     lines = ["# Mesure de la cascade de nommage GeoNames", "",
              f"- Pays : `{country_code}`",
              f"- Bbox région : `{list(map(float, bbox))}` ; import élargi à 40 km",
@@ -475,20 +939,130 @@ def markdown_report(report: dict, *, country_code: str, bbox: Sequence[float], a
     return "\n".join(lines)
 
 
+def markdown_report(
+    report: dict,
+    *,
+    country_codes: Sequence[str] | None = None,
+    bbox: Sequence[float] | None = None,
+    archives: dict | None = None,
+    country_code: str | None = None,
+) -> str:
+    """Render the combined report as UTF-8 Markdown."""
+    codes = list(country_codes or report.get("country_codes", []))
+    if not codes and country_code:
+        codes = [country_code]
+    lines = ["# Audit prépublication — cascade GeoNames", "",
+             f"- Pays : {', '.join(f'`{code}`' for code in codes)}",
+             f"- Bbox : `{list(map(float, bbox or report.get('region_bbox', [])))}`",
+             f"- Spots analysés : **{report.get('spot_count', 0)}**",
+             f"- Divergences runtime/audit : **{report.get('naming_divergences', {}).get('count', 0)}**",
+             ""]
+    if report.get("spot_count_warning"):
+        lines += [f"> **Avertissement :** {report['spot_count_warning']}", ""]
+    lines += ["## Darkness", "", "| Corpus | Valides | Invalides | Min | P25 | Médiane | P75 | Max |", "|---|---:|---:|---:|---:|---:|---:|---:|"]
+    stats = [("Global", report.get("darkness", {}))]
+    stats += [(country, details.get("darkness", {}))
+              for country, details in sorted(report.get("countries", {}).items())]
+    for label, values in stats:
+        lines.append("| {} | {} | {} | {} | {} | {} | {} | {} |".format(
+            label, values.get("count", 0), values.get("invalid", 0),
+            values.get("min", "—"), values.get("p25", "—"), values.get("median", "—"),
+            values.get("p75", "—"), values.get("max", "—")))
+    lines += ["", "### Bins fixes de darkness (0,1)", "", "| Corpus | " + " | ".join(report.get("darkness", {}).get("bins_0_1", {}).keys()) + " |", "|---|" + "---:|" * len(report.get("darkness", {}).get("bins_0_1", {}))]
+    for label, values in stats:
+        bins = values.get("bins_0_1", {})
+        lines.append("| {} | {} |".format(label, " | ".join(str(bins.get(key, 0)) for key in bins)))
+    raster = report.get("raster")
+    if raster:
+        lines += ["", "## Emprise ALR valide", "", f"- Raster : `{raster.get('path')}`",
+                  f"- Pixels finis : **{raster.get('finite_pixels', 0)} / {raster.get('total_pixels', 0)}**",
+                  f"- Emprise WGS84 : `{raster.get('valid_bounds')}`",
+                  f"- Couverture des bords : `{raster.get('edge_coverage')}`", ""]
+    lines += ["## Distances de la cascade", "", "| Pays | <5 km | 5–25 km | 25–40 km | ADM2 | ADM1 |", "|---|---:|---:|---:|---:|---:|"]
+    for country, details in sorted(report.get("countries", {}).items()):
+        tiers = details["distance_tiers"]
+        lines.append(f"| `{country}` | {tiers['under_5']} | {tiers['5_to_25']} | {tiers['25_to_40']} | {tiers['ADM2']} | {tiers['ADM1']} |")
+    tiers = report["distance_tiers"]
+    lines.append(f"| **Global** | {tiers['under_5']} | {tiers['5_to_25']} | {tiers['25_to_40']} | {tiers['ADM2']} | {tiers['ADM1']} |")
+    lines += ["", "## Gagnants par code", "", "| Pays | Code | Spots |", "|---|---|---:|"]
+    for country, details in sorted(report.get("countries", {}).items()):
+        for code, count in sorted(details["winner_by_code"].items()):
+            lines.append(f"| `{country}` | `{code}` | {count} |")
+    lines += ["", "## Contrôle des pays", "", f"- Codes inattendus : `{report.get('unexpected_country_codes', {})}`",
+              f"- IM/JE/GG : `{report.get('forbidden_crown_codes', {})}`", ""]
+    island_report = report.get("islands", {})
+    if island_report:
+        lines += ["## Îles", "", "| Île | Pays | Natural Earth 1:10m | Spots proches | Statut |", "|---|---|---|---:|---|"]
+        for island in island_report.get("named_islands", []):
+            lines.append(f"| {island['name']} | `{island['country']}` | {'oui' if island['natural_earth_covered'] else 'non'} | {island['spot_count_within_km']} | `{island['status']}` |")
+        lines += ["", "Dépendances de la Couronne volontairement hors périmètre : `IM`, `JE`, `GG`.", ""]
+        for island in island_report.get("crown_dependencies", []):
+            lines.append(f"- `{island['country']}` {island['name']} : Natural Earth={'oui' if island['natural_earth_covered'] else 'non'}, statut=`{island['status']}`.")
+        lines += ["", "Spots situés spatialement dans une dépendance interdite (identifiants uniquement) :", ""]
+        for country, spot_ids in sorted(island_report.get("forbidden_spatial_spots", {}).items()):
+            ids = ", ".join(f"`{spot_id}`" for spot_id in spot_ids) or "aucun"
+            lines.append(f"- `{country}` : {ids}")
+    lines += ["## Divergences runtime/audit", ""]
+    if report.get("naming_divergences", {}).get("details"):
+        lines += ["| Pays | ID | Champs | Runtime | Audit |", "|---|---|---|---|---|"]
+        for item in report["naming_divergences"]["details"]:
+            lines.append(f"| `{item['country']}` | `{item['id']}` | {', '.join(item['fields'])} | `{item['runtime']}` | `{item['audit']}` |")
+    else:
+        lines.append("Aucune divergence.")
+    lines += ["", "## Échantillon déterministe", "", "| Pays | Tier | ID | Runtime name | Audit name | Runtime code | Runtime distance km | Audit code | Audit distance km | near | darkness |", "|---|---|---|---|---|---|---:|---|---:|---|---:|"]
+    for row in report.get("samples", []):
+        runtime_distance = ("—" if row.get("runtime_distance_km") is None else
+                            f"{float(row['runtime_distance_km']):.3f}")
+        audit_distance = ("—" if row.get("audit_distance_km") is None else
+                          f"{float(row['audit_distance_km']):.3f}")
+        darkness = "—" if row.get("darkness") is None else str(row["darkness"])
+        values = [str(row.get(key, "")).replace("|", "\\|") for key in (
+            "country", "tier", "id", "runtime_name", "audit_name", "runtime_code",
+        )]
+        values += [runtime_distance,
+                   str(row.get("audit_code", "")).replace("|", "\\|"), audit_distance,
+                   str(row.get("near", "")).replace("|", "\\|"),
+                   darkness.replace("|", "\\|")]
+        lines.append(f"| {' | '.join(values)} |")
+    lines += ["", "## Provenance GeoNames", ""]
+    for country, entry in sorted(report.get("manifest", {}).items()):
+        lines.append(f"- `{country}` : source `{entry.get('source_url', '')}`, archive SHA-256 `{entry.get('source_sha256', '')}`, extract `{entry.get('extract_path', '')}`, codes `{entry.get('codes_applied', [])}`.")
+    return "\n".join(lines) + "\n"
+
+
 def run_measurement(args: argparse.Namespace) -> dict:
     bbox = tuple(args.bbox)
-    expanded = expanded_bbox(bbox, ORDINARY_MAX_KM)
+    raw_codes = getattr(args, "country_code", None) or ["FR"]
+    country_codes = [raw_codes] if isinstance(raw_codes, str) else list(raw_codes)
+    country_codes = list(dict.fromkeys(str(code).strip().upper() for code in country_codes if str(code).strip()))
     geonames_dir = Path(args.geonames_dir)
-    archives = _archive_metadata(geonames_dir, [args.country_code])
-    archive = geonames_dir / f"{args.country_code.upper()}.zip"
-    ordinary, admins, observed, total = load_country_records(archive, args.country_code, expanded, CANDIDATE_CODES)
+    # This is deliberately the same guard and loader used by run.py.  The
+    # audit must never silently fall back to national ZIP archives.
+    manifest = validate_geonames_manifest(
+        data_dir=geonames_dir,
+        countries=country_codes,
+        feature_codes=FILTERED_FEATURE_CODES,
+        manifest_path=getattr(args, "manifest_path", None),
+    )
+    naming_index = GeoNamesIndex.from_filtered_extracts(
+        data_dir=geonames_dir,
+        countries=country_codes,
+        feature_codes=FILTERED_FEATURE_CODES,
+        bbox=bbox,
+        margin_km=ORDINARY_MAX_KM,
+        manifest_path=getattr(args, "manifest_path", None),
+    )
     spots = load_spots(args.spots_dir)
-    report = analyse(spots, ordinary, admins, observed)
-    report.update({"region_bbox": list(bbox), "expanded_bbox": list(expanded), "country_code": args.country_code.upper(),
-                   "geonames_records_in_expanded_bbox": total, "ordinary_records_indexed": len(ordinary),
-                   "admin_records_indexed": {"ADM2": sum(r.feature_code == "ADM2" for r in admins),
-                                              "ADM1": sum(r.feature_code == "ADM1" for r in admins)},
-                   "archives": archives})
+    raster_path = getattr(args, "raster_path", None)
+    report = analyse_multi_country(
+        spots, naming_index, country_codes, manifest=manifest, bbox=bbox,
+        raster_path=raster_path,
+        expected_spots=(EXPECTED_FR_SPOTS if country_codes == ["FR"] else None),
+        islands=audit_named_islands(spots, country_codes),
+    )
+    report["expanded_bbox"] = list(expanded_bbox(bbox, ORDINARY_MAX_KM))
+    report["geonames_dir"] = str(geonames_dir)
+    report["geonames_feature_codes"] = list(FILTERED_FEATURE_CODES)
     return report
 
 
@@ -497,8 +1071,13 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--spots-dir", required=True, help="Dossier des tuiles JSON après clip")
     parser.add_argument("--bbox", nargs=4, type=float, default=DEFAULT_BBOX,
                         metavar=("LON_MIN", "LAT_MIN", "LON_MAX", "LAT_MAX"))
-    parser.add_argument("--country-code", default="FR", help="Code ISO du corpus (FR, ES ou GB)")
+    parser.add_argument("--country-code", action="append", default=None,
+                        help="Code ISO du corpus; répétable pour un audit multi-pays")
     parser.add_argument("--geonames-dir", default="data/geonames")
+    parser.add_argument("--manifest-path", default=None,
+                        help="Manifeste filtré explicite (défaut: <geonames-dir>/manifest.yaml)")
+    parser.add_argument("--raster-path", default=None,
+                        help="Raster darkness debug à mesurer (emprise des pixels finis)")
     parser.add_argument("--out-json", default="validation/naming_cascade_france_2025.json")
     parser.add_argument("--out-md", default="validation/naming_cascade_france_2025.md")
     return parser
@@ -510,8 +1089,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     Path(args.out_json).parent.mkdir(parents=True, exist_ok=True)
     Path(args.out_json).write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     Path(args.out_md).parent.mkdir(parents=True, exist_ok=True)
-    Path(args.out_md).write_text(markdown_report(report, country_code=args.country_code.upper(), bbox=args.bbox,
-                                                 archives=report["archives"]), encoding="utf-8")
+    codes = report["country_codes"]
+    Path(args.out_md).write_text(markdown_report(report, country_codes=codes, bbox=args.bbox), encoding="utf-8")
     print(f"Wrote {args.out_json} and {args.out_md}: {report['spot_count']} spots")
     return 0
 

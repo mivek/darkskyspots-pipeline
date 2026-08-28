@@ -3,6 +3,10 @@ import math
 import re
 
 import yaml
+from shapely.geometry import box
+from shapely.ops import unary_union
+
+from .geography import load_geography, validate_country_codes
 
 REQUIRED_FIELDS = {"bbox", "equal_area_epsg", "admin_level", "osm_country_code"}
 
@@ -11,7 +15,8 @@ def load_regions(
     path: str = "regions.yaml",
     *,
     allow_legacy_geometry: bool = False,
-    validate_partition: bool = False,
+    validate_partition: bool = True,
+    geography=None,
 ) -> dict[str, dict]:
     """Load regions.yaml and validate its geometry.
 
@@ -19,9 +24,11 @@ def load_regions(
         path: YAML registry path.
         allow_legacy_geometry: Allow non-integer numeric coordinates for preview
             workflows only; strict production loading must leave this false.
-        validate_partition: Check that declared bboxes do not overlap in area.
-            Set false only when inspecting legacy or intentionally overlapping
-            preview data.
+        validate_partition: Check that publishable Natural Earth country
+            geometries do not overlap in area. Set false only when inspecting
+            legacy or intentionally overlapping preview data.
+        geography: Optional loaded Natural Earth geography, primarily useful
+            for tests and callers that already hold the dataset in memory.
     """
     with open(path) as f:
         data = yaml.safe_load(f)
@@ -53,7 +60,7 @@ def load_regions(
             country_owners[code] = name
         region["osm_country_code"] = normalised
     if validate_partition:
-        validate_bbox_partition(data)
+        validate_publishable_partition(data, geography=geography)
     return data
 
 
@@ -95,17 +102,41 @@ def _validate_region(
         raise ValueError(f"Region {name!r}: bbox coordinates must be ordered")
 
 
-def validate_bbox_partition(regions: dict[str, dict]) -> None:
-    """Reject positive-area intersections between declared region bboxes."""
+def validate_publishable_partition(regions: dict[str, dict], *, geography=None) -> None:
+    """Reject positive-area intersections between publishable region extents.
+
+    Region bboxes are working envelopes and may overlap.  Ownership is defined
+    by the configured Natural Earth country geometries clipped to each bbox.
+    A shared border or point has zero area and is intentionally allowed.
+    """
+    geo = geography or load_geography()
+    validate_country_codes(
+        [code for region in regions.values() for code in region["osm_country_code"]],
+        geography=geo,
+    )
+    extents = {}
+    for name, region in regions.items():
+        codes = region["osm_country_code"]
+        country_geometry = unary_union([geo.countries[code] for code in codes])
+        extents[name] = country_geometry.intersection(box(*region["bbox"]))
+
     items = list(regions.items())
     for index, (left_name, left) in enumerate(items):
-        left_bbox = left["bbox"]
-        for right_name, right in items[index + 1 :]:
-            right_bbox = right["bbox"]
-            overlap_width = min(left_bbox[2], right_bbox[2]) - max(left_bbox[0], right_bbox[0])
-            overlap_height = min(left_bbox[3], right_bbox[3]) - max(left_bbox[1], right_bbox[1])
-            if overlap_width > 0 and overlap_height > 0:
-                raise ValueError(f"Regions {left_name!r} and {right_name!r} overlap")
+        for right_name, _right in items[index + 1 :]:
+            if extents[left_name].intersection(extents[right_name]).area > 0:
+                raise ValueError(
+                    f"Publishable extents for regions {left_name!r} and "
+                    f"{right_name!r} overlap"
+                )
+
+
+def validate_bbox_partition(regions: dict[str, dict], *, geography=None) -> None:
+    """Backward-compatible name for publishable partition validation.
+
+    The old rectangle-only behavior is deliberately no longer available:
+    bboxes are working envelopes and do not define ownership.
+    """
+    validate_publishable_partition(regions, geography=geography)
 
 
 def get_region(name: str, regions_path: str = "regions.yaml") -> dict:

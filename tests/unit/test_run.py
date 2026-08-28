@@ -2,10 +2,49 @@
 from contextlib import ExitStack
 import json
 from pathlib import Path
+import re
+import time
 from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest
+
+
+@pytest.fixture(autouse=True)
+def mock_filtered_geonames_api(monkeypatch):
+    """Keep orchestrator tests independent from the GeoNames data checkout.
+
+    The production path is intentionally strict: it calls the filtered-extract
+    API and has no ZIP fallback.  These tests replace that API with a small
+    index double; tests exercising the guard override the validator locally.
+    """
+    import run
+
+    monkeypatch.setattr(run, "validate_geonames_manifest", lambda **_kwargs: None)
+
+    index = MagicMock()
+    index.enrich_spots.side_effect = lambda spots: [
+        dict(
+            spot,
+            name=spot.get("name", "Test landmark"),
+            nameDistanceKm=spot.get("nameDistanceKm", 1.0),
+            nameFeatureCode=spot.get("nameFeatureCode", "PPL"),
+            nameFeatureClass=spot.get("nameFeatureClass", "P"),
+            nameGeoNameId=spot.get("nameGeoNameId", 1),
+        )
+        for spot in spots
+    ]
+
+    def factory(_cls, **_kwargs):
+        return index
+
+    monkeypatch.setattr(
+        run.GeoNamesIndex,
+        "from_filtered_extracts",
+        classmethod(factory),
+        raising=False,
+    )
+    return index
 
 
 def _make_args(tmp_path, **overrides):
@@ -297,23 +336,270 @@ def test_run_skips_step_7_when_no_push(mock_load_places, tmp_path, mock_region):
     with rasterio.open(input_path, "w", **profile) as dst:
         dst.write(data, 1)
 
-    args = _make_args(tmp_path)  # default: --no-push is set
+    args = _make_args(tmp_path, no_clusters=True)  # explicit prepublication mode
 
     with \
         patch("run.clone_data_repo") as mock_clone, \
         patch("run.copy_spots_to_repo") as mock_copy, \
-        patch("run.commit_and_push") as mock_commit:
+        patch("run.commit_and_push") as mock_commit, \
+        patch("run.write_cluster_files") as mock_clusters:
         rc = run(args)
 
     assert rc == 0, f"run() returned {rc}, expected 0"
     mock_clone.assert_not_called()
     mock_copy.assert_not_called()
     mock_commit.assert_not_called()
+    mock_clusters.assert_not_called()
 
     # Verify tile files were written locally
     spots_dir = tmp_path / "output" / "spots"
     tile_files = list(spots_dir.glob("*.json"))
     assert len(tile_files) > 0, "Expected tile files to be written even with --no-push"
+
+
+def test_multi_country_manifest_validation_precedes_raster(tmp_path):
+    """A GB+IE manifest mismatch aborts before any raster collaborator runs."""
+    from src.geonames import NAMING_FEATURE_CODES
+    from run import run
+
+    _write_input(tmp_path, region="uk_ireland")
+    args = _make_args(tmp_path, region="uk_ireland", no_clusters=True)
+    validation = RuntimeError("GeoNames manifest codes differ; re-extract IE")
+
+    with patch("run.validate_geonames_manifest", side_effect=validation) as manifest, \
+         patch("run.slice_and_compute") as raster:
+        assert run(args) == 1
+
+    manifest.assert_called_once()
+    assert manifest.call_args.kwargs["countries"] == ["GB", "IE"]
+    assert manifest.call_args.kwargs["feature_codes"] is NAMING_FEATURE_CODES
+    raster.assert_not_called()
+
+
+def test_multi_country_runtime_uses_one_filtered_index_and_only_configured_spots(
+    tmp_path,
+):
+    """The full orchestrator path carries GB+IE through clip, naming and tiles."""
+    from rasterio.transform import from_bounds
+    from src.geonames import NAMING_FEATURE_CODES
+    from run import run
+
+    _write_input(tmp_path, region="uk_ireland")
+    args = _make_args(tmp_path, region="uk_ireland", no_push=False)
+    transform = from_bounds(-11, 49, 2, 55, 2, 2)
+    candidates = [
+        {
+            "id": "gb-spot",
+            "lat": 51.2,
+            "lon": -1.4,
+            "row": 0,
+            "col": 0,
+            "darkness": 0.8,
+            "bortle": 3,
+            "country": "GB",
+        },
+        {
+            "id": "ie-spot",
+            "lat": 53.3,
+            "lon": -8.1,
+            "row": 1,
+            "col": 1,
+            "darkness": 0.9,
+            "bortle": 3,
+            "country": "IE",
+        },
+    ]
+    slice_result = MagicMock(
+        data=np.full((2, 2), 1.0), transform=transform, crs="EPSG:4326"
+    )
+    naming_index = MagicMock()
+    naming_index.enrich_spots.side_effect = lambda spots: [
+        dict(spot, name=f"{spot['country']} landmark") for spot in spots
+    ]
+
+    def clone(_url, _branch, target_dir):
+        (Path(target_dir) / "spots").mkdir()
+
+    with ExitStack() as stack:
+        stack.enter_context(patch("run.validate_geonames_manifest"))
+        loader = stack.enter_context(
+            patch("run.GeoNamesIndex.from_filtered_extracts", return_value=naming_index)
+        )
+        stack.enter_context(patch("run.slice_and_compute", return_value=slice_result))
+        stack.enter_context(patch("run.alr_to_darkness", return_value=np.full((2, 2), 0.5)))
+        stack.enter_context(
+            patch("run.alr_to_bortle", return_value=np.full((2, 2), 3, dtype=int))
+        )
+        stack.enter_context(patch("run.mesh_minima", return_value=candidates))
+        clip = stack.enter_context(
+            patch("run.classify_candidates", return_value=(candidates, {}))
+        )
+        stack.enter_context(patch("run.redundancy_filter", return_value=candidates))
+        places = stack.enter_context(patch("run.load_places", return_value=[]))
+        stack.enter_context(patch("run.ensure_coverage", return_value=candidates))
+        stack.enter_context(patch("run.attach_near_town", return_value=candidates))
+        stack.enter_context(patch("run.enrich_all", side_effect=lambda spots: spots))
+        tile_export = stack.enter_context(
+            patch("run.classify_spots_into_tiles", return_value={})
+        )
+        stack.enter_context(patch("run.write_tile_file"))
+        stack.enter_context(patch("run.clone_data_repo", side_effect=clone))
+        stack.enter_context(
+            patch(
+                "run.audit_country_spots",
+                return_value={
+                    "missing": [],
+                    "invalid": [],
+                    "unconfigured": [],
+                    "mismatched": [],
+                    "ambiguous": [],
+                    "unassignable": [],
+                    "valid": 0,
+                },
+            )
+        )
+        copy = stack.enter_context(patch("run.copy_spots_to_repo"))
+        commit = stack.enter_context(patch("run.commit_and_push"))
+        assert run(args) == 0
+
+    loader.assert_called_once_with(
+        data_dir="data",
+        countries=["GB", "IE"],
+        feature_codes=NAMING_FEATURE_CODES,
+        bbox=[-11, 49, 2, 55],
+        margin_km=40,
+    )
+    clip.assert_called_once()
+    assert clip.call_args.args[1] == ["GB", "IE"]
+    places.assert_called_once_with(
+        {
+            "bbox": [-11, 49, 2, 55],
+            "equal_area_epsg": 3035,
+            "admin_level": 8,
+            "osm_country_code": ["GB", "IE"],
+            "name": "Angleterre, Pays de Galles et Irlande (≤55°N)",
+        }
+    )
+    naming_index.enrich_spots.assert_called_once()
+    assert {spot["country"] for spot in naming_index.enrich_spots.call_args.args[0]} == {
+        "GB",
+        "IE",
+    }
+    assert all(
+        spot["country"] in {"GB", "IE"}
+        for spot in tile_export.call_args.args[0]
+    )
+    assert copy.call_args.kwargs["country_codes"] == ["GB", "IE"]
+    commit.assert_called_once()
+
+
+def test_nominal_bbox_filter_blocks_halo_candidates_from_all_publish_steps(
+    tmp_path, caplog
+):
+    """A mesh minimum in the ALR halo never reaches the publishable pipeline."""
+    from rasterio.transform import from_bounds
+    from run import run
+
+    _write_input(tmp_path, region="uk_ireland")
+    args = _make_args(tmp_path, region="uk_ireland", no_clusters=True)
+    transform = from_bounds(-11, 49, 2, 55, 2, 2)
+    halo_candidate = {
+        "id": "gb-halo",
+        "lat": 56.0,
+        "lon": -1.4,
+        "row": 0,
+        "col": 0,
+        "darkness": 0.7,
+        "bortle": 3,
+        "country": "GB",
+    }
+    gb_candidate = {
+        "id": "gb-inside",
+        "lat": 51.2,
+        "lon": -1.4,
+        "row": 0,
+        "col": 1,
+        "darkness": 0.8,
+        "bortle": 3,
+        "country": "GB",
+    }
+    ie_candidate = {
+        "id": "ie-inside",
+        "lat": 53.3,
+        "lon": -8.1,
+        "row": 1,
+        "col": 0,
+        "darkness": 0.9,
+        "bortle": 3,
+        "country": "IE",
+    }
+    candidates = [halo_candidate, gb_candidate, ie_candidate]
+    slice_result = MagicMock(
+        data=np.full((2, 2), 1.0), transform=transform, crs="EPSG:4326"
+    )
+    redundancy_input = []
+    coverage_mesh_input = []
+    naming_input = []
+    tile_input = []
+
+    def capture_redundancy(spots, *args, **kwargs):
+        redundancy_input.extend(spots)
+        return spots
+
+    def capture_coverage(filtered, all_mesh_points, *args, **kwargs):
+        coverage_mesh_input.extend(all_mesh_points)
+        return filtered
+
+    def capture_naming(spots):
+        naming_input.extend(spots)
+        return [dict(spot, name=f"{spot['country']} landmark") for spot in spots]
+
+    def capture_tiles(spots, *args, **kwargs):
+        tile_input.extend(spots)
+        return {}
+
+    with ExitStack() as stack:
+        stack.enter_context(patch("run.validate_geonames_manifest"))
+        stack.enter_context(patch("run.slice_and_compute", return_value=slice_result))
+        stack.enter_context(
+            patch("run.alr_to_darkness", return_value=np.full((2, 2), 0.5))
+        )
+        stack.enter_context(
+            patch("run.alr_to_bortle", return_value=np.full((2, 2), 3, dtype=int))
+        )
+        stack.enter_context(patch("run.mesh_minima", return_value=candidates))
+        stack.enter_context(
+            patch("run.classify_candidates", return_value=(candidates, {}))
+        )
+        stack.enter_context(
+            patch("run.redundancy_filter", side_effect=capture_redundancy)
+        )
+        stack.enter_context(patch("run.load_places", return_value=[]))
+        stack.enter_context(patch("run.ensure_coverage", side_effect=capture_coverage))
+        stack.enter_context(
+            patch(
+                "run.attach_near_town",
+                side_effect=lambda spots, _places: spots,
+            )
+        )
+        naming_index = MagicMock()
+        naming_index.enrich_spots.side_effect = capture_naming
+        stack.enter_context(
+            patch("run.GeoNamesIndex.from_filtered_extracts", return_value=naming_index)
+        )
+        stack.enter_context(patch("run.enrich_all", side_effect=lambda spots: spots))
+        stack.enter_context(
+            patch("run.classify_spots_into_tiles", side_effect=capture_tiles)
+        )
+        stack.enter_context(patch("run.write_tile_file"))
+        with caplog.at_level("INFO", logger="pipeline"):
+            assert run(args) == 0
+
+    assert [spot["id"] for spot in redundancy_input] == ["gb-inside", "ie-inside"]
+    assert [spot["id"] for spot in coverage_mesh_input] == ["gb-inside", "ie-inside"]
+    assert [spot["id"] for spot in naming_input] == ["gb-inside", "ie-inside"]
+    assert [spot["id"] for spot in tile_input] == ["gb-inside", "ie-inside"]
+    assert "Nominal bbox filter: 2 kept, 1 rejected" in caplog.text
 
 
 def test_run_keeps_unassigned_spots_before_tile_classification(tmp_path, mock_region):
@@ -506,6 +792,211 @@ def test_migration_guard_rejects_new_country_anomaly_categories(tmp_path, proble
          patch("run.commit_and_push") as commit:
         assert run_country_migration(args) == 1
     commit.assert_not_called()
+
+
+@pytest.mark.parametrize("prune_orphan_spots", [False, True])
+def test_published_migration_regenerates_clusters_before_commit_and_preserves_data_year(
+    tmp_path, prune_orphan_spots
+):
+    """Published migrations update the cluster contract in the same commit."""
+    from run import run_country_migration
+
+    regions = {"france": {"osm_country_code": ["FR"]}}
+    events = []
+
+    def clone(_url, _branch, target):
+        clone_dir = Path(target)
+        (clone_dir / "spots").mkdir()
+        clusters_dir = clone_dir / "clusters"
+        clusters_dir.mkdir()
+        (clusters_dir / "index.json").write_text(
+            json.dumps(
+                {
+                    "schema": 1,
+                    "generated": "2026-08-03T00:00:00.000000000Z",
+                    "data_year": 2021,
+                    "levels": [],
+                }
+            ),
+            encoding="utf-8",
+        )
+        events.append("clone")
+
+    def migrate(*_args, **_kwargs):
+        events.append("migration")
+        return {"changed": 1}
+
+    def audit(*_args, **_kwargs):
+        events.append("audit")
+        return {
+            "missing": [],
+            "invalid": [],
+            "unconfigured": [],
+            "mismatched": [],
+            "ambiguous": [],
+            "unassignable": [],
+            "valid": 1,
+        }
+
+    def clusters(*args, **kwargs):
+        events.append("clusters")
+        assert args[0].name == "spots"
+        assert args[1].name == "clusters"
+        assert kwargs["data_year"] == 2021
+        assert re.fullmatch(
+            r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{9}Z",
+            kwargs["generated"],
+        )
+
+    def commit(*_args, **_kwargs):
+        events.append("commit")
+
+    args = MagicMock(
+        no_push=False,
+        data_repo_url="git@example.invalid:data.git",
+        data_repo_branch="main",
+        year=2025,
+        prune_orphan_spots=prune_orphan_spots,
+    )
+    with patch("run.load_regions", return_value=regions), \
+         patch("run.clone_data_repo", side_effect=clone), \
+         patch("run.migrate_country_tags", side_effect=migrate), \
+         patch("run.audit_country_spots", side_effect=audit), \
+         patch("run.write_cluster_files", side_effect=clusters), \
+         patch("run.commit_and_push", side_effect=commit):
+        assert run_country_migration(args) == 0
+
+    assert events == ["clone", "migration", "audit", "clusters", "commit"]
+
+
+def test_published_migration_uses_year_when_cluster_manifest_is_unusable(tmp_path):
+    """The informational data_year falls back to the migration year."""
+    from run import run_country_migration
+
+    regions = {"france": {"osm_country_code": ["FR"]}}
+
+    def clone(_url, _branch, target):
+        clone_dir = Path(target)
+        (clone_dir / "spots").mkdir()
+        (clone_dir / "clusters").mkdir()
+        (clone_dir / "clusters" / "index.json").write_text(
+            '{"schema": 99, "data_year": 2010}', encoding="utf-8"
+        )
+
+    args = MagicMock(
+        no_push=False,
+        data_repo_url="git@example.invalid:data.git",
+        data_repo_branch="main",
+        year=2025,
+        prune_orphan_spots=False,
+    )
+    audit = {
+        "missing": [], "invalid": [], "unconfigured": [], "mismatched": [],
+        "ambiguous": [], "unassignable": [], "valid": 0,
+    }
+    with patch("run.load_regions", return_value=regions), \
+         patch("run.clone_data_repo", side_effect=clone), \
+         patch("run.migrate_country_tags", return_value={}), \
+         patch("run.audit_country_spots", return_value=audit), \
+         patch("run.write_cluster_files") as clusters, \
+         patch("run.commit_and_push"):
+        assert run_country_migration(args) == 0
+
+    assert clusters.call_args.kwargs["data_year"] == 2025
+
+
+def test_published_migration_without_manifest_or_year_fails_before_commit(tmp_path):
+    """A missing informational value cannot produce a publishable migration."""
+    from run import run_country_migration
+
+    regions = {"france": {"osm_country_code": ["FR"]}}
+    args = MagicMock(
+        no_push=False,
+        data_repo_url="git@example.invalid:data.git",
+        data_repo_branch="main",
+        year=None,
+        prune_orphan_spots=False,
+    )
+    audit = {
+        "missing": [], "invalid": [], "unconfigured": [], "mismatched": [],
+        "ambiguous": [], "unassignable": [], "valid": 0,
+    }
+    with patch("run.load_regions", return_value=regions), \
+         patch("run.clone_data_repo", side_effect=lambda _u, _b, target: (Path(target) / "spots").mkdir()), \
+         patch("run.migrate_country_tags", return_value={}), \
+         patch("run.audit_country_spots", return_value=audit), \
+         patch("run.write_cluster_files") as clusters, \
+         patch("run.commit_and_push") as commit:
+        assert run_country_migration(args) == 1
+
+    clusters.assert_not_called()
+    commit.assert_not_called()
+
+
+def test_published_migration_cluster_failure_never_reaches_commit(tmp_path):
+    """Cluster generation is a hard pre-commit step."""
+    from run import run_country_migration
+
+    regions = {"france": {"osm_country_code": ["FR"]}}
+    args = MagicMock(
+        no_push=False,
+        data_repo_url="git@example.invalid:data.git",
+        data_repo_branch="main",
+        year=2025,
+        prune_orphan_spots=False,
+    )
+    audit = {
+        "missing": [], "invalid": [], "unconfigured": [], "mismatched": [],
+        "ambiguous": [], "unassignable": [], "valid": 0,
+    }
+    with patch("run.load_regions", return_value=regions), \
+         patch("run.clone_data_repo", side_effect=lambda _u, _b, target: (Path(target) / "spots").mkdir()), \
+         patch("run.migrate_country_tags", return_value={}), \
+         patch("run.audit_country_spots", return_value=audit), \
+         patch("run.write_cluster_files", side_effect=OSError("cluster failure")), \
+         patch("run.commit_and_push") as commit:
+        assert run_country_migration(args) == 1
+
+    commit.assert_not_called()
+
+
+def test_local_migration_does_not_regenerate_or_publish_clusters(tmp_path):
+    """The no-push migration path remains a local spot-only transformation."""
+    from run import run_country_migration
+
+    spots_dir = tmp_path / "output" / "spots"
+    spots_dir.mkdir(parents=True)
+    args = MagicMock(
+        no_push=True,
+        output_dir=str(tmp_path / "output"),
+        prune_orphan_spots=True,
+    )
+    with patch("run.load_regions", return_value={"france": {"osm_country_code": ["FR"]}}), \
+         patch("run.migrate_country_tags", return_value={}) as migrate, \
+         patch("run.write_cluster_files") as clusters, \
+         patch("run.commit_and_push") as commit:
+        assert run_country_migration(args) == 0
+
+    migrate.assert_called_once()
+    clusters.assert_not_called()
+    commit.assert_not_called()
+
+
+def test_generated_timestamp_is_nanosecond_precise_and_monotonic(monkeypatch):
+    """Equal clock readings still produce distinct ordered manifest values."""
+    import run
+
+    base = time.time_ns()
+    monkeypatch.setattr(run, "_LAST_GENERATED_NS", 0)
+    monkeypatch.setattr(run.time, "time_ns", lambda: base)
+
+    first = run._generated_date()
+    second = run._generated_date()
+
+    pattern = r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{9}Z"
+    assert re.fullmatch(pattern, first)
+    assert re.fullmatch(pattern, second)
+    assert first < second
 
 
 def test_country_pruning_requires_explicit_migration_flag(tmp_path):

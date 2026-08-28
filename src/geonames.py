@@ -10,10 +10,14 @@ parameter and must not be hidden in the loader.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import csv
+import hashlib
 import math
 from pathlib import Path
 import zipfile
 from typing import Iterable, Mapping, Sequence
+
+import yaml
 
 import numpy as np
 from scipy.spatial import cKDTree
@@ -24,6 +28,29 @@ from .utils import haversine_km
 _DEFAULT_MARGIN_KM = 40.0
 _ADMIN_1 = "ADM1"
 _ADMIN_2 = "ADM2"
+FILTERED_EXTRACT_COLUMNS = (
+    "geonameid",
+    "name",
+    "latitude",
+    "longitude",
+    "feature_class",
+    "feature_code",
+    "country_code",
+)
+
+# Product parameter for the naming cascade.  Keep this tuple in the GeoNames
+# module so the runtime, extraction utility and audit cannot silently drift.
+# The contents are intentionally unchanged from the original pipeline list.
+NAMING_FEATURE_CODES = tuple(sorted({
+    "PPL", "PPLA", "PPLA2", "PPLA3", "PPLA4", "PPLA5", "PPLC", "PPLF",
+    "PPLG", "PPLL", "PPLR", "PPLS",
+    "LK", "LKC", "LKN", "LKS", "RSV",
+    "CAPE", "CLDA", "CNYN", "GRGE", "HDLD", "ISL", "ISLS", "MT", "MTS",
+    "PASS", "PK", "PKS", "PLAT", "PROM", "SDL", "UPLD", "VLC",
+    "FRST", "HTH", "TUND",
+    "LCTY", "PRK", "RESF", "RESN", "RESW", "RGN", "RGNL",
+}))
+FILTERED_FEATURE_CODES = tuple(sorted(set(NAMING_FEATURE_CODES) | {_ADMIN_1, _ADMIN_2}))
 
 
 @dataclass(frozen=True)
@@ -201,6 +228,63 @@ class GeoNamesIndex:
         index.max_distance_km = float(margin_km)
         return index
 
+    @classmethod
+    def from_filtered_extracts(
+        cls,
+        *,
+        data_dir: str | Path = "data",
+        countries: Iterable[str],
+        feature_codes: Iterable[str],
+        bbox: Sequence[float],
+        margin_km: float = _DEFAULT_MARGIN_KM,
+        manifest_path: str | Path | None = None,
+    ) -> "GeoNamesIndex":
+        """Load versioned, code-filtered TSV extracts.
+
+        The source ZIPs are deliberately not part of the runtime input.  The
+        manifest and the byte hash of every TSV are checked before any rows
+        are loaded.  Ordinary records are then filtered by the regional bbox
+        expanded by ``margin_km``; ADM1 and ADM2 remain country-wide fallback
+        records.
+        """
+        bbox = _validate_bbox(bbox)
+        margin = _validate_margin(margin_km)
+        country_codes = _normalise_countries(countries)
+        codes = _normalise_feature_codes(feature_codes)
+        manifest = validate_filtered_extracts(
+            data_dir=data_dir,
+            countries=country_codes,
+            feature_codes=codes,
+            manifest_path=manifest_path,
+        )
+
+        ordinary: dict[str, list[GeoNameRecord]] = {}
+        adm2: dict[str, list[GeoNameRecord]] = {}
+        adm1: dict[str, list[GeoNameRecord]] = {}
+        for country in country_codes:
+            extract = _manifest_extract_path(manifest, country, manifest_path, data_dir)
+            rows = _load_filtered_extract(extract, country)
+            ordinary[country] = []
+            adm2[country] = []
+            adm1[country] = []
+            for row in rows:
+                if row.feature_class == "A" and row.feature_code == _ADMIN_1:
+                    adm1[country].append(row)
+                elif row.feature_class == "A" and row.feature_code == _ADMIN_2:
+                    adm2[country].append(row)
+                elif row.feature_code in codes and _in_expanded_bbox(row, bbox, margin):
+                    ordinary[country].append(row)
+            if not adm1[country]:
+                raise ValueError(f"GeoNames extract {extract} contains no ADM1 records")
+
+        index = cls(
+            ordinary_by_country=ordinary,
+            adm2_by_country=adm2,
+            adm1_by_country=adm1,
+        )
+        index.max_distance_km = margin
+        return index
+
     def resolve(self, spot: Mapping[str, object], country: str | None = None) -> NamingResult:
         """Resolve one spot to a non-empty name.
 
@@ -272,6 +356,173 @@ def _archive_path(data_dir: Path, country: str) -> Path:
     if data_dir.name.lower() == "geonames":
         return data_dir / f"{country}.zip"
     return data_dir / "geonames" / f"{country}.zip"
+
+
+def _geonames_dir(data_dir: str | Path) -> Path:
+    path = Path(data_dir)
+    return path if path.name.lower() == "geonames" else path / "geonames"
+
+
+def _normalise_countries(countries: Iterable[str]) -> tuple[str, ...]:
+    if isinstance(countries, str):
+        countries = [countries]
+    values = tuple(dict.fromkeys(str(c).strip().upper() for c in countries if str(c).strip()))
+    if not values:
+        raise ValueError("countries must contain at least one ISO code")
+    return values
+
+
+def _normalise_feature_codes(feature_codes: Iterable[str]) -> tuple[str, ...]:
+    if isinstance(feature_codes, str):
+        feature_codes = [feature_codes]
+    values = {str(code).strip().upper() for code in feature_codes if str(code).strip()}
+    if not values:
+        raise ValueError("feature_codes must contain at least one non-empty code")
+    values.update({_ADMIN_1, _ADMIN_2})
+    return tuple(sorted(values))
+
+
+def _validate_margin(margin_km: float) -> float:
+    if margin_km < 0 or not math.isfinite(float(margin_km)):
+        raise ValueError("margin_km must be a finite non-negative number")
+    return float(margin_km)
+
+
+def _manifest_path_for(data_dir: str | Path, manifest_path: str | Path | None) -> Path:
+    if manifest_path is not None:
+        return Path(manifest_path)
+    return _geonames_dir(data_dir) / "manifest.yaml"
+
+
+def _manifest_extract_path(
+    manifest: Mapping[str, object],
+    country: str,
+    manifest_path: str | Path | None,
+    data_dir: str | Path,
+) -> Path:
+    countries = manifest.get("countries")
+    entry = countries.get(country) if isinstance(countries, Mapping) else None
+    if not isinstance(entry, Mapping) or not isinstance(entry.get("extract_path"), str):
+        raise ValueError(f"GeoNames manifest has no extract_path for country {country}")
+    raw_path = Path(str(entry["extract_path"]))
+    if raw_path.is_absolute():
+        return raw_path
+    manifest_file = _manifest_path_for(data_dir, manifest_path)
+    candidate = manifest_file.parent / raw_path
+    if candidate.exists() or not (Path.cwd() / raw_path).exists():
+        return candidate
+    return Path.cwd() / raw_path
+
+
+def validate_filtered_extracts(
+    *,
+    data_dir: str | Path = "data",
+    countries: Iterable[str],
+    feature_codes: Iterable[str],
+    manifest_path: str | Path | None = None,
+) -> dict[str, object]:
+    """Validate extract presence, hashes and the exact code-list contract.
+
+    This function is intentionally separate so the pipeline can call it
+    before opening the raster.  Source archives are not required at runtime;
+    their manifest paths and URLs are retained solely for re-extraction.
+    """
+    requested = _normalise_countries(countries)
+    current_codes = list(_normalise_feature_codes(feature_codes))
+    manifest_file = _manifest_path_for(data_dir, manifest_path)
+    if not manifest_file.is_file():
+        raise FileNotFoundError(
+            f"GeoNames filtered-extract manifest missing: {manifest_file}; "
+            "run tools/extract_geonames.py to re-extract"
+        )
+    try:
+        manifest = yaml.safe_load(manifest_file.read_text(encoding="utf-8"))
+    except (OSError, yaml.YAMLError) as exc:
+        raise ValueError(f"Cannot read GeoNames manifest {manifest_file}: {exc}") from exc
+    if not isinstance(manifest, dict) or not isinstance(manifest.get("countries"), dict):
+        raise ValueError(f"GeoNames manifest {manifest_file} must contain a countries mapping")
+    for country in requested:
+        entry = manifest["countries"].get(country)
+        if not isinstance(entry, dict):
+            raise FileNotFoundError(
+                f"GeoNames manifest has no country {country}; re-extract it with "
+                "tools/extract_geonames.py"
+            )
+        recorded = sorted(str(code).strip().upper() for code in entry.get("codes_applied", []))
+        if recorded != current_codes:
+            raise ValueError(
+                f"GeoNames filtered extract is stale for {country}: manifest codes {recorded}, "
+                f"current codes {current_codes}; source_path={entry.get('source_path')}, "
+                f"source_url={entry.get('source_url')}. Re-extract the country with "
+                "tools/extract_geonames.py."
+            )
+        extract = _manifest_extract_path(manifest, country, manifest_path, data_dir)
+        if not extract.is_file():
+            raise FileNotFoundError(
+                f"GeoNames filtered extract missing for {country}: {extract}; "
+                f"source_path={entry.get('source_path')}, source_url={entry.get('source_url')}; "
+                "re-extract with tools/extract_geonames.py"
+            )
+        expected_hash = str(entry.get("extract_sha256", "")).strip().lower()
+        actual_hash = hashlib.sha256(extract.read_bytes()).hexdigest()
+        if not expected_hash or actual_hash != expected_hash:
+            raise ValueError(
+                f"GeoNames filtered extract hash mismatch for {country}: {extract}; "
+                f"manifest={expected_hash or '<missing>'}, actual={actual_hash}; "
+                f"source_path={entry.get('source_path')}, source_url={entry.get('source_url')}; "
+                "re-extract with tools/extract_geonames.py"
+            )
+    return manifest
+
+
+# Name used by the orchestrator: keep the validation operation explicit while
+# retaining the more descriptive public function for library callers.
+validate_geonames_manifest = validate_filtered_extracts
+
+
+def _load_filtered_extract(path: Path, country: str) -> list[GeoNameRecord]:
+    try:
+        with path.open("r", encoding="utf-8", newline="") as stream:
+            reader = csv.DictReader(stream, delimiter="\t")
+            if tuple(reader.fieldnames or ()) != FILTERED_EXTRACT_COLUMNS:
+                raise ValueError(
+                    f"GeoNames extract {path} has invalid header; expected "
+                    f"{list(FILTERED_EXTRACT_COLUMNS)}"
+                )
+            rows: list[GeoNameRecord] = []
+            for line_number, values in enumerate(reader, start=2):
+                if None in values:
+                    raise ValueError(f"GeoNames extract {path} has extra columns at line {line_number}")
+                row = _parse_filtered_row(values, country)
+                if row is not None:
+                    rows.append(row)
+            return rows
+    except UnicodeDecodeError as exc:
+        raise ValueError(f"GeoNames extract {path} is not valid UTF-8") from exc
+
+
+def _parse_filtered_row(values: Mapping[str | None, str], expected_country: str) -> GeoNameRecord | None:
+    try:
+        geonameid = int(values["geonameid"])
+        lat = float(values["latitude"])
+        lon = float(values["longitude"])
+    except (KeyError, TypeError, ValueError):
+        return None
+    name = values.get("name", "").strip()
+    feature_class = values.get("feature_class", "").strip().upper()
+    feature_code = values.get("feature_code", "").strip().upper()
+    country = values.get("country_code", "").strip().upper()
+    if not name or country != expected_country.upper() or not (math.isfinite(lat) and math.isfinite(lon)):
+        return None
+    return GeoNameRecord(
+        geonameid=geonameid,
+        name=name,
+        lat=lat,
+        lon=lon,
+        feature_class=feature_class,
+        feature_code=feature_code,
+        country_code=country,
+    )
 
 
 def _load_archive(path: Path, country: str) -> list[GeoNameRecord]:
@@ -360,4 +611,13 @@ def _unit_vector(lat: float, lon: float) -> tuple[float, float, float]:
     )
 
 
-__all__ = ["GeoNameRecord", "GeoNamesIndex", "NamingResult"]
+__all__ = [
+    "FILTERED_EXTRACT_COLUMNS",
+    "FILTERED_FEATURE_CODES",
+    "NAMING_FEATURE_CODES",
+    "GeoNameRecord",
+    "GeoNamesIndex",
+    "NamingResult",
+    "validate_filtered_extracts",
+    "validate_geonames_manifest",
+]

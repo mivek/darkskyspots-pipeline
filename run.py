@@ -9,6 +9,7 @@ import json
 import logging
 import sys
 import tempfile
+import time
 from contextlib import nullcontext
 from datetime import datetime, timezone
 from pathlib import Path
@@ -25,7 +26,11 @@ from src.config import (
 )
 from src.coverage import attach_near_town, ensure_coverage, load_places
 from src.enrich import enrich_all
-from src.geonames import GeoNamesIndex
+from src.geonames import (
+    GeoNamesIndex,
+    NAMING_FEATURE_CODES,
+    validate_geonames_manifest,
+)
 from src.extract import mesh_minima, redundancy_filter
 from src.alr import slice_and_compute
 from src.convert import alr_to_bortle, alr_to_darkness
@@ -49,21 +54,8 @@ from src.tile_export import (
 
 logger = logging.getLogger("pipeline")
 
-# Product parameter for the naming cascade.  Keep this list at the call site
-# (rather than hiding it in the GeoNames loader) so measurement runs and future
-# regions can inject a reviewed list without changing the index implementation.
-# The list is intentionally code-granular: whole GeoNames classes contain
-# noisy linear features such as streams and micro-reliefs.
-NAMING_FEATURE_CODES = (
-    "PPL", "PPLA", "PPLA2", "PPLA3", "PPLA4", "PPLA5", "PPLC", "PPLF",
-    "PPLG", "PPLL", "PPLR", "PPLS",
-    "LK", "LKC", "LKN", "LKS", "RSV",
-    "CAPE", "CLDA", "CNYN", "GRGE", "HDLD", "ISL", "ISLS", "MT", "MTS",
-    "PASS", "PK", "PKS", "PLAT", "PROM", "SDL", "UPLD", "VLC",
-    "FRST", "HTH", "TUND",
-    "LCTY", "PRK", "RESF", "RESN", "RESW", "RGN", "RGNL",
-)
-
+# These are deliberately imported from the GeoNames module: the extractor,
+# manifest validator, runtime and naming audit must share one product list.
 AUDIT_PROBLEM_KEYS = (
     "missing",
     "invalid",
@@ -83,14 +75,94 @@ def _audit_has_problems(audit: dict) -> bool:
     return any(_audit_count(audit, key) for key in AUDIT_PROBLEM_KEYS)
 
 
+_LAST_GENERATED_NS = 0
+
+
 def _generated_date() -> str:
-    return datetime.now(timezone.utc).date().isoformat()
+    """Return a process-monotonic UTC timestamp for cluster manifests."""
+    global _LAST_GENERATED_NS
+
+    generated_ns = time.time_ns()
+    if generated_ns <= _LAST_GENERATED_NS:
+        generated_ns = _LAST_GENERATED_NS + 1
+    _LAST_GENERATED_NS = generated_ns
+
+    seconds, nanoseconds = divmod(generated_ns, 1_000_000_000)
+    timestamp = datetime.fromtimestamp(seconds, timezone.utc)
+    return f"{timestamp:%Y-%m-%dT%H:%M:%S}.{nanoseconds:09d}Z"
+
+
+def _region_country_codes(region: dict) -> list[str]:
+    """Return the configured country list in one stable, runtime shape."""
+    raw_codes = region["osm_country_code"]
+    if isinstance(raw_codes, str):
+        raw_codes = [raw_codes]
+    country_codes = [str(code).strip().upper() for code in raw_codes]
+    validate_country_codes(country_codes)
+    return country_codes
+
+
+def _validate_geonames_inputs(country_codes: list[str]) -> None:
+    """Fail before raster work when filtered GeoNames data is unavailable/stale."""
+    validate_geonames_manifest(
+        data_dir="data",
+        countries=country_codes,
+        feature_codes=NAMING_FEATURE_CODES,
+    )
+
+
+def _load_geonames_index(country_codes: list[str], bbox) -> GeoNamesIndex:
+    """Load only the versioned, code-filtered GeoNames extracts."""
+    loader = getattr(GeoNamesIndex, "from_filtered_extracts", None)
+    if not callable(loader):
+        raise RuntimeError(
+            "Filtered GeoNames support is unavailable: "
+            "GeoNamesIndex.from_filtered_extracts is required; ZIP archives "
+            "are not accepted by the pipeline"
+        )
+    return loader(
+        data_dir="data",
+        countries=country_codes,
+        feature_codes=NAMING_FEATURE_CODES,
+        bbox=bbox,
+        margin_km=40,
+    )
+
+
+def _filter_candidates_to_bbox(candidates: list[dict], bbox) -> tuple[list[dict], int]:
+    """Keep only candidates in the region's nominal, inclusive bbox.
+
+    The raster deliberately includes an ALR halo. Mesh minima can therefore
+    be found outside the region even after the Natural Earth country clip;
+    those minima must not participate in redundancy, coverage, naming, or
+    tile export.
+    """
+    lon_min, lat_min, lon_max, lat_max = bbox
+    kept: list[dict] = []
+    rejected = 0
+    for candidate in candidates:
+        try:
+            lat = float(candidate["lat"])
+            lon = float(candidate["lon"])
+        except (KeyError, TypeError, ValueError):
+            rejected += 1
+            continue
+        if lon_min <= lon <= lon_max and lat_min <= lat <= lat_max:
+            kept.append(candidate)
+        else:
+            rejected += 1
+    return kept, rejected
 
 def run(args) -> int:
     """Execute the 7-step pipeline. Returns 0 on success, 1 on error."""
     try:
         region = get_region(args.region)
         logger.info("Region: %s (%s)", region["name"], args.region)
+
+        country_codes = _region_country_codes(region)
+        # This is intentionally before input/raster handling.  A stale or
+        # incomplete filtered extract must never yield a partial run.
+        _validate_geonames_inputs(country_codes)
 
         input_path = Path(args.input_dir) / args.region / f"{args.year}.tif"
         if not input_path.exists():
@@ -103,11 +175,6 @@ def run(args) -> int:
         # Bboxes remain raster/GeoNames envelopes only.  They do not confer
         # ownership of any tile; country clipping decides what is publishable.
         all_tile_ids = sorted(enumerate_tiles_in_bbox(tuple(region["bbox"]), TILE_SIZE_DEG))
-        country_codes = region["osm_country_code"]
-        if isinstance(country_codes, str):
-            country_codes = [country_codes]
-        validate_country_codes(country_codes)
-
         # Step 0: Radiance -> ALR (returns data + geo metadata)
         logger.info("Step 0: Radiance -> ALR")
         slice_result = slice_and_compute(
@@ -170,6 +237,16 @@ def run(args) -> int:
         )
         logger.info("  Geographic candidate stats: %s", geography_stats)
 
+        candidates, bbox_rejected = _filter_candidates_to_bbox(
+            candidates, region["bbox"]
+        )
+        logger.info(
+            "  Nominal bbox filter: %d kept, %d rejected outside %s (ALR halo)",
+            len(candidates),
+            bbox_rejected,
+            region["bbox"],
+        )
+
         # Step 3: Redundancy filter
         logger.info("Step 3: Redundancy filter")
         filtered = redundancy_filter(candidates, REDUNDANCY_KM)
@@ -193,13 +270,7 @@ def run(args) -> int:
         # by the country-scoped GeoNames feature-code index and is guaranteed
         # before tile export.
         logger.info("Step 5: GeoNames naming cascade + enrichment")
-        naming_index = GeoNamesIndex.from_archives(
-            data_dir="data",
-            countries=country_codes,
-            feature_codes=NAMING_FEATURE_CODES,
-            bbox=region["bbox"],
-            margin_km=40,
-        )
+        naming_index = _load_geonames_index(country_codes, region["bbox"])
         named = naming_index.enrich_spots(covered)
         if any(not isinstance(spot.get("name"), str) or not spot["name"].strip() for spot in named):
             raise ValueError("GeoNames naming cascade produced an empty name")
@@ -370,6 +441,33 @@ def _audit_before_write(spots_dir: Path, regions: dict[str, dict]) -> bool:
     return True
 
 
+def _migration_data_year(clone_dir: Path, args) -> int:
+    """Resolve cluster metadata without making ``data_year`` authoritative."""
+    manifest_path = clone_dir / "clusters" / "index.json"
+    try:
+        with manifest_path.open(encoding="utf-8") as source:
+            manifest = json.load(source)
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        manifest = None
+
+    if isinstance(manifest, dict) and manifest.get("schema") == 1:
+        data_year = manifest.get("data_year")
+        # This field is copied only because the cluster writer requires it as
+        # informative metadata. It is not used to decide cache identity or
+        # whether the migration is current. An unknown manifest schema is not
+        # a supported source for the metadata, so --year remains the fallback.
+        if isinstance(data_year, int) and not isinstance(data_year, bool):
+            return data_year
+
+    data_year = getattr(args, "year", None)
+    if data_year is None:
+        raise ValueError(
+            "Cannot regenerate clusters: no data_year in a valid clusters/index.json "
+            "and no --year fallback was provided"
+        )
+    return data_year
+
+
 def run_list_orphans(args) -> int:
     try:
         regions = load_regions()
@@ -456,6 +554,12 @@ def run_country_migration(args) -> int:
                 if not getattr(args, "prune_orphan_spots", False) and _audit_has_problems(audit):
                     logger.error("Migration left unresolved spots; use --prune-orphan-spots explicitly")
                     return 1
+                write_cluster_files(
+                    clone_dir / "spots",
+                    clone_dir / "clusters",
+                    data_year=_migration_data_year(clone_dir, args),
+                    generated=_generated_date(),
+                )
                 commit_and_push(str(clone_dir), f"data: migrate country tags ({args.year})")
         print(json.dumps(report, indent=2, ensure_ascii=False))
         return 0

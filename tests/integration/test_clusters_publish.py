@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, patch
 
 import numpy as np
 from rasterio.transform import from_bounds
+from src.clusters import write_cluster_files
 
 
 def _spot(spot_id, lat, lon):
@@ -44,7 +45,10 @@ def test_published_clusters_read_spots_after_current_region_copy(tmp_path):
         cluster_calls.append((spots_dir, clusters_dir, data_year, generated, allowed_tile_ids))
         assert Path(clusters_dir) == Path(spots_dir).parent / "clusters"
         assert data_year == 2025
-        assert re.fullmatch(r"\d{4}-\d{2}-\d{2}", generated)
+        assert re.fullmatch(
+            r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{9}Z",
+            generated,
+        )
         assert allowed_tile_ids is None
         for path in Path(spots_dir).glob("*.json"):
             seen_ids.extend(spot["id"] for spot in json.loads(path.read_text())["spots"])
@@ -53,6 +57,8 @@ def test_published_clusters_read_spots_after_current_region_copy(tmp_path):
 
     with ExitStack() as stack:
         stack.enter_context(patch("run.clone_data_repo", side_effect=clone))
+        stack.enter_context(patch("run._validate_geonames_inputs"))
+        stack.enter_context(patch("run._load_geonames_index", return_value=MagicMock()))
         stack.enter_context(patch("run.audit_country_spots", return_value={
             "missing": [], "invalid": [], "unconfigured": [], "mismatched": [],
             "ambiguous": [], "valid": 1,
@@ -96,3 +102,47 @@ def test_a_then_b_scoped_publication_preserves_a_tiles(tmp_path):
     a_envelope = json.loads((clone / "spots" / "N048E002.json").read_text())
     assert {spot["id"] for spot in a_envelope["spots"]} == {"a", "b"}
     assert [spot["country"] for spot in a_envelope["spots"]] == ["AD", "FR"]
+
+
+def test_gb_ie_publication_regenerates_global_clusters_from_all_tiles(tmp_path):
+    """Global clusters include both countries after merging the new run."""
+    from src.publish import audit_publication_country_codes, copy_spots_to_repo
+
+    repo = tmp_path / "repo"
+    fr = _spot("fr", 50.05, -0.05)
+    gb = _spot("gb", 50.25, 0.25)
+    ie = _spot("ie", 53.1, -6.1)
+    gb["country"] = "GB"
+    ie["country"] = "IE"
+
+    copy_spots_to_repo(
+        None,
+        repo,
+        country_codes=["FR"],
+        envelopes={"N050W001": {"tile": "N050W001", "spots": [fr]}},
+    )
+    copy_spots_to_repo(
+        None,
+        repo,
+        country_codes=["GB", "IE"],
+        envelopes={
+            "N050W001": {"tile": "N050W001", "spots": [gb]},
+            "N053W006": {"tile": "N053W006", "spots": [ie]},
+        },
+    )
+
+    country_report = audit_publication_country_codes(
+        repo / "spots", forbidden_codes=["IM", "JE", "GG"]
+    )
+    assert country_report["country_counts"] == {"FR": 1, "GB": 1, "IE": 1}
+    assert country_report["forbidden_counts"] == {}
+
+    write_cluster_files(
+        repo / "spots",
+        repo / "clusters",
+        data_year=2025,
+        generated="2026-08-27",
+    )
+    level_one = json.loads((repo / "clusters" / "L1.json").read_text())
+    representatives = {cluster["rep"]["id"] for cluster in level_one}
+    assert {"fr", "gb", "ie"} <= representatives

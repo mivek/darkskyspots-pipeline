@@ -2,6 +2,7 @@
 import json
 import logging
 import re
+from collections import Counter
 from collections.abc import Collection, Mapping
 import subprocess
 from pathlib import Path
@@ -10,6 +11,7 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 VERSION_PATTERN = re.compile(r'"version":\s*"(\d{4})\.(\d+)"')
+CLUSTER_MANIFEST_PATH = "clusters/index.json"
 
 
 def clone_data_repo(url: str, branch: str, target_dir: str) -> str:
@@ -388,6 +390,49 @@ def _read_envelopes(spots_dir: str | Path) -> dict[str, dict]:
     return result
 
 
+def audit_publication_country_codes(
+    spots_dir: str | Path,
+    *,
+    forbidden_codes: Collection[str] = (),
+) -> dict:
+    """Count country tags in published tiles without changing any file.
+
+    The returned report is suitable for a reproducible post-publication audit.
+    ``forbidden_codes`` is intentionally evaluated after normalising tags to
+    upper case, so a malformed lower-case tag cannot evade the Crown
+    dependency check performed by the audit tool.
+    """
+    directory = Path(spots_dir)
+    if not directory.is_dir():
+        raise FileNotFoundError(f"Spot tile directory does not exist: {directory}")
+    envelopes = _read_envelopes(directory)
+    counts: Counter[str] = Counter()
+    total_spots = 0
+    for envelope in envelopes.values():
+        for spot in envelope["spots"]:
+            raw_country = spot.get("country")
+            country = (
+                raw_country.strip().upper()
+                if isinstance(raw_country, str) and raw_country.strip()
+                else "<missing>"
+            )
+            counts[country] += 1
+            total_spots += 1
+
+    forbidden = {
+        code: counts.get(code, 0)
+        for code in sorted({str(code).strip().upper() for code in forbidden_codes})
+        if counts.get(code, 0)
+    }
+    return {
+        "spots_dir": str(spots_dir),
+        "tile_count": len(envelopes),
+        "spot_count": total_spots,
+        "country_counts": dict(sorted(counts.items())),
+        "forbidden_counts": forbidden,
+    }
+
+
 def audit_country_spots(
     spots_dir: str | Path,
     regions: Mapping[str, dict],
@@ -455,11 +500,85 @@ def migrate_country_tags(
     return result
 
 
+def _read_manifest_generated(raw: str, source: str) -> str:
+    """Return a valid cache-invalidation value from a cluster manifest."""
+    try:
+        manifest = json.loads(raw)
+    except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+        raise RuntimeError(
+            f"Cannot publish spots: {source} is not valid JSON. "
+            "Regenerate clusters before publishing."
+        ) from exc
+    generated = manifest.get("generated") if isinstance(manifest, dict) else None
+    if not isinstance(generated, str) or not generated.strip():
+        raise RuntimeError(
+            f"Cannot publish spots: {source} has no valid 'generated' value. "
+            "Regenerate clusters before publishing."
+        )
+    return generated
+
+
+def _validate_spot_publication(data_repo_dir: str | Path) -> None:
+    """Ensure staged spot changes have a newly generated cluster manifest."""
+    staged = subprocess.run(
+        ["git", "diff", "--cached", "--name-only", "-z", "--"],
+        cwd=data_repo_dir,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout
+    staged_paths = {path for path in staged.split("\0") if path}
+    if not any(path == "spots" or path.startswith("spots/") for path in staged_paths):
+        return
+
+    if CLUSTER_MANIFEST_PATH not in staged_paths:
+        raise RuntimeError(
+            "Cannot publish spots: clusters/index.json is not staged. "
+            "Regenerate clusters before publishing spot changes."
+        )
+
+    staged_manifest = subprocess.run(
+        ["git", "show", f":{CLUSTER_MANIFEST_PATH}"],
+        cwd=data_repo_dir,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if staged_manifest.returncode != 0:
+        raise RuntimeError(
+            "Cannot publish spots: clusters/index.json is missing or unreadable. "
+            "Regenerate clusters before publishing."
+        )
+    new_generated = _read_manifest_generated(
+        staged_manifest.stdout,
+        "the staged cluster manifest",
+    )
+
+    old_result = subprocess.run(
+        ["git", "show", f"HEAD:{CLUSTER_MANIFEST_PATH}"],
+        cwd=data_repo_dir,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if old_result.returncode == 0:
+        old_generated = _read_manifest_generated(
+            old_result.stdout,
+            "the HEAD cluster manifest",
+        )
+        if old_generated == new_generated:
+            raise RuntimeError(
+                "Cannot publish spots: clusters/index.json.generated is unchanged. "
+                "Regenerate clusters before publishing spot changes."
+            )
+
+
 def commit_and_push(data_repo_dir: str, message: str) -> None:
-    """Git add . -> commit -> push inside data_repo_dir."""
+    """Git add . -> validate -> commit -> push inside data_repo_dir."""
     subprocess.run(
         ["git", "add", "."], cwd=data_repo_dir, check=True, capture_output=True, text=True
     )
+    _validate_spot_publication(data_repo_dir)
     subprocess.run(
         ["git", "commit", "-m", message],
         cwd=data_repo_dir,

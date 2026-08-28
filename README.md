@@ -23,6 +23,34 @@ python run.py \
 
 Output appears in `/output/spots/`. Publication also generates global clusters after copying the current region into the cloned data repository. Add `--no-push` to keep the run local.
 
+### Angleterre, Pays de Galles et Irlande
+
+La région `uk_ireland` couvre le Royaume-Uni et l’Irlande au sud de 55°N,
+avec la bbox de travail entière `[-11, 49, 2, 55]`. Le raster d’entrée doit
+être préparé avec 300 km de contexte :
+
+```bash
+python make_region_input.py \
+    --src input/viirs_2025_raw.tif \
+    --bbox -11 49 2 55 \
+    --context-km 300 \
+    --out input/uk_ireland/2025.tif
+
+python run.py \
+    --year 2025 \
+    --region uk_ireland \
+    --input-dir ./input \
+    --output-dir ./output/uk_ireland_2025_300km \
+    --no-push \
+    --no-clusters
+```
+
+Ce premier run est une prépublication : il n’effectue aucun clone, commit ou
+push. Une emprise ALR valide insuffisante ne déclenche pas automatiquement un
+run à 350 km. Ce contexte élargi modifie potentiellement les valeurs de
+darkness ; il nécessite une décision manuelle et une comparaison sur la zone
+commune avant toute régénération ou publication.
+
 ## CLI reference
 
 | Flag | Required | Default | Description |
@@ -32,7 +60,7 @@ Output appears in `/output/spots/`. Publication also generates global clusters a
 | `--data-repo-url` | Mode-dependent | — | Required for published runs and published cluster regeneration; optional for local and audit modes. |
 | `--data-repo-branch` | No | `main` | Branch to push to in the data repo. |
 | `--no-push` | No | `false` | Skip step 7 (publish). Output stays in `/output/spots/`. |
-| `--no-clusters` | No | `false` | Skip cluster generation. |
+| `--no-clusters` | No | `false` | Skip local cluster generation. Rejected for published runs; use only with `--no-push`. |
 | `--regenerate-clusters` | No | `false` | Published mode: clone/audit the complete repository, write clusters/, then commit/push; requires --year and --data-repo-url. With --no-push: read output/spots/, write clusters-local/, and perform no clone, audit, commit, or push; requires only --year. |
 | `--audit-country-tags` | No | `false` | Strictly read-only audit of missing, invalid, unconfigured, mismatched, ambiguous, and unassignable spots, with a projected migration summary. `--list-orphans` is a deprecated alias. |
 | `--migrate-country-tags` | No | `false` | Explicitly reclassify historical spots with Natural Earth geometry. Does not delete unresolved spots. |
@@ -79,15 +107,28 @@ Clusters must be regenerated only after repository spot tiles are complete. In p
 
 Normal --no-push also never clones or pushes: it leaves output/spots/ and, unless --no-clusters, writes the local output/clusters-local/ artifact.
 
+Any published change under `spots/` must include a regenerated
+`clusters/index.json` in the same commit. The manifest's `generated` value is
+the signal consumed by the client cache, so `commit_and_push` rejects a spot
+change when the manifest is absent, invalid, or unchanged. Published country
+migrations regenerate clusters automatically; `--no-clusters` is incompatible
+with every remote publication. The client-side cache contract belongs in the
+application repository's `docs/conventions.md`.
+
 ## Region bboxes and migrations
 
-Bboxes in regions.yaml remain raster/GeoNames working envelopes, not tile
-ownership. Regions may overlap. `osm_country_code` is a list of ISO alpha-2
-codes; the Natural Earth 1:10m polygons decide which countries can publish.
+Bboxes in regions.yaml define both the raster/GeoNames working envelope and the
+nominal latitude/longitude domain of publishable spots; they do not define tile
+ownership. Regions may overlap as rectangles. `osm_country_code` is a list of
+ISO alpha-2 codes; the Natural Earth 1:10m polygons decide which countries can
+publish.
 
 The 300 km ALR margin avoids raster edge effects and remains in the luminosity
-calculation, but it never creates candidates. Land masking and country clipping
-happen before redundancy, with no coastal buffer; islands are retained.
+calculation. Mesh minima can consequently be found in that halo, but the
+orchestrator removes candidates outside the inclusive nominal bbox immediately
+after land/country clipping and before redundancy. The same filtered list is
+used for coverage, naming, and tile export. There is no coastal buffer; islands
+inside the configured countries are retained.
 
 Changing a published country configuration is a spot-level migration. Run the
 read-only country audit first, then review `--migrate-country-tags` and (only if
@@ -105,7 +146,7 @@ name, so splitting or regrouping regions does not orphan published spots.
 
 ## Published cluster files and cache identity
 
-The repository contains clusters/index.json and clusters/L1.json–L6.json. Every level exists, including empty levels whose JSON is []. Manifest levels[*].files is an array. Each file entry has a SHA-256 hash of the exact UTF-8 bytes; that per-file hash is the cache identity, so clients reuse or invalidate each level independently by hash. Deterministic serialization/order makes identical inputs byte-identical. generated is a human-readable generation date. data_year is informative metadata only: it is neither a cache key nor a substitute for published spot contents.
+The repository contains clusters/index.json and clusters/L1.json–L6.json. Every level exists, including empty levels whose JSON is []. Manifest levels[*].files is an array. Each file entry has a SHA-256 hash of the exact UTF-8 bytes; that per-file hash is the cache identity, so clients reuse or invalidate each level independently by hash. Deterministic serialization/order makes identical inputs byte-identical. `generated` is a precise UTC ISO-8601 timestamp written for each cluster generation. `data_year` is informative metadata only: it is neither a cache key nor a substitute for published spot contents. The client-side invalidation behavior is documented in the application repository.
 
 ## Data directory
 
@@ -114,6 +155,10 @@ The `data/` directory contains:
 - **`cities500.txt`** — extracted on first pipeline run (gitignored, ~50 MB).
 - **`natural_earth/`** — versioned Natural Earth v5.1.1 1:10m land and
   admin-0 country layers. They are loaded locally; runs never download them.
+- **`geonames/extracts/*.tsv` et `geonames/manifest.yaml`** — extractions
+  GeoNames filtrées par codes, versionnées avec leur manifeste. Les archives
+  nationales sources ne sont pas des entrées runtime ; le manifeste indique
+  leur URL et leur chemin pour une réextraction en cas de divergence de codes.
 
 No other data files are required.
 

@@ -64,6 +64,50 @@ def test_parser_custom_dirs_and_no_clusters():
     assert args.no_clusters is True
 
 
+@pytest.mark.parametrize(
+    "args",
+    [
+        ["--year", "2025", "--region", "france", "--no-push"],
+        ["--migrate-country-tags", "--no-push"],
+        ["--regenerate-clusters", "--year", "2025", "--no-push"],
+    ],
+)
+def test_parser_accepts_no_clusters_for_local_modes(args):
+    from src.cli import parse_args
+
+    parsed = parse_args([*args, "--no-clusters"])
+
+    assert parsed.no_clusters is True
+
+
+@pytest.mark.parametrize(
+    "extra_args",
+    [
+        ["--year", "2025", "--region", "france", "--data-repo-url", "git@x"],
+        ["--migrate-country-tags", "--data-repo-url", "git@x"],
+        ["--regenerate-clusters", "--year", "2025", "--data-repo-url", "git@x"],
+    ],
+)
+def test_parser_rejects_no_clusters_when_publishing(extra_args, capsys):
+    from src.cli import parse_args
+
+    with pytest.raises(SystemExit):
+        parse_args([*extra_args, "--no-clusters"])
+
+    error = capsys.readouterr().err
+    assert "--no-clusters cannot be used when publishing" in error
+    assert "--no-push" in error
+
+
+@pytest.mark.parametrize("mode", ["--list-orphans", "--audit-country-tags"])
+def test_parser_accepts_no_clusters_for_read_only_mode(mode):
+    from src.cli import parse_args
+
+    args = parse_args([mode, "--no-clusters"])
+
+    assert args.no_clusters is True
+
+
 def test_parser_list_orphans_is_read_only_mode():
     from src.cli import parse_args
     args = parse_args(["--list-orphans"])

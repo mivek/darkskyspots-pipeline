@@ -28,6 +28,10 @@ debug_bortle_*.tif
 /output/
 /spots/
 
+# GeoNames source archives are reproducible inputs for local re-extraction;
+# only the small code-filtered TSVs and their manifest are versioned.
+/data/geonames/sources/
+
 # Design and planning docs (ephemeral, regenerated each feature)
 /docs/designs/
 /docs/plans/

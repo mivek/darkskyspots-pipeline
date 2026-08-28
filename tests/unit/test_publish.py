@@ -4,6 +4,7 @@ import hashlib
 import logging
 from pathlib import Path
 import subprocess
+import sys
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -100,6 +101,84 @@ def test_copy_spots_to_repo_merges_country_and_preserves_neighbor(tmp_path):
     copy_spots_to_repo(None, dst, country_codes=["FR"], envelopes=incoming)
     result = json.loads((dst / "spots" / "N001E001.json").read_text())
     assert [spot["id"] for spot in result["spots"]] == ["ES".lower(), "fr-new"]
+
+
+def test_multi_country_publication_replaces_only_gb_ie_and_preserves_fr(tmp_path):
+    """The first GB/IE publication keeps FR in a genuinely shared tile."""
+    from src.publish import copy_spots_to_repo
+
+    repo = tmp_path / "repo"
+    spots_dir = repo / "spots"
+    spots_dir.mkdir(parents=True)
+    _write_envelope(
+        spots_dir / "N050W001.json",
+        "N050W001",
+        [
+            {"id": "fr", "country": "FR"},
+            {"id": "gb-old", "country": "GB"},
+            {"id": "ie-old", "country": "IE"},
+            {"id": "es", "country": "ES"},
+        ],
+    )
+
+    copy_spots_to_repo(
+        None,
+        repo,
+        country_codes=["GB", "IE"],
+        envelopes={
+            "N050W001": {
+                "tile": "N050W001",
+                "version": "2026.1",
+                "spots": [
+                    {"id": "gb-new", "country": "GB"},
+                    {"id": "ie-new", "country": "IE"},
+                ],
+            }
+        },
+    )
+
+    result = json.loads((spots_dir / "N050W001.json").read_text(encoding="utf-8"))
+    assert [spot["id"] for spot in result["spots"]] == [
+        "es", "fr", "gb-new", "ie-new"
+    ]
+
+
+def test_empty_gb_ie_envelope_is_deterministic_and_keeps_neighbor(tmp_path):
+    """An empty UK/Ireland run cannot rewrite or remove a neighbour tile."""
+    from src.publish import copy_spots_to_repo, merge_publication_envelopes
+
+    old = {
+        "N050W001": {
+            "version": "2026.4",
+            "source": "france",
+            "generated": "2026-08-01T00:00:00Z",
+            "tile": "N050W001",
+            "spots": [{"id": "fr", "country": "FR"}],
+        }
+    }
+    empty_run = {
+        "N050W001": {
+            "version": "2026.5",
+            "source": "uk_ireland",
+            "generated": "2026-08-02T00:00:00Z",
+            "tile": "N050W001",
+            "spots": [],
+        }
+    }
+    expected = merge_publication_envelopes(old, empty_run, ["GB", "IE"])
+    assert expected == old
+    assert merge_publication_envelopes(old, empty_run, ["IE", "GB"]) == expected
+
+    repo = tmp_path / "repo"
+    spots_dir = repo / "spots"
+    spots_dir.mkdir(parents=True)
+    path = spots_dir / "N050W001.json"
+    original = json.dumps(old["N050W001"], ensure_ascii=False) + "\n"
+    path.write_text(original, encoding="utf-8")
+    copy_spots_to_repo(None, repo, country_codes=["GB", "IE"], envelopes=empty_run)
+    assert path.read_text(encoding="utf-8") == original
+    copy_spots_to_repo(None, repo, country_codes=["IE", "GB"], envelopes=empty_run)
+    assert path.read_text(encoding="utf-8") == original
 
 
 def _write_envelope(path, tile_id, spots):
@@ -235,6 +314,58 @@ def test_audit_returns_projection_without_mutating_files(tmp_path):
     assert result["projection"]["migration_and_prune"]["deleted"] == 0
     assert path.read_bytes() == before
     assert path.stat().st_mtime_ns == before_mtime
+
+
+def test_audit_publication_country_codes_counts_and_reports_crown_dependencies(tmp_path):
+    from src.publish import audit_publication_country_codes
+
+    spots = tmp_path / "spots"
+    spots.mkdir()
+    _write_envelope(
+        spots / "N050W001.json",
+        "N050W001",
+        [
+            {"id": "fr", "country": "fr"},
+            {"id": "gb", "country": "GB"},
+            {"id": "im", "country": "IM"},
+            {"id": "missing"},
+        ],
+    )
+
+    report = audit_publication_country_codes(
+        spots, forbidden_codes=["IM", "JE", "GG"]
+    )
+
+    assert report["tile_count"] == 1
+    assert report["spot_count"] == 4
+    assert report["country_counts"] == {
+        "GB": 1, "FR": 1, "IM": 1, "<missing>": 1
+    }
+    assert report["forbidden_counts"] == {"IM": 1}
+
+
+def test_publication_audit_tool_reports_counts_and_fails_for_crown_code(tmp_path):
+    spots = tmp_path / "spots"
+    spots.mkdir()
+    _write_envelope(
+        spots / "N050W001.json",
+        "N050W001",
+        [{"id": "gb", "country": "GB"}, {"id": "gg", "country": "GG"}],
+    )
+
+    result = subprocess.run(
+        [sys.executable, "tools/audit_publication.py", str(spots)],
+        cwd=Path(__file__).parents[2],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 1
+    report = json.loads(result.stdout)[0]
+    assert report["country_counts"] == {"GB": 1, "GG": 1}
+    assert report["forbidden_counts"] == {"GG": 1}
+    assert "forbidden Crown dependency" in result.stderr
 
 
 def test_audit_distinguishes_missing_invalid_ambiguous_and_unassignable(tmp_path):
@@ -428,17 +559,135 @@ def test_compute_new_version_stays_monotone_across_double_digit_minor_versions()
 
 
 def test_commit_and_push_calls_git():
-    """subprocess.run is called 3 times: add, commit, push."""
+    """The central guard runs between git add and commit."""
     from src.publish import commit_and_push
     with patch("src.publish.subprocess.run") as mock_run:
         mock_run.return_value = MagicMock(returncode=0)
         commit_and_push("/tmp/repo", "test message")
-    assert mock_run.call_count == 3
+    assert mock_run.call_count == 4
     cmds = [c.args[0] for c in mock_run.call_args_list]
     assert cmds[0] == ["git", "add", "."]
-    assert cmds[1][0:3] == ["git", "commit", "-m"]
-    assert cmds[1][3] == "test message"
-    assert cmds[2] == ["git", "push"]
+    assert cmds[1] == ["git", "diff", "--cached", "--name-only", "-z", "--"]
+    assert cmds[2][0:3] == ["git", "commit", "-m"]
+    assert cmds[2][3] == "test message"
+    assert cmds[3] == ["git", "push"]
+
+
+def _init_publish_git_repo(path, *, generated="old", with_manifest=True):
+    """Create a temporary repository with a local push target."""
+    spots = path / "spots"
+    spots.mkdir(parents=True)
+    _write_envelope(
+        spots / "T.json", "T", [{"id": "old", "country": "FR"}]
+    )
+    if with_manifest:
+        clusters = path / "clusters"
+        clusters.mkdir()
+        (clusters / "index.json").write_text(
+            json.dumps({"generated": generated, "data_year": 2025}),
+            encoding="utf-8",
+        )
+    _init_test_git_repo(path)
+    remote = path.parent / "remote.git"
+    subprocess.run(["git", "init", "--bare", "-q", str(remote)], check=True)
+    subprocess.run(["git", "remote", "add", "origin", str(remote)], cwd=path, check=True)
+    branch = subprocess.run(
+        ["git", "branch", "--show-current"],
+        cwd=path,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    subprocess.run(["git", "push", "-u", "origin", branch], cwd=path, check=True, capture_output=True)
+    return path
+
+
+def _change_spot(path):
+    spot_path = path / "spots" / "T.json"
+    envelope = json.loads(spot_path.read_text(encoding="utf-8"))
+    envelope["spots"][0]["id"] = "new"
+    spot_path.write_text(json.dumps(envelope), encoding="utf-8")
+
+
+def _change_manifest(path, generated):
+    manifest_path = path / "clusters" / "index.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["generated"] = generated
+    manifest["test_marker"] = generated
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+
+def _git_head(path, *args):
+    return subprocess.run(
+        ["git", "show", "HEAD:" + "/".join(args)],
+        cwd=path,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout
+
+
+def test_commit_and_push_rejects_spot_only_publication(tmp_path):
+    from src.publish import commit_and_push
+    repo = _init_publish_git_repo(tmp_path / "repo")
+    _change_spot(repo)
+
+    with pytest.raises(RuntimeError, match="Regenerate clusters before publishing"):
+        commit_and_push(str(repo), "spot change")
+
+    assert json.loads(_git_head(repo, "spots", "T.json"))["spots"][0]["id"] == "old"
+
+
+def test_commit_and_push_rejects_unchanged_manifest_generated(tmp_path):
+    from src.publish import commit_and_push
+    repo = _init_publish_git_repo(tmp_path / "repo", generated="same")
+    _change_spot(repo)
+    _change_manifest(repo, "same")
+
+    with pytest.raises(RuntimeError, match="generated is unchanged"):
+        commit_and_push(str(repo), "spot change")
+
+    assert json.loads(_git_head(repo, "spots", "T.json"))["spots"][0]["id"] == "old"
+
+
+def test_commit_and_push_allows_spot_publication_with_changed_manifest(tmp_path):
+    from src.publish import commit_and_push
+    repo = _init_publish_git_repo(tmp_path / "repo", generated="old")
+    _change_spot(repo)
+    _change_manifest(repo, "new")
+
+    commit_and_push(str(repo), "spot change")
+
+    assert json.loads(_git_head(repo, "spots", "T.json"))["spots"][0]["id"] == "new"
+    assert json.loads(_git_head(repo, "clusters", "index.json"))["generated"] == "new"
+
+
+def test_commit_and_push_allows_cluster_only_publication(tmp_path):
+    from src.publish import commit_and_push
+    repo = _init_publish_git_repo(tmp_path / "repo", generated="old")
+    _change_manifest(repo, "new")
+    (repo / "clusters" / "L1.json").write_text("[]", encoding="utf-8")
+
+    commit_and_push(str(repo), "cluster refresh")
+
+    assert json.loads(_git_head(repo, "clusters", "index.json"))["generated"] == "new"
+    assert json.loads(_git_head(repo, "spots", "T.json"))["spots"][0]["id"] == "old"
+
+
+def test_commit_and_push_allows_first_manifest_with_spot_publication(tmp_path):
+    from src.publish import commit_and_push
+    repo = _init_publish_git_repo(tmp_path / "repo", with_manifest=False)
+    _change_spot(repo)
+    clusters = repo / "clusters"
+    clusters.mkdir()
+    (clusters / "index.json").write_text(
+        json.dumps({"generated": "first", "data_year": 2025}),
+        encoding="utf-8",
+    )
+
+    commit_and_push(str(repo), "initial clusters")
+
+    assert json.loads(_git_head(repo, "clusters", "index.json"))["generated"] == "first"
 
 
 # --- compute_new_version (Task 9.2) ---

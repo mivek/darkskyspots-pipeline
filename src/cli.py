@@ -42,7 +42,9 @@ def create_parser() -> argparse.ArgumentParser:
     # it is never accepted as an operational alias.
     parser.add_argument("--prune-orphans", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument(
-        "--no-clusters", action="store_true", help="Skip cluster generation"
+        "--no-clusters",
+        action="store_true",
+        help="Skip local cluster generation; incompatible with publication",
     )
     parser.add_argument("--debug-raster", action="store_true", help="Sauvegarde les rasters intermédiaires darkness et bortle en GeoTIFF dans le dossier de sortie")
     parser.add_argument("--input-dir", type=str, default="./input", help="Directory with input GeoTIFFs")
@@ -64,6 +66,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
     audit_mode = args.list_orphans or args.audit_country_tags
     migration_mode = args.migrate_country_tags or args.prune_orphan_spots
+    if args.no_clusters and not args.no_push and not audit_mode:
+        parser.error(
+            "--no-clusters cannot be used when publishing; remove --no-clusters "
+            "or add --no-push for a local run"
+        )
     if args.prune_orphan_spots and not args.migrate_country_tags:
         parser.error("--prune-orphan-spots requires --migrate-country-tags")
     if migration_mode:

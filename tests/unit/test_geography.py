@@ -104,6 +104,12 @@ def test_invalid_natural_earth_code_is_rejected():
         validate_country_codes(["AA", "ZZ"], geography=synthetic_geography())
 
 
+def test_natural_earth_iso_a2_eh_codes_cover_configured_and_crown_territories():
+    geo = load_geography()
+
+    assert {"FR", "GB", "IE", "IM", "JE", "GG"}.issubset(geo.countries)
+
+
 def test_andorra_and_monaco_are_kept_in_shared_french_tiles():
     geo = load_geography()
     andorra, _ = classify_candidates(

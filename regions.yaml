@@ -4,3 +4,9 @@ france:
   admin_level: 8
   osm_country_code: ["FR"]
   name: "France"
+uk_ireland:
+  bbox: [-11, 49, 2, 55]
+  equal_area_epsg: 3035
+  admin_level: 8
+  osm_country_code: ["GB", "IE"]
+  name: "Angleterre, Pays de Galles et Irlande (≤55°N)"
