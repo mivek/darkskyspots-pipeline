@@ -66,7 +66,7 @@ def test_published_clusters_read_spots_after_current_region_copy(tmp_path):
         stack.enter_context(patch("run.slice_and_compute", return_value=slice_result))
         stack.enter_context(patch("run.alr_to_darkness", return_value=np.full((2, 2), 0.5)))
         stack.enter_context(patch("run.alr_to_bortle", return_value=np.full((2, 2), 3, dtype=int)))
-        stack.enter_context(patch("run.mesh_minima", return_value=[]))
+        stack.enter_context(patch("run.mesh_darkest", return_value=[]))
         stack.enter_context(patch("run.redundancy_filter", return_value=[]))
         stack.enter_context(patch("run.load_places", return_value=[]))
         stack.enter_context(patch("run.ensure_coverage", return_value=[]))

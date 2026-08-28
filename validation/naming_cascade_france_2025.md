@@ -1,858 +1,203 @@
-# Mesure de la cascade de nommage GeoNames
+# Audit prépublication — cascade GeoNames
 
 - Pays : `FR`
-- Bbox région : `[-6.0, 41.0, 8.0, 51.0]` ; import élargi à 40 km
-- Spots mesurés : **2143** (référence indicative : 2139)
-- Archives : `FR` f39c60910f77
+- Bbox : `[-6.0, 41.0, 8.0, 51.0]`
+- Spots analysés : **2189**
+- Divergences runtime/audit : **0**
 
-> **Avertissement :** Corpus contient 2143 spots FR, référence indicative 2139 (écart +4); mesure poursuivie.
+> **Avertissement :** Corpus contient 2189 spots, référence indicative 2139 (écart +50).
 
-## Distribution
+## Darkness
 
-| Tier | Spots |
-|---|---:|
-| < 5 km | 2135 |
-| 5–25 km | 8 |
-| 25–40 km | 0 |
-| repli ADM2 | 0 |
-| repli ADM1 | 0 |
+| Corpus | Valides | Invalides | Min | P25 | Médiane | P75 | Max |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Global | 2189 | 0 | 0.0 | 0.546701 | 0.739238 | 0.85227 | 1.0 |
+| FR | 2189 | 0 | 0.0 | 0.546701 | 0.739238 | 0.85227 | 1.0 |
 
-## Codes retenus comme candidats
+### Bins fixes de darkness (0,1)
 
-La liste est une hypothèse à valider à la lecture des 100 exemples. L'arbitrage est uniquement la distance au point GeoNames; les classes ne sont pas utilisées comme priorité.
+| Corpus | 0.0-0.1 | 0.1-0.2 | 0.2-0.3 | 0.3-0.4 | 0.4-0.5 | 0.5-0.6 | 0.6-0.7 | 0.7-0.8 | 0.8-0.9 | 0.9-1.0 |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| Global | 23 | 51 | 27 | 139 | 222 | 183 | 180 | 484 | 493 | 387 |
+| FR | 23 | 51 | 27 | 139 | 222 | 183 | 180 | 484 | 493 | 387 |
 
-| Code | Décision | Spots nommés | Définition / raison |
-|---|---|---:|---|
-| `ADM1` | écarté | 0 | Administration réservée au repli ADM2 puis ADM1. |
-| `ADM1H` | écarté | 0 | Administration réservée au repli ADM2 puis ADM1. |
-| `ADM2` | écarté | 0 | Administration réservée au repli ADM2 puis ADM1. |
-| `ADM3` | écarté | 0 | Administration réservée au repli ADM2 puis ADM1. |
-| `ADM3H` | écarté | 0 | Administration réservée au repli ADM2 puis ADM1. |
-| `ADM4` | écarté | 0 | Administration réservée au repli ADM2 puis ADM1. |
-| `ADM4H` | écarté | 0 | Administration réservée au repli ADM2 puis ADM1. |
-| `ADM5` | écarté | 0 | Administration réservée au repli ADM2 puis ADM1. |
-| `ADMD` | écarté | 0 | Administration réservée au repli ADM2 puis ADM1. |
-| `ADMDH` | écarté | 0 | Administration réservée au repli ADM2 puis ADM1. |
-| `ADMF` | écarté | 0 | Administration réservée au repli ADM2 puis ADM1. |
-| `AGRF` | écarté | 0 | Administration réservée au repli ADM2 puis ADM1. |
-| `AIRB` | écarté | 0 | Administration réservée au repli ADM2 puis ADM1. |
-| `AIRF` | écarté | 0 | Administration réservée au repli ADM2 puis ADM1. |
-| `AIRH` | écarté | 0 | Administration réservée au repli ADM2 puis ADM1. |
-| `AIRP` | écarté | 0 | Administration réservée au repli ADM2 puis ADM1. |
-| `AIRQ` | écarté | 0 | Administration réservée au repli ADM2 puis ADM1. |
-| `AIRS` | écarté | 0 | Administration réservée au repli ADM2 puis ADM1. |
-| `AMTH` | écarté | 0 | Administration réservée au repli ADM2 puis ADM1. |
-| `AMUS` | écarté | 0 | Administration réservée au repli ADM2 puis ADM1. |
-| `ANCH` | écarté | 0 | Administration réservée au repli ADM2 puis ADM1. |
-| `ANS` | écarté | 0 | Administration réservée au repli ADM2 puis ADM1. |
-| `ARCH` | écarté | 0 | Administration réservée au repli ADM2 puis ADM1. |
-| `ARCHV` | écarté | 0 | Administration réservée au repli ADM2 puis ADM1. |
-| `AREA` | écarté | 0 | Administration réservée au repli ADM2 puis ADM1. |
-| `ART` | écarté | 0 | Administration réservée au repli ADM2 puis ADM1. |
-| `ASTR` | écarté | 0 | Administration réservée au repli ADM2 puis ADM1. |
-| `ASYL` | écarté | 0 | Administration réservée au repli ADM2 puis ADM1. |
-| `ATHF` | écarté | 0 | Administration réservée au repli ADM2 puis ADM1. |
-| `BANK` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `BAR` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `BAY` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `BCH` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `BCN` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `BDG` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `BDGQ` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `BGHT` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `BLDA` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `BLDG` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `BLDO` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `BNK` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `BP` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `BRKS` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `BRKW` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `BTL` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `BUSTN` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `BUTE` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `CAPE` | retenu | 3 | Cap nommé et ponctuel; repère géographique lisible. |
-| `CARN` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `CAVE` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `CH` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `CHN` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `CHNM` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `CLDA` | retenu | 0 | Caldeira nommée; relief singulier. |
-| `CLF` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `CLG` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `CMP` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `CMPQ` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `CMTY` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `CNL` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `CNLA` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `CNLI` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `CNLN` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `CNLX` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `CNYN` | retenu | 0 | Canyon nommé; relief singulier. |
-| `CNYU` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `COLF` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `COMC` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `COVE` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `CRNT` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `CRQ` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `CSNO` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `CST` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `CSTL` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `CSTM` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `CSWY` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `CTHSE` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `CTRA` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `CTRB` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `CTRCM` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `CTRF` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `CTRR` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `CTRS` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `CUET` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `CULT` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `CVNT` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `DAM` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `DAMQ` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `DARY` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `DCK` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `DCKB` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `DEVH` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `DIKE` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `DIP` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `DPR` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `DTCHD` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `DUNE` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `EST` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `ESTY` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `FCL` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `FISH` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `FLD` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `FLLS` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `FLTM` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `FLTT` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `FNDY` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `FORD` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `FRM` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `FRMQ` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `FRMS` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `FRST` | retenu | 104 | Forêt nommée; zone naturelle étendue. |
-| `FT` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `GAP` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `GATE` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `GDN` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `GHSE` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `GLCR` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `GOVL` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `GRAZ` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `GRGE` | retenu | 0 | Gorge nommée; relief singulier. |
-| `GRSLD` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `GRVE` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `GULF` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `HBR` | écarté | 0 | Hydrographie non ponctuelle; exclu pour éviter les noms linéaires anonymes. |
-| `HDLD` | retenu | 0 | Pointe terrestre importante; repère ponctuel. |
-| `HERM` | écarté | 0 | Hydrographie non ponctuelle; exclu pour éviter les noms linéaires anonymes. |
-| `HLL` | écarté | 0 | Hydrographie non ponctuelle; exclu pour éviter les noms linéaires anonymes. |
-| `HLLS` | écarté | 0 | Hydrographie non ponctuelle; exclu pour éviter les noms linéaires anonymes. |
-| `HMSD` | écarté | 0 | Hydrographie non ponctuelle; exclu pour éviter les noms linéaires anonymes. |
-| `HSE` | écarté | 0 | Hydrographie non ponctuelle; exclu pour éviter les noms linéaires anonymes. |
-| `HSEC` | écarté | 0 | Hydrographie non ponctuelle; exclu pour éviter les noms linéaires anonymes. |
-| `HSP` | écarté | 0 | Hydrographie non ponctuelle; exclu pour éviter les noms linéaires anonymes. |
-| `HSPC` | écarté | 0 | Hydrographie non ponctuelle; exclu pour éviter les noms linéaires anonymes. |
-| `HSPL` | écarté | 0 | Hydrographie non ponctuelle; exclu pour éviter les noms linéaires anonymes. |
-| `HSTS` | écarté | 0 | Hydrographie non ponctuelle; exclu pour éviter les noms linéaires anonymes. |
-| `HTH` | retenu | 0 | Lande nommée; zone naturelle étendue. |
-| `HTL` | écarté | 0 | Hydrographie non ponctuelle; exclu pour éviter les noms linéaires anonymes. |
-| `HUT` | écarté | 0 | Hydrographie non ponctuelle; exclu pour éviter les noms linéaires anonymes. |
-| `INDS` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `INLT` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `INSM` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `ISL` | retenu | 1 | Île nommée; repère ponctuel. |
-| `ISLET` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `ISLS` | retenu | 0 | Groupe d'îles nommé; repère ponctuel. |
-| `ISLT` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `ISLX` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `ITTR` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `JTY` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `LBED` | écarté | 0 | Zone générique/historique non retenue sans preuve de repère utile. |
-| `LCTY` | retenu | 0 | Lieu-dit nommé; toponyme cartographique explicite. |
-| `LEPC` | écarté | 0 | Zone générique/historique non retenue sans preuve de repère utile. |
-| `LGN` | écarté | 0 | Zone générique/historique non retenue sans preuve de repère utile. |
-| `LGNS` | écarté | 0 | Zone générique/historique non retenue sans preuve de repère utile. |
-| `LIBR` | écarté | 0 | Zone générique/historique non retenue sans preuve de repère utile. |
-| `LK` | retenu | 10 | Lac nommé; excellent repère ponctuel. |
-| `LKC` | retenu | 0 | Bras/partie de lac nommé; retenu avec les lacs ponctuels. |
-| `LKN` | retenu | 0 | Lac nommé; excellent repère ponctuel. |
-| `LKS` | retenu | 0 | Groupe de lacs nommé; excellent repère ponctuel. |
-| `LKX` | écarté | 0 | Zone générique/historique non retenue sans preuve de repère utile. |
-| `LOCK` | écarté | 0 | Zone générique/historique non retenue sans preuve de repère utile. |
-| `LTHSE` | écarté | 0 | Zone générique/historique non retenue sans preuve de repère utile. |
-| `MALL` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `MAR` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `MFG` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `MFGC` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `MFGQ` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `MKT` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `ML` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `MLSW` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `MLWND` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `MN` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `MNA` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `MNMT` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `MNQ` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `MNQR` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `MOLE` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `MRN` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `MRSH` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `MRSHN` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `MSQE` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `MSTY` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `MT` | retenu | 24 | Montagne nommée; relief significatif. |
-| `MTRO` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `MTS` | retenu | 0 | Chaîne ou groupe de montagnes nommé; relief significatif. |
-| `MUS` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `MVA` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `NOV` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `NSY` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `NVB` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `OAS` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `OBPT` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `OBS` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `OBSR` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `OPRA` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `PAL` | écarté | 0 | Type de localité non retenu dans cette hypothèse; near reste la commune cities500. |
-| `PASS` | retenu | 7 | Col nommé; repère routier et géographique significatif. |
-| `PCLI` | écarté | 0 | Type de localité non retenu dans cette hypothèse; near reste la commune cities500. |
-| `PEN` | écarté | 0 | Type de localité non retenu dans cette hypothèse; near reste la commune cities500. |
-| `PGDA` | écarté | 0 | Type de localité non retenu dans cette hypothèse; near reste la commune cities500. |
-| `PIER` | écarté | 0 | Type de localité non retenu dans cette hypothèse; near reste la commune cities500. |
-| `PK` | retenu | 31 | Sommet nommé; relief significatif. |
-| `PKLT` | écarté | 0 | Type de localité non retenu dans cette hypothèse; near reste la commune cities500. |
-| `PKS` | retenu | 0 | Groupe de sommets nommé; relief significatif. |
-| `PLAT` | retenu | 0 | Plateau nommé; relief étendu et identifiable. |
-| `PLDR` | écarté | 0 | Type de localité non retenu dans cette hypothèse; near reste la commune cities500. |
-| `PLN` | écarté | 0 | Type de localité non retenu dans cette hypothèse; near reste la commune cities500. |
-| `PND` | écarté | 0 | Type de localité non retenu dans cette hypothèse; near reste la commune cities500. |
-| `PNDN` | écarté | 0 | Type de localité non retenu dans cette hypothèse; near reste la commune cities500. |
-| `PNDS` | écarté | 0 | Type de localité non retenu dans cette hypothèse; near reste la commune cities500. |
-| `PO` | écarté | 0 | Type de localité non retenu dans cette hypothèse; near reste la commune cities500. |
-| `POOL` | écarté | 0 | Type de localité non retenu dans cette hypothèse; near reste la commune cities500. |
-| `PP` | écarté | 0 | Type de localité non retenu dans cette hypothèse; near reste la commune cities500. |
-| `PPL` | retenu | 1945 | Localité peuplée; repère lisible et comparable à near. |
-| `PPLA` | retenu | 0 | Siège administratif; toponyme local identifiable. |
-| `PPLA2` | retenu | 0 | Siège administratif; toponyme local identifiable. |
-| `PPLA3` | retenu | 2 | Siège administratif; toponyme local identifiable. |
-| `PPLA4` | retenu | 2 | Siège administratif; toponyme local identifiable. |
-| `PPLA5` | retenu | 1 | Siège administratif; toponyme local identifiable. |
-| `PPLC` | retenu | 0 | Capitale; repère nommé stable. |
-| `PPLCH` | écarté | 0 | Type de localité non retenu dans cette hypothèse; near reste la commune cities500. |
-| `PPLF` | retenu | 0 | Ancien site de peuplement; toponyme encore cartographié. |
-| `PPLG` | retenu | 0 | Quartier/section de peuplement nommé; repère local. |
-| `PPLH` | écarté | 0 | Type de localité non retenu dans cette hypothèse; near reste la commune cities500. |
-| `PPLL` | retenu | 3 | Lieu de peuplement abandonné; toponyme conservé. |
-| `PPLQ` | écarté | 0 | Type de localité non retenu dans cette hypothèse; near reste la commune cities500. |
-| `PPLR` | retenu | 0 | Lieu de peuplement rural; repère local explicite. |
-| `PPLS` | retenu | 0 | Lieu de peuplement; repère local explicite. |
-| `PPLW` | écarté | 0 | Type de localité non retenu dans cette hypothèse; near reste la commune cities500. |
-| `PPLX` | écarté | 0 | Type de localité non retenu dans cette hypothèse; near reste la commune cities500. |
-| `PPQ` | écarté | 0 | Type de localité non retenu dans cette hypothèse; near reste la commune cities500. |
-| `PRK` | retenu | 2 | Parc nommé; zone étendue identifiable. |
-| `PRMN` | écarté | 0 | Type de localité non retenu dans cette hypothèse; near reste la commune cities500. |
-| `PRN` | écarté | 0 | Type de localité non retenu dans cette hypothèse; near reste la commune cities500. |
-| `PRNJ` | écarté | 0 | Type de localité non retenu dans cette hypothèse; near reste la commune cities500. |
-| `PROM` | retenu | 0 | Promontoire nommé; relief singulier. |
-| `PRT` | écarté | 0 | Type de localité non retenu dans cette hypothèse; near reste la commune cities500. |
-| `PS` | écarté | 0 | Type de localité non retenu dans cette hypothèse; near reste la commune cities500. |
-| `PSH` | écarté | 0 | Type de localité non retenu dans cette hypothèse; near reste la commune cities500. |
-| `PT` | écarté | 0 | Type de localité non retenu dans cette hypothèse; near reste la commune cities500. |
-| `QUAY` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `RD` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `RDA` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `RDCR` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `RDGE` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `RDJCT` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `RDST` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `RECG` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `RECR` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `REG` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `RES` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `RESF` | retenu | 0 | Réserve forestière nommée; zone étendue. |
-| `RESH` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `RESN` | retenu | 0 | Réserve naturelle nommée; zone étendue. |
-| `REST` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `RESV` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `RESW` | retenu | 0 | Réserve de faune nommée; zone étendue. |
-| `RET` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `RF` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `RGN` | retenu | 8 | Région géographique nommée; repère étendu. |
-| `RGNH` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `RGNL` | retenu | 0 | Région naturelle nommée; repère étendu. |
-| `RHSE` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `RJCT` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `RK` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `RKFL` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `RKS` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `RLG` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `RLGR` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `RNGA` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `RR` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `RRQ` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `RSRT` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `RSTN` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `RSTNQ` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `RSTP` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `RSV` | retenu | 0 | Réservoir nommé; excellent repère ponctuel. |
-| `RSVT` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `RUIN` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `RVN` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `RYD` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `SALT` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `SCH` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `SCHA` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `SCHC` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `SCHL` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `SCHM` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `SCHT` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `SCRP` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `SD` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `SDL` | retenu | 0 | Zone saline nommée; zone naturelle identifiable. |
-| `SEA` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `SHOL` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `SHOR` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `SHRN` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `SHSE` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `SLCE` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `SMU` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `SNOW` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `SNTR` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `SPA` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `SPIT` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `SPLY` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `SPNG` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `SPNT` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `SPUR` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `SQR` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `ST` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `STBL` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `STDM` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `STKR` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `STM` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `STMA` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `STMC` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `STMD` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `STMI` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `STMM` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `STMS` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `STMSB` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `STMX` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `STNB` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `STNM` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `STNR` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `STPS` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `STRT` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `SWT` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `SYG` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `TAL` | écarté | 0 | Relief non retenu : micro-relief ou point trop hétérogène. |
-| `THTR` | écarté | 0 | Relief non retenu : micro-relief ou point trop hétérogène. |
-| `TMB` | écarté | 0 | Relief non retenu : micro-relief ou point trop hétérogène. |
-| `TNL` | écarté | 0 | Relief non retenu : micro-relief ou point trop hétérogène. |
-| `TNLRR` | écarté | 0 | Relief non retenu : micro-relief ou point trop hétérogène. |
-| `TOLL` | écarté | 0 | Relief non retenu : micro-relief ou point trop hétérogène. |
-| `TOWR` | écarté | 0 | Relief non retenu : micro-relief ou point trop hétérogène. |
-| `TRAM` | écarté | 0 | Relief non retenu : micro-relief ou point trop hétérogène. |
-| `TRANT` | écarté | 0 | Relief non retenu : micro-relief ou point trop hétérogène. |
-| `TREE` | écarté | 0 | Relief non retenu : micro-relief ou point trop hétérogène. |
-| `TRIG` | écarté | 0 | Relief non retenu : micro-relief ou point trop hétérogène. |
-| `TRL` | écarté | 0 | Relief non retenu : micro-relief ou point trop hétérogène. |
-| `TRNU` | écarté | 0 | Relief non retenu : micro-relief ou point trop hétérogène. |
-| `TRR` | écarté | 0 | Relief non retenu : micro-relief ou point trop hétérogène. |
-| `TUND` | retenu | 0 | Toundra nommée; zone naturelle étendue. |
-| `UNIV` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `UPLD` | retenu | 0 | Haut-plateau nommé; relief étendu identifiable. |
-| `VAL` | écarté | 0 | Végétation non retenue : zone trop hétérogène ou peu distinctive. |
-| `VIN` | écarté | 0 | Végétation non retenue : zone trop hétérogène ou peu distinctive. |
-| `VLC` | retenu | 0 | Vallée nommée; repère naturel étendu. |
-| `WALL` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `WALLA` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `WHRL` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `WLL` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `WTRC` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `WTRW` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
-| `ZOO` | écarté | 0 | Code observé hors hypothèse candidate; à examiner dans l'échantillon. |
+## Emprise ALR valide
+
+- Raster : `/tmp/darkskyspots-france-mJlGtB/debug_darkness_france_2025.tif`
+- Pixels finis : **4765367 / 11711566**
+- Emprise WGS84 : `[-4.891666666666675, 42.49583333333333, 6.004166666666659, 51.99999999999999]`
+- Couverture des bords : `{'west': False, 'south': False, 'east': False, 'north': True, 'all': False}`
+
+## Distances de la cascade
+
+| Pays | <5 km | 5–25 km | 25–40 km | ADM2 | ADM1 |
+|---|---:|---:|---:|---:|---:|
+| `FR` | 2182 | 7 | 0 | 0 | 0 |
+| **Global** | 2182 | 7 | 0 | 0 | 0 |
 
 ## Gagnants par code
 
-| Code | Spots |
-|---|---:|
-| `CAPE` | 3 |
-| `FRST` | 104 |
-| `ISL` | 1 |
-| `LK` | 10 |
-| `MT` | 24 |
-| `PASS` | 7 |
-| `PK` | 31 |
-| `PPL` | 1945 |
-| `PPLA3` | 2 |
-| `PPLA4` | 2 |
-| `PPLA5` | 1 |
-| `PPLL` | 3 |
-| `PRK` | 2 |
-| `RGN` | 8 |
+| Pays | Code | Spots |
+|---|---|---:|
+| `FR` | `CAPE` | 1 |
+| `FR` | `FRST` | 107 |
+| `FR` | `GRGE` | 1 |
+| `FR` | `ISL` | 5 |
+| `FR` | `LK` | 10 |
+| `FR` | `MT` | 24 |
+| `FR` | `MTS` | 3 |
+| `FR` | `PASS` | 5 |
+| `FR` | `PK` | 36 |
+| `FR` | `PPL` | 1979 |
+| `FR` | `PPLA2` | 1 |
+| `FR` | `PPLA3` | 4 |
+| `FR` | `PPLA5` | 1 |
+| `FR` | `PPLL` | 5 |
+| `FR` | `PRK` | 2 |
+| `FR` | `RGN` | 3 |
+| `FR` | `UPLD` | 2 |
 
-## Codes observés mais écartés
+## Contrôle des pays
 
-Les volumes ci-dessous sont ceux des entités importables dans la bbox élargie; ils ne signifient pas qu'elles auraient gagné un spot.
+- Codes inattendus : `{}`
+- IM/JE/GG : `{'IM': 0, 'JE': 0, 'GG': 0}`
 
-| Code | Entités observées |
-|---|---:|
-| `ADM4` | 34382 |
-| `HTL` | 12123 |
-| `PO` | 9725 |
-| `RSTN` | 3084 |
-| `STM` | 3009 |
-| `ST` | 2390 |
-| `ADM4H` | 1816 |
-| `PPLX` | 1122 |
-| `HSEC` | 877 |
-| `CH` | 861 |
-| `FRM` | 846 |
-| `PT` | 846 |
-| `HSTS` | 840 |
-| `HLL` | 631 |
-| `RECG` | 546 |
-| `RK` | 397 |
-| `CSTL` | 376 |
-| `SQR` | 327 |
-| `SHOL` | 318 |
-| `ADM3` | 315 |
-| `AIRP` | 290 |
-| `RF` | 252 |
-| `COVE` | 248 |
-| `SCH` | 241 |
-| `CNL` | 235 |
-| `RKS` | 227 |
-| `BCH` | 219 |
-| `MUS` | 217 |
-| `ADMF` | 210 |
-| `TOWR` | 208 |
-| `BAY` | 202 |
-| `RUIN` | 195 |
-| `BDG` | 184 |
-| `RDGE` | 182 |
-| `MSTY` | 180 |
-| `PND` | 162 |
-| `FT` | 151 |
-| `HBR` | 143 |
-| `AIRF` | 142 |
-| `PRT` | 123 |
-| `VAL` | 122 |
-| `HSE` | 107 |
-| `ARCHV` | 101 |
-| `HSP` | 92 |
-| `PPLH` | 89 |
-| `QUAY` | 86 |
-| `ANS` | 84 |
-| `GLCR` | 83 |
-| `MRSH` | 80 |
-| `ADM5` | 78 |
-| `GATE` | 75 |
-| `MNMT` | 75 |
-| `LGN` | 73 |
-| `CMTY` | 71 |
-| `CHNM` | 62 |
-| `LTHSE` | 62 |
-| `FCL` | 50 |
-| `GDN` | 49 |
-| `UNIV` | 49 |
-| `THTR` | 45 |
-| `RDST` | 43 |
-| `BLDG` | 40 |
-| `PS` | 40 |
-| `STDM` | 40 |
-| `PAL` | 39 |
-| `RECR` | 38 |
-| `AREA` | 36 |
-| `REST` | 36 |
-| `PPLCH` | 35 |
-| `RHSE` | 35 |
-| `CAVE` | 34 |
-| `CVNT` | 34 |
-| `PPLQ` | 33 |
-| `RSRT` | 32 |
-| `DCK` | 31 |
-| `HUT` | 30 |
-| `PRN` | 30 |
-| `RD` | 29 |
-| `AIRQ` | 27 |
-| `VIN` | 27 |
-| `DAM` | 26 |
-| `GAP` | 26 |
-| `RLG` | 26 |
-| `RDA` | 24 |
-| `CTHSE` | 23 |
-| `LIBR` | 23 |
-| `ADM1H` | 21 |
-| `MTRO` | 21 |
-| `INLT` | 20 |
-| `MKT` | 20 |
-| `ML` | 20 |
-| `ART` | 19 |
-| `ATHF` | 19 |
-| `EST` | 19 |
-| `FLTT` | 19 |
-| `ITTR` | 19 |
-| `PPLW` | 19 |
-| `BUSTN` | 16 |
-| `AIRB` | 15 |
-| `CLF` | 15 |
-| `DUNE` | 15 |
-| `STNB` | 15 |
-| `RR` | 14 |
-| `RYD` | 14 |
-| `BRKW` | 13 |
-| `CSNO` | 13 |
-| `CULT` | 13 |
-| `DEVH` | 13 |
-| `ISLX` | 13 |
-| `PLN` | 13 |
-| `STMM` | 13 |
-| `CMP` | 12 |
-| `ISLET` | 12 |
-| `JTY` | 12 |
-| `MALL` | 12 |
-| `MFG` | 12 |
-| `PEN` | 12 |
-| `PP` | 12 |
-| `SPNG` | 12 |
-| `STNM` | 12 |
-| `ADM3H` | 11 |
-| `ADMDH` | 11 |
-| `ANCH` | 11 |
-| `BNK` | 11 |
-| `FLD` | 11 |
-| `OPRA` | 11 |
-| `RGNH` | 11 |
-| `STMA` | 11 |
-| `STMC` | 11 |
-| `BRKS` | 10 |
-| `CTRF` | 10 |
-| `DIKE` | 10 |
-| `FLLS` | 10 |
-| `GRAZ` | 10 |
-| `LOCK` | 10 |
-| `ZOO` | 10 |
-| `AMUS` | 9 |
-| `CHN` | 9 |
-| `ESTY` | 9 |
-| `HLLS` | 9 |
-| `PRMN` | 9 |
-| `SCHC` | 9 |
-| `ADMD` | 8 |
-| `OBPT` | 8 |
-| `PSH` | 8 |
-| `AIRH` | 7 |
-| `AMTH` | 7 |
-| `ARCH` | 7 |
-| `BLDA` | 7 |
-| `BTL` | 7 |
-| `MAR` | 7 |
-| `OBS` | 7 |
-| `RDJCT` | 7 |
-| `RES` | 7 |
-| `BCN` | 6 |
-| `BGHT` | 6 |
-| `CNLA` | 6 |
-| `CNLN` | 6 |
-| `CRNT` | 6 |
-| `CRQ` | 6 |
-| `CST` | 6 |
-| `DCKB` | 6 |
-| `GHSE` | 6 |
-| `INSM` | 6 |
-| `MN` | 6 |
-| `MNQR` | 6 |
-| `RET` | 6 |
-| `SPA` | 6 |
-| `BANK` | 5 |
-| `BAR` | 5 |
-| `BLDO` | 5 |
-| `FRMS` | 5 |
-| `HERM` | 5 |
-| `INDS` | 5 |
-| `LKX` | 5 |
-| `SALT` | 5 |
-| `STBL` | 5 |
-| `STPS` | 5 |
-| `AGRF` | 4 |
-| `CMPQ` | 4 |
-| `FRMQ` | 4 |
-| `GRSLD` | 4 |
-| `MNQ` | 4 |
-| `RDCR` | 4 |
-| `RRQ` | 4 |
-| `RSTP` | 4 |
-| `SHOR` | 4 |
-| `STMI` | 4 |
-| `STNR` | 4 |
-| `TREE` | 4 |
-| `WTRW` | 4 |
-| `BDGQ` | 3 |
-| `CARN` | 3 |
-| `CLG` | 3 |
-| `COLF` | 3 |
-| `DARY` | 3 |
-| `GOVL` | 3 |
-| `HSPC` | 3 |
-| `LBED` | 3 |
-| `MRSHN` | 3 |
-| `MSQE` | 3 |
-| `PKLT` | 3 |
-| `SCHA` | 3 |
-| `SHRN` | 3 |
-| `SLCE` | 3 |
-| `SNTR` | 3 |
-| `STRT` | 3 |
-| `SWT` | 3 |
-| `TMB` | 3 |
-| `TNL` | 3 |
-| `TOLL` | 3 |
-| `TRANT` | 3 |
-| `ASTR` | 2 |
-| `BUTE` | 2 |
-| `COMC` | 2 |
-| `CSWY` | 2 |
-| `CTRCM` | 2 |
-| `CTRR` | 2 |
-| `DPR` | 2 |
-| `DTCHD` | 2 |
-| `FNDY` | 2 |
-| `GULF` | 2 |
-| `ISLT` | 2 |
-| `MFGQ` | 2 |
-| `MOLE` | 2 |
-| `PNDS` | 2 |
-| `POOL` | 2 |
-| `PRNJ` | 2 |
-| `REG` | 2 |
-| `RNGA` | 2 |
-| `SPLY` | 2 |
-| `SPNT` | 2 |
-| `SPUR` | 2 |
-| `STMS` | 2 |
-| `STMX` | 2 |
-| `SYG` | 2 |
-| `TRAM` | 2 |
-| `TRL` | 2 |
-| `WALLA` | 2 |
-| `WLL` | 2 |
-| `WTRC` | 2 |
-| `AIRS` | 1 |
-| `ASYL` | 1 |
-| `BP` | 1 |
-| `CNLI` | 1 |
-| `CNLX` | 1 |
-| `CNYU` | 1 |
-| `CSTM` | 1 |
-| `CTRA` | 1 |
-| `CTRB` | 1 |
-| `CTRS` | 1 |
-| `CUET` | 1 |
-| `DAMQ` | 1 |
-| `DIP` | 1 |
-| `FISH` | 1 |
-| `FLTM` | 1 |
-| `FORD` | 1 |
-| `GRVE` | 1 |
-| `HMSD` | 1 |
-| `HSPL` | 1 |
-| `LEPC` | 1 |
-| `LGNS` | 1 |
-| `MFGC` | 1 |
-| `MLSW` | 1 |
-| `MLWND` | 1 |
-| `MNA` | 1 |
-| `MRN` | 1 |
-| `MVA` | 1 |
-| `NOV` | 1 |
-| `NSY` | 1 |
-| `NVB` | 1 |
-| `OAS` | 1 |
-| `OBSR` | 1 |
-| `PCLI` | 1 |
-| `PGDA` | 1 |
-| `PIER` | 1 |
-| `PLDR` | 1 |
-| `PNDN` | 1 |
-| `PPQ` | 1 |
-| `RESH` | 1 |
-| `RESV` | 1 |
-| `RJCT` | 1 |
-| `RKFL` | 1 |
-| `RLGR` | 1 |
-| `RSTNQ` | 1 |
-| `RSVT` | 1 |
-| `RVN` | 1 |
-| `SCHL` | 1 |
-| `SCHM` | 1 |
-| `SCHT` | 1 |
-| `SCRP` | 1 |
-| `SD` | 1 |
-| `SEA` | 1 |
-| `SHSE` | 1 |
-| `SMU` | 1 |
-| `SNOW` | 1 |
-| `SPIT` | 1 |
-| `STKR` | 1 |
-| `STMD` | 1 |
-| `STMSB` | 1 |
-| `TAL` | 1 |
-| `TNLRR` | 1 |
-| `TRIG` | 1 |
-| `TRNU` | 1 |
-| `TRR` | 1 |
-| `WALL` | 1 |
-| `WHRL` | 1 |
+## Îles
 
-## Échantillon déterministe de libellés
+| Île | Pays | Natural Earth 1:10m | Spots proches | Statut |
+|---|---|---|---:|---|
+| Isle of Wight | `GB` | oui | 0 | `covered_by_natural_earth_no_spot` |
+| Anglesey | `GB` | oui | 0 | `covered_by_natural_earth_no_spot` |
+| Isles of Scilly | `GB` | oui | 0 | `covered_by_natural_earth_no_spot` |
+| Lundy | `GB` | oui | 0 | `covered_by_natural_earth_no_spot` |
+| Isle of Sheppey | `GB` | oui | 0 | `covered_by_natural_earth_no_spot` |
+| Achill Island | `IE` | oui | 0 | `covered_by_natural_earth_no_spot` |
+| Valentia Island | `IE` | oui | 0 | `covered_by_natural_earth_no_spot` |
+| Arranmore | `IE` | oui | 0 | `covered_by_natural_earth_no_spot` |
 
-20 exemples par tier sont pris dans l'ordre stable des identifiants, puis complétés si un tier est court.
+Dépendances de la Couronne volontairement hors périmètre : `IM`, `JE`, `GG`.
 
-| Tier | ID | Libellé | Code | Distance km | near | darkness |
-|---|---|---|---|---:|---|---:|
-| under_5 | `43.3646_4.5979` | Pointe du Sablon | `CAPE` | 3.884 | Saintes-Maries-de-la-Mer | 0.5164487577472683 |
-| under_5 | `42.8646_-0.6271` | Bois de Belonce | `FRST` | 0.880 | Bedous | 0.8657982332130807 |
-| under_5 | `44.0104_4.8271` | Île de la Motte | `ISL` | 1.592 | Sauveterre | 0.1985714110554978 |
-| under_5 | `45.3396_1.8979` | Étang de Brach | `LK` | 2.280 | Eyrein | 0.9960178002680335 |
-| under_5 | `43.3229_5.6562` | Tête de Roussargue | `MT` | 0.835 | Gémenos | 0.18956160711470416 |
-| under_5 | `43.3187_-1.6771` | Col d'Ibardin | `PASS` | 0.556 | Urrugne | 0.340273949983839 |
-| under_5 | `42.7812_-0.1188` | Montferrat | `PK` | 2.278 | Cauterets | 0.8987895325432587 |
-| under_5 | `42.8604_0.2854` | Aulon | `PPL` | 1.330 | Saint-Lary-Soulan | 0.9001366342555064 |
-| under_5 | `45.5229_0.6562` | Nontron | `PPLA3` | 0.852 | Nontron | 0.9995049169911439 |
-| under_5 | `47.9521_5.6104` | Saulxures | `PPLA4` | 1.945 | Saulxures | 0.8793927367947865 |
-| under_5 | `43.3687_5.3312` | Marseille 16 | `PPLA5` | 1.021 | Saint-Henri | 0.0 |
-| under_5 | `43.9187_5.2896` | Clavaillan | `PPLL` | 1.035 | Roussillon | 0.49706144932702245 |
-| 5_to_25 | `43.5021_4.4812` | Parc Naturel Régional de Camargue | `PRK` | 5.891 | Saintes-Maries-de-la-Mer | 0.49856590229454656 |
-| under_5 | `43.5021_1.3437` | Midi-Pyrénées | `RGN` | 0.872 | Frouzins | 0.1914168516096496 |
-| under_5 | `42.8146_0.0896` | Pic Long | `PK` | 1.776 | Luz-Saint-Sauveur | 0.9309846355037861 |
-| under_5 | `42.8187_-0.3979` | Pic du Pourtalet | `PK` | 1.168 | Laruns | 0.826687778035483 |
-| under_5 | `42.8187_-0.5938` | Pic d'Arri | `PK` | 1.338 | Bedous | 0.8461939618578812 |
-| under_5 | `42.8437_0.5646` | Sommet d'Anténac | `PK` | 1.411 | Bagnères-de-Luchon | 0.8361626092024769 |
-| under_5 | `42.8812_0.9354` | Antras | `PPL` | 0.624 | Moulis | 0.8618952846408092 |
-| under_5 | `42.8979_-0.2563` | Hautafulhe | `PK` | 4.062 | Arrens-Marsous | 0.8707226795620563 |
-| under_5 | `42.8979_0.4729` | Sommet du Templa | `PK` | 0.632 | Arreau | 0.8820099827801153 |
-| under_5 | `42.9062_1.2521` | Castet d'Aleu | `PPL` | 0.229 | Oust | 0.8446090159766386 |
-| under_5 | `42.9521_-0.0271` | Pic de Nerbiou | `PK` | 0.915 | Pierrefitte-Nestalas | 0.8479835805093325 |
-| under_5 | `42.9521_-0.4396` | Les Eaux-Chaudes | `PPL` | 0.185 | Laruns | 0.8579591988845368 |
-| under_5 | `42.9521_0.1104` | Pic de Merlheu | `PK` | 1.744 | Campan | 0.8604421024380531 |
-| under_5 | `42.9521_0.7104` | Pic du Gar | `PK` | 0.963 | Cierp-Gaud | 0.8467227997880077 |
-| under_5 | `42.9521_0.9771` | Buzan | `PPL` | 1.489 | Moulis | 0.8471443036768495 |
-| under_5 | `42.9521_1.4354` | La Cabirole | `PPL` | 2.053 | La Bastide-de-Sérou | 0.8186373235496369 |
-| under_5 | `42.9521_1.8062` | Cap de la Mounjo | `PK` | 0.567 | Lavelanet | 0.8004904976636789 |
-| under_5 | `42.9979_-0.2646` | Ferrières | `PPL` | 1.415 | Arrens-Marsous | 0.8230584333090278 |
-| under_5 | `42.9979_-0.4854` | Turon de la Goaïta | `PK` | 0.668 | Laruns | 0.8368906684461821 |
-| 5_to_25 | `43.3646_4.6437` | Beauduc | `PPL` | 5.544 | Port-Saint-Louis-du-Rhône | 0.4706299399378392 |
-| 5_to_25 | `43.4604_3.5437` | Montagnac | `PPL` | 5.463 | Montagnac | 0.4370716392540116 |
-| 5_to_25 | `43.5062_4.8729` | La Bayanne | `PPL` | 6.581 | Istres | 0.19774499041523053 |
-| 5_to_25 | `43.9187_-1.0813` | Quartier du Bourg | `PPL` | 5.057 | Lesperon | 0.7288448833415595 |
-| 5_to_25 | `44.6479_-0.6729` | Saucats | `PPL` | 6.064 | Saucats | 0.4664808273188473 |
-| 5_to_25 | `44.7896_-1.2229` | Jane de Boy | `PPL` | 5.091 | Arès | 0.7275238717658408 |
-| 5_to_25 | `44.8354_-1.0396` | Laruau | `PPL` | 5.399 | Le Porge | 0.643238409506027 |
-| under_5 | `42.9979_-0.7188` | Forêt d'Issaux | `FRST` | 0.287 | Bedous | 0.8464041289662854 |
-| under_5 | `42.9979_-0.8063` | Sainte-Engrâce | `PPL` | 0.541 | Arette | 0.8498178578143749 |
-| under_5 | `42.9979_0.2437` | le Haboura | `PK` | 1.741 | Campan | 0.8369887237527953 |
-| under_5 | `42.9979_0.5229` | Cap de Serre | `PK` | 0.760 | Loures-Barousse | 0.8379933061440674 |
-| under_5 | `42.9979_1.9896` | Sonnac-sur-l'Hers | `PPL` | 0.737 | Chalabre | 0.8111410143844325 |
-| under_5 | `42.9979_2.3104` | Véraza | `PPL` | 1.417 | Alet-les-Bains | 0.7234888334456249 |
-| under_5 | `43.0229_2.7187` | Jonquières | `PPL` | 2.084 | Saint-Laurent-de-la-Cabrerisse | 0.6054062890262963 |
-| under_5 | `43.0437_-0.8979` | Licq | `PPL` | 3.074 | Tardets | 0.8256224128273673 |
-| under_5 | `43.0437_0.3354` | Prat | `PPL` | 0.691 | Avezac-Prat-Lahitte | 0.7371680560875891 |
-| under_5 | `43.0437_1.2979` | Clermont | `PPL` | 0.588 | Rimont | 0.7914040241692979 |
-| under_5 | `43.0437_1.7146` | Malléon | `PPL` | 1.351 | Les Pujols | 0.7356628695324008 |
-| under_5 | `43.0437_2.4896` | Pech de la Coupe | `PK` | 2.193 | Montlaur | 0.6942873938694472 |
-| under_5 | `43.0479_-1.1729` | Iraukotuturru | `PK` | 3.466 | Saint-Jean-le-Vieux | 0.7223393563970422 |
-| under_5 | `43.0687_3.0896` | Gruissan-Plage | `PPL` | 3.578 | Gruissan | 0.39760503325747476 |
-| under_5 | `43.0896_-0.2146` | Pène de la Hèche | `PK` | 1.379 | Arthez-d'Asson | 0.7315973683933806 |
-| under_5 | `43.0896_0.1104` | Trébons | `PPL` | 1.544 | Trébons | 0.716593851233014 |
-| under_5 | `43.0896_0.9812` | Touille | `PPL` | 1.234 | Salies-du-Salat | 0.7659112649994891 |
-| under_5 | `43.0896_1.4812` | Monesple | `PPL` | 0.647 | Artigat | 0.7352709398206807 |
-| under_5 | `43.0896_1.8521` | Mirepoix | `PPL` | 1.758 | Mirepoix | 0.7759525158322675 |
-| under_5 | `43.0896_2.8562` | Bois du Vicomte | `FRST` | 2.485 | Saint-André-de-Roquelongue | 0.4959547803143285 |
-| under_5 | `43.0937_-1.3563` | Argarai | `PK` | 1.230 | Saint-Étienne-de-Baïgorry | 0.6226564067449968 |
-| under_5 | `43.1354_-0.4396` | Bescat | `PPL` | 1.505 | Buzy | 0.6823148657992477 |
-| under_5 | `43.1354_-0.6729` | Soum d'Ombret | `PK` | 1.172 | Aramits | 0.720994855015983 |
-| under_5 | `43.1354_-0.7188` | Aramits | `PPL` | 1.736 | Aramits | 0.7680376687357713 |
-| under_5 | `43.1354_-1.0813` | Egurmendi | `PK` | 0.668 | Saint-Jean-le-Vieux | 0.7701203010564974 |
-| under_5 | `43.1354_2.0312` | La Courtète | `PPL` | 1.534 | Belvèze-du-Razès | 0.7646318789161084 |
-| under_5 | `43.1354_2.1229` | Cambieure | `PPL` | 1.258 | Belvèze-du-Razès | 0.7334336469744918 |
-| under_5 | `43.1354_2.3521` | Verzeille | `PPL` | 2.479 | Leuc | 0.6405279160474545 |
-| under_5 | `43.1396_0.6562` | Villeneuve-de-Rivière | `PPL` | 2.239 | Villeneuve-de-Rivière | 0.7341302710379464 |
-| under_5 | `43.1812_-0.9021` | Idaux | `PPL` | 1.040 | Gotein | 0.7922481291435255 |
-| under_5 | `43.1812_1.2062` | Gouzens | `PPL` | 1.553 | Montesquieu-Volvestre | 0.7184443889618013 |
-| under_5 | `43.1812_1.7146` | Gaudiès | `PPL` | 1.462 | Belpech | 0.6887766649692104 |
-| under_5 | `43.1812_1.9396` | Cazalrenoux | `PPL` | 2.078 | Fanjeaux | 0.7361463573118714 |
-| under_5 | `43.1812_2.5396` | Capendu | `PPL` | 1.492 | Capendu | 0.6216244460301064 |
-| under_5 | `43.1854_0.4312` | Galez | `PPL` | 2.149 | Galan | 0.8174937639237138 |
-| under_5 | `43.1854_0.9312` | Le Fréchet | `PPL` | 0.632 | Boussens | 0.7265061546313867 |
-| under_5 | `43.2229_-1.2188` | Suhescun | `PPL` | 2.055 | Irissarry | 0.6974724103688481 |
-| under_5 | `43.2271_-0.2104` | Bois de Beuste | `FRST` | 0.860 | Beuste | 0.5622687591389478 |
-| under_5 | `43.2271_1.3896` | Saint-Ybars | `PPL` | 1.248 | Saint-Ybars | 0.6501664221231989 |
-| under_5 | `43.2271_3.2271` | Les Cabanes de Fleury | `PPL` | 1.209 | Vendres | 0.4012579063644258 |
-| under_5 | `43.2271_5.5187` | Port Miou | `PPL` | 2.000 | Cassis | 0.11822322873692381 |
-| under_5 | `43.2312_0.2021` | Gonez | `PPL` | 0.980 | Bordes | 0.720796050739974 |
-| under_5 | `43.2312_0.5187` | Monléon-Magnoac | `PPL` | 2.264 | Monléon-Magnoac | 0.852665779168339 |
-| under_5 | `43.2312_0.6104` | Nizan-Gesse | `PPL` | 1.074 | Blajan | 0.8414462078654665 |
-| under_5 | `43.2312_2.4021` | Montredon | `PPL` | 1.199 | Berriac | 0.4990819088441052 |
-| under_5 | `43.2312_2.8562` | Canet | `PPL` | 0.820 | Canet | 0.46920340130846283 |
-| under_5 | `43.2312_2.9479` | Moussan | `PPL` | 0.132 | Moussan | 0.3380653415927982 |
-| under_5 | `43.2729_-0.2563` | Artigueloutan | `PPL` | 0.843 | Artigueloutan | 0.48224153518369506 |
-| under_5 | `43.2729_-0.8104` | Larrory | `PPL` | 2.149 | Espès-Undurein | 0.7365717236581971 |
-| under_5 | `43.2729_-1.0646` | Bois d'Ostabat | `FRST` | 0.787 | Beyrie-sur-Joyeuse | 0.7532728581007927 |
-| under_5 | `43.2729_-1.4021` | Menditipiko tipiko Bizkarra | `PK` | 1.056 | Bidarray | 0.5923804950485314 |
-| under_5 | `43.2729_5.4729` | Mont Saint-Cyr | `PK` | 1.596 | La Barasse | 0.0 |
-| under_5 | `43.2771_-0.0313` | Bois de Pouey | `FRST` | 1.669 | Ger | 0.6480252895300238 |
-| under_5 | `43.2771_2.4021` | Conques-sur-Orbiel | `PPL` | 1.654 | Conques-sur-Orbiel | 0.5913495135620876 |
-| under_5 | `43.2771_5.7479` | Le Camp du Castellet | `PPL` | 2.172 | Cuges-les-Pins | 0.2573021047429135 |
-| under_5 | `43.3187_-0.3979` | Lons | `PPL` | 1.139 | Lons | 0.34770618149932464 |
-| under_5 | `43.3187_-0.6271` | Le Château | `PPL` | 3.736 | Monein | 0.5620329865228515 |
-| under_5 | `43.3187_-1.0813` | Beyrie-sur-Joyeuse | `PPL` | 1.202 | Beyrie-sur-Joyeuse | 0.7399235492827445 |
-| under_5 | `43.3187_-1.4938` | Ainhoa | `PPL` | 1.380 | Ainhoa | 0.49893430662544447 |
-| under_5 | `43.3187_0.7937` | Saint-Laurent | `PPL` | 0.852 | L'Isle-en-Dodon | 0.8140233921531994 |
-| under_5 | `43.3187_1.0229` | Castelnau-Picampeau | `PPL` | 1.449 | Le Fousseret | 0.6952951536835792 |
-| under_5 | `43.3187_1.2521` | Marquefave | `PPL` | 0.509 | Marquefave | 0.5470347731654235 |
+- `IM` Isle of Man : Natural Earth=oui, statut=`out_of_scope_crown_dependency`.
+- `JE` Jersey : Natural Earth=oui, statut=`out_of_scope_crown_dependency`.
+- `GG` Guernsey : Natural Earth=oui, statut=`out_of_scope_crown_dependency`.
 
-## Provenance
+Spots situés spatialement dans une dépendance interdite (identifiants uniquement) :
 
-Données GeoNames sous CC BY 4.0; archives nationales téléchargées depuis `https://download.geonames.org/export/dump/`. Le readme de chaque archive décrit le format des 19 colonnes et les codes administratifs.
+- `GG` : aucun
+- `IM` : aucun
+- `JE` : aucun
+## Divergences runtime/audit
 
-## Mesure du retrait du filtre `near`
+Aucune divergence.
 
-Run de mesure du 25 août 2026, avec `--no-push --no-clusters` et une sortie temporaire sous `/tmp`.
-Le corpus historique après clip utilisé pour la comparaison est `output/crosscheck/spots/*.json`.
+## Échantillon déterministe
 
-| Mesure | Valeur |
-|---|---:|
-| Spots du résultat | 2 143 |
-| Spots historiques | 2 143 |
-| Spots restaurés (nouveaux IDs) | 0 |
-| Spots disparus | 0 |
-| IDs communs | 2 143 |
-| Spots restaurés avec `near` vide | 0 |
-| Spots du résultat avec `near` vide | 0 |
+| Pays | Tier | ID | Runtime name | Audit name | Runtime code | Runtime distance km | Audit code | Audit distance km | near | darkness |
+|---|---|---|---|---|---|---:|---|---:|---|---:|
+| FR | under_5 | 48.6812_-2.3188 | Cap Fréhel | Cap Fréhel | CAPE | 0.639 | CAPE | 0.639 | Fréhel | 0.9493970027058072 |
+| FR | under_5 | 42.9562_0.9812 | Forêt de Bourrudech | Forêt de Bourrudech | FRST | 1.677 | FRST | 1.677 | Moulis | 0.8453497294026767 |
+| FR | under_5 | 44.2771_3.2771 | Gorges du Tarn | Gorges du Tarn | GRGE | 2.249 | GRGE | 2.249 | Sainte-Enimie | 0.9897869644292336 |
+| FR | 5_to_25 | 43.4604_4.5271 | Le Cassieu | Le Cassieu | ISL | 6.728 | ISL | 6.728 | Saintes-Maries-de-la-Mer | 0.5165801571204972 |
+| FR | under_5 | 43.5562_4.7854 | Étang des Aulnes | Étang des Aulnes | LK | 3.886 | LK | 3.886 | Saint-Martin-de-Crau | 0.32172896695013287 |
+| FR | under_5 | 43.2312_5.4687 | Mont de la Gardiole | Mont de la Gardiole | MT | 0.940 | MT | 0.940 | Vaufrège | 0.06723796860472353 |
+| FR | under_5 | 43.1396_3.0854 | Montagne de la Clape | Montagne de la Clape | MTS | 2.281 | MTS | 2.281 | Gruissan | 0.3511053124668133 |
+| FR | under_5 | 43.3229_-1.6813 | Col d'Ibardin | Col d'Ibardin | PASS | 0.715 | PASS | 0.715 | Urrugne | 0.3283859366912818 |
+| FR | under_5 | 42.8104_0.2104 | Pic Cabanou | Pic Cabanou | PK | 2.152 | PK | 2.152 | Saint-Lary-Soulan | 0.9363553807949505 |
+| FR | under_5 | 42.7937_0.0146 | Gèdre | Gèdre | PPL | 0.871 | PPL | 0.871 | Luz-Saint-Sauveur | 0.9310140832333134 |
+| FR | under_5 | 46.6729_5.5562 | Lons-le-Saunier | Lons-le-Saunier | PPLA2 | 0.273 | PPLA2 | 0.273 | Lons-le-Saunier | 0.6012905985062957 |
+| FR | under_5 | 44.7437_5.3771 | Die | Die | PPLA3 | 1.218 | PPLA3 | 1.218 | Die | 0.7922950417864193 |
+| FR | under_5 | 43.3646_5.3354 | Marseille 16 | Marseille 16 | PPLA5 | 0.539 | PPLA5 | 0.539 | Saint-Henri | 0.0 |
+| FR | under_5 | 43.9146_5.2854 | Clavaillan | Clavaillan | PPLL | 1.072 | PPLL | 1.072 | Roussillon | 0.4928371670699706 |
+| FR | under_5 | 44.0979_3.5937 | Parc National des Cévennes | Parc National des Cévennes | PRK | 2.175 | PRK | 2.175 | Valleraugue | 0.842911458758196 |
+| FR | under_5 | 43.5062_4.3229 | Petite Camargue | Petite Camargue | RGN | 0.858 | RGN | 0.858 | Saintes-Maries-de-la-Mer | 0.49660354248233873 |
+| FR | under_5 | 43.0437_2.8604 | Pla del Pal | Pla del Pal | UPLD | 2.193 | UPLD | 2.193 | Portel-des-Corbières | 0.5238483970908423 |
+| FR | under_5 | 42.8146_-0.1688 | la Huchole | la Huchole | PK | 1.186 | PK | 1.186 | Cauterets | 0.8884020084125125 |
+| FR | under_5 | 42.8146_-0.5771 | Pic d'Arri | Pic d'Arri | PK | 2.583 | PK | 2.583 | Bedous | 0.8441987751638065 |
+| FR | under_5 | 42.8604_0.6604 | Pic de Maupas | Pic de Maupas | PK | 0.661 | PK | 0.661 | Cierp-Gaud | 0.8144685042035005 |
+| FR | under_5 | 42.8771_-0.3521 | Crête les Quintétes | Crête les Quintétes | PK | 0.827 | PK | 0.827 | Arrens-Marsous | 0.8706552543179165 |
+| FR | under_5 | 42.8771_0.3979 | Bordères-Louron | Bordères-Louron | PPL | 0.599 | PPL | 0.599 | Arreau | 0.9056094282616404 |
+| FR | under_5 | 42.8854_0.6146 | Guran | Guran | PPL | 0.525 | PPL | 0.525 | Cierp-Gaud | 0.8580892823744883 |
+| FR | under_5 | 42.8854_0.9896 | Balacet | Balacet | PPL | 0.681 | PPL | 0.681 | Moulis | 0.874292967416868 |
+| FR | under_5 | 42.8896_-0.5813 | Pène d'Udapet | Pène d'Udapet | PK | 0.662 | PK | 0.662 | Bedous | 0.8723759668739601 |
+| FR | under_5 | 42.9021_1.2062 | Soueix-Rogalle | Soueix-Rogalle | PPL | 0.880 | PPL | 0.880 | Oust | 0.8474162702731692 |
+| FR | under_5 | 42.9146_1.3229 | Biert | Biert | PPL | 1.874 | PPL | 1.874 | Massat | 0.8517982909711533 |
+| FR | under_5 | 42.9271_1.3937 | Cap du Carmil | Cap du Carmil | PK | 1.717 | PK | 1.717 | Massat | 0.8378129286071339 |
+| FR | under_5 | 42.9396_-0.0313 | Ortiac | Ortiac | PPL | 1.696 | PPL | 1.696 | Pierrefitte-Nestalas | 0.86079597158501 |
+| FR | under_5 | 42.9396_1.6562 | Roc Nègre | Roc Nègre | PK | 1.290 | PK | 1.290 | Montgaillard | 0.7398801713993476 |
+| FR | under_5 | 42.9479_1.7521 | Roc Marot | Roc Marot | PK | 1.331 | PK | 1.331 | Montferrier | 0.7965531118648167 |
+| FR | under_5 | 42.9521_0.7937 | Razecueillé | Razecueillé | PPL | 1.851 | PPL | 1.851 | Aspet | 0.860603802503523 |
+| FR | under_5 | 42.9562_-0.1188 | Pic d'Escorne-Crabe | Pic d'Escorne-Crabe | PK | 1.171 | PK | 1.171 | Pierrefitte-Nestalas | 0.8392142136459771 |
+| FR | under_5 | 42.9562_-0.8563 | Pic Lakhoura | Pic Lakhoura | PK | 1.518 | PK | 1.518 | Tardets | 0.8449778223426434 |
+| FR | under_5 | 42.9562_0.2437 | La Séoube | La Séoube | PPL | 0.880 | PPL | 0.880 | Campan | 0.8754888093163565 |
+| FR | 5_to_25 | 43.3687_4.6937 | Salin-de-Giraud | Salin-de-Giraud | PPL | 5.885 | PPL | 5.885 | Port-Saint-Louis-du-Rhône | 0.41075056046993763 |
+| FR | 5_to_25 | 43.5021_4.8771 | Ventillon | Ventillon | PPL | 6.244 | PPL | 6.244 | Fos-sur-Mer | 0.18349144369857306 |
+| FR | 5_to_25 | 44.0521_-0.7646 | Luglon | Luglon | PPL | 5.035 | PPL | 5.035 | Arengosse | 0.8590944113361821 |
+| FR | 5_to_25 | 44.0521_-0.8104 | Le Platiet | Le Platiet | PPL | 5.412 | PPL | 5.412 | Arengosse | 0.8467289102841877 |
+| FR | 5_to_25 | 44.3979_-0.9396 | La Gare de Lugos | La Gare de Lugos | PPL | 6.206 | PPL | 6.206 | Ychoux | 0.7891764697667281 |
+| FR | 5_to_25 | 44.6521_-0.6813 | Saucats | Saucats | PPL | 6.700 | PPL | 6.700 | Saucats | 0.46060058851512076 |
+| FR | under_5 | 42.9646_1.9646 | Sainte-Colombe-sur-l'Hers | Sainte-Colombe-sur-l'Hers | PPL | 1.372 | PPL | 1.372 | Chalabre | 0.8203971797338394 |
+| FR | under_5 | 42.9687_-0.7646 | Soum de Lèche | Soum de Lèche | PK | 0.673 | PK | 0.673 | Bedous | 0.8585461212687605 |
+| FR | under_5 | 42.9812_2.1729 | Bouriège | Bouriège | PPL | 0.762 | PPL | 0.762 | Espéraza | 0.7680134038914245 |
+| FR | under_5 | 42.9937_2.3312 | Pla d'al Bouich | Pla d'al Bouich | PK | 0.979 | PK | 0.979 | Alet-les-Bains | 0.7396137429799898 |
+| FR | under_5 | 42.9979_-1.0396 | Pic de Bizkarze | Pic de Bizkarze | PK | 0.760 | PK | 0.760 | Tardets | 0.7851304242932593 |
+| FR | under_5 | 43.0021_-0.4354 | Louvie-Soubiron | Louvie-Soubiron | PPL | 1.502 | PPL | 1.502 | Laruns | 0.8406875710790083 |
+| FR | under_5 | 43.0021_-0.6688 | le Layens | le Layens | PK | 2.728 | PK | 2.728 | Bedous | 0.8439766150314638 |
+| FR | under_5 | 43.0021_0.2229 | le Haboura | le Haboura | PK | 0.513 | PK | 0.513 | Campan | 0.8456629522639485 |
+| FR | under_5 | 43.0021_0.5396 | Escalère de Coume Nère | Escalère de Coume Nère | PK | 0.236 | PK | 0.236 | Loures-Barousse | 0.8479068509612793 |
+| FR | under_5 | 43.0021_0.7604 | Arbon | Arbon | PPL | 1.176 | PPL | 1.176 | Aspet | 0.8336294012895626 |
+| FR | under_5 | 43.0396_2.9521 | Hameau du Lac | Hameau du Lac | PPL | 2.059 | PPL | 2.059 | Sigean | 0.46215537133862983 |
+| FR | under_5 | 43.0437_-1.3604 | Forêt de Hayra | Forêt de Hayra | FRST | 0.903 | FRST | 0.903 | Saint-Étienne-de-Baïgorry | 0.6097334526384551 |
+| FR | under_5 | 43.0479_-0.1188 | la Serre | la Serre | PK | 0.528 | PK | 0.528 | Argelès-Gazost | 0.7385440103721332 |
+| FR | under_5 | 43.0479_-0.2604 | Pic du Monbula | Pic du Monbula | PK | 1.648 | PK | 1.648 | Arthez-d'Asson | 0.7794037534319774 |
+| FR | under_5 | 43.0479_0.0479 | Pic de la Clique | Pic de la Clique | PK | 0.393 | PK | 0.393 | Pouzac | 0.7674762142663633 |
+| FR | under_5 | 43.0479_0.3812 | Lortet | Lortet | PPL | 0.564 | PPL | 0.564 | La Barthe-de-Neste | 0.731862831482829 |
+| FR | under_5 | 43.0479_0.7062 | Régades | Régades | PPL | 1.311 | PPL | 1.311 | Labarthe-Rivière | 0.7364582822545077 |
+| FR | under_5 | 43.0479_1.2187 | Contrazy | Contrazy | PPL | 1.384 | PPL | 1.384 | Montjoie-en-Couserans | 0.801817293684328 |
+| FR | under_5 | 43.0479_2.5104 | Serre de la Pène | Serre de la Pène | PK | 1.243 | PK | 1.243 | Montlaur | 0.6935867805974161 |
+| FR | under_5 | 43.0896_2.1729 | Lauraguel | Lauraguel | PPL | 0.954 | PPL | 0.954 | Pieusse | 0.6943894691072171 |
+| FR | under_5 | 43.0937_-0.3938 | Sainte-Colome | Sainte-Colome | PPL | 1.241 | PPL | 1.241 | Louvie-Juzon | 0.7388270056325307 |
+| FR | under_5 | 43.0937_-0.8813 | Sunhar | Sunhar | PPL | 0.251 | PPL | 0.251 | Tardets | 0.8243064919094878 |
+| FR | under_5 | 43.0937_0.0604 | Astugue | Astugue | PPL | 0.959 | PPL | 0.959 | Trébons | 0.7114190204092956 |
+| FR | under_5 | 43.0937_1.0146 | Betchat | Betchat | PPL | 0.318 | PPL | 0.318 | Cassagne | 0.7694868074793193 |
+| FR | under_5 | 43.0937_1.4021 | Sabarat | Sabarat | PPL | 1.274 | PPL | 1.274 | Les Bordes-sur-Arize | 0.7595986576407947 |
+| FR | under_5 | 43.0937_1.4854 | Monesple | Monesple | PPL | 0.755 | PPL | 0.755 | Artigat | 0.7330571645112764 |
+| FR | under_5 | 43.0937_1.8937 | Mirepoix | Mirepoix | PPL | 1.736 | PPL | 1.736 | Mirepoix | 0.7781576632360082 |
+| FR | under_5 | 43.0979_-1.1771 | Esterenguibel | Esterenguibel | PPL | 0.951 | PPL | 0.951 | Saint-Jean-le-Vieux | 0.7298741010329746 |
+| FR | under_5 | 43.1187_2.6771 | le Crès | le Crès | PK | 2.386 | PK | 2.386 | Fabrezan | 0.6153046583996534 |
+| FR | under_5 | 43.1396_0.2437 | Chelle-Spou | Chelle-Spou | PPL | 0.382 | PPL | 0.382 | Cieutat | 0.7556666792671407 |
+| FR | under_5 | 43.1396_1.8021 | Bois de la Belène | Bois de la Belène | FRST | 0.717 | FRST | 0.717 | Belpech | 0.739097782470586 |
+| FR | under_5 | 43.1396_2.0812 | Mazerolles-du-Razès | Mazerolles-du-Razès | PPL | 0.795 | PPL | 0.795 | Belvèze-du-Razès | 0.7426847630421859 |
+| FR | under_5 | 43.1396_2.8146 | Boutenac | Boutenac | PPL | 2.105 | PPL | 2.105 | Boutenac | 0.49106118037845936 |
+| FR | under_5 | 43.1437_-1.1313 | Mendive | Mendive | PPL | 1.297 | PPL | 1.297 | Saint-Jean-le-Vieux | 0.7541720897290176 |
+| FR | under_5 | 43.1854_-0.1188 | Pontacq | Pontacq | PPL | 0.335 | PPL | 0.335 | Pontacq | 0.6578662442756674 |
+| FR | under_5 | 43.1854_-0.7146 | Esquiule | Esquiule | PPL | 1.109 | PPL | 1.109 | Esquiule | 0.7312845408213222 |
+| FR | under_5 | 43.1854_1.1187 | Saint-Christaud | Saint-Christaud | PPL | 0.933 | PPL | 0.933 | Cazères | 0.7213277578404516 |
+| FR | under_5 | 43.1854_2.0271 | Fanjeaux | Fanjeaux | PPL | 0.567 | PPL | 0.567 | Fanjeaux | 0.7348808534005665 |
+| FR | under_5 | 43.1896_5.6521 | Le Liouquet | Le Liouquet | PPL | 1.376 | PPL | 1.376 | Ceyreste | 0.18956159459478528 |
+| FR | under_5 | 43.2271_0.4271 | Sabarros | Sabarros | PPL | 1.375 | PPL | 1.375 | Galan | 0.8310280442590028 |
+| FR | under_5 | 43.2271_0.4896 | Gaussan | Gaussan | PPL | 0.255 | PPL | 0.255 | Monléon-Magnoac | 0.8556262844342555 |
+| FR | under_5 | 43.2271_2.9521 | Moussan | Moussan | PPL | 0.548 | PPL | 0.548 | Moussan | 0.31753367253119524 |
+| FR | under_5 | 43.2312_-0.3063 | Baliros | Baliros | PPL | 0.397 | PPL | 0.397 | Bordes | 0.515323733468305 |
+| FR | under_5 | 43.2312_-0.5229 | Bois du Laring | Bois du Laring | FRST | 2.249 | FRST | 2.249 | Lasseube | 0.5945984135612666 |
+| FR | under_5 | 43.2312_1.3021 | Bax | Bax | PPL | 1.250 | PPL | 1.250 | Lézat-sur-Lèze | 0.6563343138888256 |
+| FR | under_5 | 43.2312_1.6646 | Mestribès | Mestribès | PPL | 2.433 | PPL | 2.433 | Mazères | 0.6341545363649526 |
+| FR | under_5 | 43.2354_-0.9854 | Pagolle | Pagolle | PPL | 1.269 | PPL | 1.269 | Ordiarp | 0.7831672640014435 |
+| FR | under_5 | 43.2354_-1.2688 | Ahaice | Ahaice | PPL | 0.315 | PPL | 0.315 | Ossès | 0.680661471871969 |
+| FR | under_5 | 43.2521_0.6146 | Gensac-de-Boulogne | Gensac-de-Boulogne | PPL | 2.320 | PPL | 2.320 | Blajan | 0.8459381421582387 |
+| FR | under_5 | 43.2604_3.1771 | Lespignan | Lespignan | PPL | 1.528 | PPL | 1.528 | Lespignan | 0.404867994882797 |
+| FR | under_5 | 43.2646_0.1979 | Marquerie | Marquerie | PPL | 0.608 | PPL | 0.608 | Pouyastruc | 0.7303420383429007 |
+| FR | under_5 | 43.2729_2.2646 | Ventenac-Cabardès | Ventenac-Cabardès | PPL | 1.781 | PPL | 1.781 | Ventenac-Cabardès | 0.6506002806224532 |
+| FR | under_5 | 43.2729_2.5562 | Peyriac-Minervois | Peyriac-Minervois | PPL | 2.148 | PPL | 2.148 | Peyriac-Minervois | 0.6435429225847944 |
+| FR | under_5 | 43.2729_2.7687 | Oupia | Oupia | PPL | 1.911 | PPL | 1.911 | Olonzac | 0.5808505453966257 |
+| FR | under_5 | 43.2729_2.9062 | Le Somail | Le Somail | PPL | 0.892 | PPL | 0.892 | Mirepeisset | 0.4745292723781367 |
+| FR | under_5 | 43.2729_5.7437 | Le Camp du Castellet | Le Camp du Castellet | PPL | 1.780 | PPL | 1.780 | Cuges-les-Pins | 0.25307865766371174 |
+| FR | under_5 | 43.2771_-0.4854 | Aubertin | Aubertin | PPL | 0.390 | PPL | 0.390 | Aubertin | 0.4973096603658751 |
+| FR | under_5 | 43.2771_-1.4521 | Pic d'Ourrezti | Pic d'Ourrezti | PK | 2.443 | PK | 2.443 | Ainhoa | 0.5467008778169469 |
+| FR | under_5 | 43.2771_0.7979 | Lilhac | Lilhac | PPL | 1.350 | PPL | 1.350 | Aurignac | 0.8166056850802945 |
 
-Le retrait du filtre ne restaure donc aucun spot dans ce corpus : les 2 143 spots terrestres avaient déjà tous une commune `cities500` à moins de 25 km. Sur les 2 143 IDs communs, `darkness` et `bortle` sont strictement invariants (0 différence dans chaque champ).
+## Provenance GeoNames
 
-Histogramme `darkness` (tranches de 0,1 ; bornes gauches inclusives, dernière borne droite incluse) :
-
-| Tranche | Spots |
-|---|---:|
-| [0.0, 0.1) | 28 |
-| [0.1, 0.2) | 56 |
-| [0.2, 0.3) | 22 |
-| [0.3, 0.4) | 148 |
-| [0.4, 0.5) | 237 |
-| [0.5, 0.6) | 170 |
-| [0.6, 0.7) | 197 |
-| [0.7, 0.8) | 479 |
-| [0.8, 0.9) | 471 |
-| [0.9, 1.0] | 335 |
-
-Résumé `darkness` : min **0,000000**, Q1 **0,522364**, médiane **0,737141**, Q3 **0,846994**, max **1,000000**.
-
-Répartition Bortle : **1 : 115**, **2 : 382**, **3 : 483**, **4 : 673**, **5 : 270**, **6 : 136**, **7 : 66**, **8 : 18**, **9 : 0**.
+- `ES` : source `https://download.geonames.org/export/dump/ES.zip`, archive SHA-256 `4f488b79a54699b3d178878103052fa89af9b3ef1e1ec0be71d0eeda76b9202c`, extract `extracts/ES.tsv`, codes `['ADM1', 'ADM2', 'CAPE', 'CLDA', 'CNYN', 'FRST', 'GRGE', 'HDLD', 'HTH', 'ISL', 'ISLS', 'LCTY', 'LK', 'LKC', 'LKN', 'LKS', 'MT', 'MTS', 'PASS', 'PK', 'PKS', 'PLAT', 'PPL', 'PPLA', 'PPLA2', 'PPLA3', 'PPLA4', 'PPLA5', 'PPLC', 'PPLF', 'PPLG', 'PPLL', 'PPLR', 'PPLS', 'PRK', 'PROM', 'RESF', 'RESN', 'RESW', 'RGN', 'RGNL', 'RSV', 'SDL', 'TUND', 'UPLD', 'VLC']`.
+- `FR` : source `https://download.geonames.org/export/dump/FR.zip`, archive SHA-256 `f39c60910f77bd8dec59ed6ee27a5e2550887b2a3adb3824ba576adb84f86c3c`, extract `extracts/FR.tsv`, codes `['ADM1', 'ADM2', 'CAPE', 'CLDA', 'CNYN', 'FRST', 'GRGE', 'HDLD', 'HTH', 'ISL', 'ISLS', 'LCTY', 'LK', 'LKC', 'LKN', 'LKS', 'MT', 'MTS', 'PASS', 'PK', 'PKS', 'PLAT', 'PPL', 'PPLA', 'PPLA2', 'PPLA3', 'PPLA4', 'PPLA5', 'PPLC', 'PPLF', 'PPLG', 'PPLL', 'PPLR', 'PPLS', 'PRK', 'PROM', 'RESF', 'RESN', 'RESW', 'RGN', 'RGNL', 'RSV', 'SDL', 'TUND', 'UPLD', 'VLC']`.
+- `GB` : source `https://download.geonames.org/export/dump/GB.zip`, archive SHA-256 `eaeab49c89415f5b3a11827c8922a830aadf9fed0b78076b30b5ba27bad25c70`, extract `extracts/GB.tsv`, codes `['ADM1', 'ADM2', 'CAPE', 'CLDA', 'CNYN', 'FRST', 'GRGE', 'HDLD', 'HTH', 'ISL', 'ISLS', 'LCTY', 'LK', 'LKC', 'LKN', 'LKS', 'MT', 'MTS', 'PASS', 'PK', 'PKS', 'PLAT', 'PPL', 'PPLA', 'PPLA2', 'PPLA3', 'PPLA4', 'PPLA5', 'PPLC', 'PPLF', 'PPLG', 'PPLL', 'PPLR', 'PPLS', 'PRK', 'PROM', 'RESF', 'RESN', 'RESW', 'RGN', 'RGNL', 'RSV', 'SDL', 'TUND', 'UPLD', 'VLC']`.
+- `IE` : source `https://download.geonames.org/export/dump/IE.zip`, archive SHA-256 `145fe7e1d3f5d172fe0d2a77f71e41f30e4096c17644a0879d72c4c682f351d5`, extract `extracts/IE.tsv`, codes `['ADM1', 'ADM2', 'CAPE', 'CLDA', 'CNYN', 'FRST', 'GRGE', 'HDLD', 'HTH', 'ISL', 'ISLS', 'LCTY', 'LK', 'LKC', 'LKN', 'LKS', 'MT', 'MTS', 'PASS', 'PK', 'PKS', 'PLAT', 'PPL', 'PPLA', 'PPLA2', 'PPLA3', 'PPLA4', 'PPLA5', 'PPLC', 'PPLF', 'PPLG', 'PPLL', 'PPLR', 'PPLS', 'PRK', 'PROM', 'RESF', 'RESN', 'RESW', 'RGN', 'RGNL', 'RSV', 'SDL', 'TUND', 'UPLD', 'VLC']`.

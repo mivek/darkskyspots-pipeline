@@ -85,7 +85,7 @@ def _mock_raster_steps(transform):
         patch("run.slice_and_compute", return_value=slice_result),
         patch("run.alr_to_darkness", return_value=np.full((2, 2), 0.5)),
         patch("run.alr_to_bortle", return_value=np.full((2, 2), 3, dtype=int)),
-        patch("run.mesh_minima", return_value=[]),
+        patch("run.mesh_darkest", return_value=[]),
         patch("run.redundancy_filter", return_value=[]),
         patch("run.load_places", return_value=[]),
         patch("run.ensure_coverage", return_value=[]),
@@ -214,7 +214,7 @@ def test_run_calls_steps_in_order(tmp_path, mock_region):
         patch("run.slice_and_compute", side_effect=tracker("slice_and_compute", mock_slice_result)), \
         patch("run.alr_to_darkness", side_effect=tracker("alr_to_darkness", np.full((20, 20), 0.5))), \
         patch("run.alr_to_bortle", side_effect=tracker("alr_to_bortle", np.full((20, 20), 3, dtype=int))), \
-        patch("run.mesh_minima", side_effect=tracker("mesh_minima", [])), \
+        patch("run.mesh_darkest", side_effect=tracker("mesh_darkest", [])), \
         patch("run.redundancy_filter", side_effect=tracker("redundancy_filter", [])), \
         patch("run.load_places", side_effect=tracker("load_places", [])), \
         patch("run.ensure_coverage", side_effect=tracker("ensure_coverage", [])), \
@@ -233,7 +233,7 @@ def test_run_calls_steps_in_order(tmp_path, mock_region):
         "slice_and_compute",
         "alr_to_darkness",
         "alr_to_bortle",
-        "mesh_minima",
+        "mesh_darkest",
         "redundancy_filter",
         "load_places",
         "ensure_coverage",
@@ -289,7 +289,7 @@ def test_run_merges_current_country_and_preserves_other_countries(tmp_path):
         patch("run.slice_and_compute", return_value=slice_result), \
         patch("run.alr_to_darkness", return_value=np.full((20, 20), 0.5)), \
         patch("run.alr_to_bortle", return_value=np.full((20, 20), 3, dtype=int)), \
-        patch("run.mesh_minima", return_value=[]), \
+        patch("run.mesh_darkest", return_value=[]), \
         patch("run.redundancy_filter", return_value=[]), \
         patch("run.load_places", return_value=[]), \
         patch("run.ensure_coverage", return_value=[]), \
@@ -430,7 +430,7 @@ def test_multi_country_runtime_uses_one_filtered_index_and_only_configured_spots
         stack.enter_context(
             patch("run.alr_to_bortle", return_value=np.full((2, 2), 3, dtype=int))
         )
-        stack.enter_context(patch("run.mesh_minima", return_value=candidates))
+        stack.enter_context(patch("run.mesh_darkest", return_value=candidates))
         clip = stack.enter_context(
             patch("run.classify_candidates", return_value=(candidates, {}))
         )
@@ -496,7 +496,7 @@ def test_multi_country_runtime_uses_one_filtered_index_and_only_configured_spots
 def test_nominal_bbox_filter_blocks_halo_candidates_from_all_publish_steps(
     tmp_path, caplog
 ):
-    """A mesh minimum in the ALR halo never reaches the publishable pipeline."""
+    """A mesh darkest pixel in the ALR halo never reaches publication."""
     from rasterio.transform import from_bounds
     from run import run
 
@@ -567,7 +567,7 @@ def test_nominal_bbox_filter_blocks_halo_candidates_from_all_publish_steps(
         stack.enter_context(
             patch("run.alr_to_bortle", return_value=np.full((2, 2), 3, dtype=int))
         )
-        stack.enter_context(patch("run.mesh_minima", return_value=candidates))
+        stack.enter_context(patch("run.mesh_darkest", return_value=candidates))
         stack.enter_context(
             patch("run.classify_candidates", return_value=(candidates, {}))
         )
@@ -651,7 +651,7 @@ def test_run_keeps_unassigned_spots_before_tile_classification(tmp_path, mock_re
 @patch("run.load_places", return_value=[])
 def test_orchestrator_attaches_bortle_before_redundancy_filter(mock_load_places, tmp_path, mock_region):
     """Regression test for the Step 2b bug: candidates must have bortle set
-    before redundancy_filter is called. We patch mesh_minima to return
+    before redundancy_filter is called. We patch mesh_darkest to return
     candidates WITHOUT a bortle field, run through the orchestrator
     but intercept before redundancy_filter. Then assert every candidate
     has a non-None bortle."""
@@ -674,7 +674,7 @@ def test_orchestrator_attaches_bortle_before_redundancy_filter(mock_load_places,
 
     captured = {}
 
-    def mock_mesh_minima(*args, **kwargs):
+    def mock_mesh_darkest(*args, **kwargs):
         # Return 3 candidates with NO bortle field
         captured["candidates"] = [
             {"lat": 42.0, "lon": 1.0, "darkness": 0.9, "row": 5, "col": 5},
@@ -689,11 +689,11 @@ def test_orchestrator_attaches_bortle_before_redundancy_filter(mock_load_places,
         # Don't actually filter, just return them
         return candidates
 
-    # NOTE: patch run.mesh_minima / run.redundancy_filter, not src.extract.*,
-    # because run.py does ``from src.extract import mesh_minima`` at module
-    # level, binding a local reference. Patching ``src.extract.mesh_minima``
+    # NOTE: patch run.mesh_darkest / run.redundancy_filter, not src.extract.*,
+    # because run.py does ``from src.extract import mesh_darkest`` at module
+    # level, binding a local reference. Patching ``src.extract.mesh_darkest``
     # would not affect the already-imported reference in run().
-    with patch("run.mesh_minima", side_effect=mock_mesh_minima), \
+    with patch("run.mesh_darkest", side_effect=mock_mesh_darkest), \
          patch("run.redundancy_filter", side_effect=mock_filter):
         args = _make_args(tmp_path)
         run(args)

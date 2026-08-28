@@ -31,7 +31,7 @@ from src.geonames import (
     NAMING_FEATURE_CODES,
     validate_geonames_manifest,
 )
-from src.extract import mesh_minima, redundancy_filter
+from src.extract import mesh_darkest, redundancy_filter
 from src.alr import slice_and_compute
 from src.convert import alr_to_bortle, alr_to_darkness
 from src.publish import (
@@ -132,9 +132,9 @@ def _load_geonames_index(country_codes: list[str], bbox) -> GeoNamesIndex:
 def _filter_candidates_to_bbox(candidates: list[dict], bbox) -> tuple[list[dict], int]:
     """Keep only candidates in the region's nominal, inclusive bbox.
 
-    The raster deliberately includes an ALR halo. Mesh minima can therefore
+    The raster deliberately includes an ALR halo. Mesh darkest pixels can therefore
     be found outside the region even after the Natural Earth country clip;
-    those minima must not participate in redundancy, coverage, naming, or
+    those candidates must not participate in redundancy, coverage, naming, or
     tile export.
     """
     lon_min, lat_min, lon_max, lat_max = bbox
@@ -209,9 +209,9 @@ def run(args) -> int:
                 dst.write(bortle.astype("float32"), 1)
             logger.info("Debug rasters written to %s", output_dir)
 
-        # Step 2: Mesh scan (local minima per cell)
-        logger.info("Step 2: Mesh scan (local minima)")
-        candidates = mesh_minima(darkness, transform, MESH_KM)
+        # Step 2: Mesh scan (darkest pixel per cell)
+        logger.info("Step 2: Mesh scan (darkest pixel per cell)")
+        candidates = mesh_darkest(darkness, transform, MESH_KM)
         logger.info("  Found %d candidate spots", len(candidates))
 
         # Step 2b: Attach bortle (and re-attach definitive darkness) to each candidate.
@@ -225,7 +225,7 @@ def run(args) -> int:
         logger.info("  Attached bortle to %d candidates", len(candidates))
 
         # The ALR margin is retained above for radiance context, but candidates
-        # are clipped before redundancy so an unpublished foreign/sea minimum
+        # are clipped before redundancy so an unpublished foreign/sea darkest pixel
         # can never suppress a published candidate.
         logger.info("Step 2c: Natural Earth land mask and country clip")
         candidates, geography_stats = classify_candidates(

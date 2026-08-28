@@ -53,12 +53,13 @@ CRS for the later coordinate conversion.
 The optional debug-raster mode writes these two arrays as GeoTIFFs. It does not
 change the spot output.
 
-### 3. Mesh minimum scan
+### 3. Mesh darkest-pixel scan
 
 `src/extract.py` divides the darkness array into approximately 5 km mesh
-cells. It selects one pixel per cell with `np.nanargmin` on the `darkness`
-array, skips cells containing only NaN values, and converts the selected pixel
-center to latitude and longitude. Each candidate initially contains its
+cells. It selects one pixel per cell with `np.nanargmax` on the `darkness`
+array (the darkest pixel), skips cells containing only NaN values, and converts
+the selected pixel center to latitude and longitude. Equal maxima select the
+first pixel in row-major order. Each candidate initially contains its
 coordinates, darkness, and source `row`/`col`. The orchestrator then attaches
 the definitive darkness and Bortle values from the selected raster pixels.
 

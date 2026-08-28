@@ -134,7 +134,7 @@ def test_andorra_and_monaco_are_kept_in_shared_french_tiles():
     assert tile_id(france_riviera[0]["lat"], france_riviera[0]["lon"]) == "N043E007"
 
 
-def test_foreign_or_sea_minimum_cannot_suppress_or_reenter_via_coverage():
+def test_foreign_or_sea_darkest_pixel_cannot_suppress_or_reenter_via_coverage():
     geo = synthetic_geography()
     foreign = candidate(0.01, 0, darkness=0.99, bortle=3)
     publishable = candidate(-0.01, 0, darkness=0.80, bortle=3)

@@ -1,4 +1,4 @@
-"""Steps 2-3: mesh grid local minima + redundancy filter."""
+"""Steps 2-3: mesh grid darkest pixels + redundancy filter."""
 import numpy as np
 from rasterio.transform import xy
 
@@ -6,7 +6,7 @@ from .config import MESH_KM, REDUNDANCY_KM
 from .utils import haversine_km
 
 
-def mesh_minima(
+def mesh_darkest(
     darkness: np.ndarray,
     transform,
     mesh_km: int = MESH_KM,
@@ -16,7 +16,8 @@ def mesh_minima(
 
     Returns list of dicts: {lat, lon, darkness, row, col}.
     Skips cells where all values are NaN (NaN halo).
-    Tie-breaker: np.argmin row-major (D6).
+    Tie-breaker: ``np.nanargmax`` returns the first maximum in row-major
+    order (D6), so equal darkness values are deterministic.
     """
     res_deg_x = abs(transform.a)  # degrees per pixel in x
     res_deg_y = abs(transform.e)  # degrees per pixel in y
@@ -32,21 +33,21 @@ def mesh_minima(
             cell = darkness[r:r + cell_px_y, c:c + cell_px_x]
             if cell.size == 0 or np.all(np.isnan(cell)):
                 continue
-            # np.argmin row-major (D6): flat index of first occurrence of min
-            flat_idx = np.nanargmin(cell)
+            # np.nanargmax row-major (D6): first occurrence of max wins.
+            flat_idx = np.nanargmax(cell)
             dr = flat_idx // cell.shape[1]
             dc = flat_idx % cell.shape[1]
-            min_row = r + dr
-            min_col = c + dc
+            darkest_row = r + dr
+            darkest_col = c + dc
             val = float(cell[dr, dc])
-            lon, lat = xy(transform, min_row, min_col, offset="center")
+            lon, lat = xy(transform, darkest_row, darkest_col, offset="center")
             points.append(
                 {
                     "lat": float(lat),
                     "lon": float(lon),
                     "darkness": val,
-                    "row": int(min_row),
-                    "col": int(min_col),
+                    "row": int(darkest_row),
+                    "col": int(darkest_col),
                 }
             )
     return points

@@ -1,58 +1,73 @@
-"""Tests for src/extract.py (mesh_minima + redundancy_filter)."""
+"""Tests for src/extract.py (mesh_darkest + redundancy_filter)."""
 import numpy as np
 import pytest
 from rasterio.transform import from_bounds
 
 
-def test_mesh_minima_simple():
-    """Small array with a known minimum in the center: finder picks it."""
-    from src.extract import mesh_minima
-    # 10x10, one cell (~5km mesh, ~0.05 deg per pixel)
-    darkness = np.full((10, 10), 0.5, dtype=np.float64)
-    darkness[5, 5] = 0.1  # global minimum
-    transform = from_bounds(-5, 41, 10, 51, 10, 10)
-    points = mesh_minima(darkness, transform, mesh_km=50)
-    # Mesh of 50 km / 0.05 deg per pixel = 1000 px per cell. So one cell covers the whole grid.
-    # But min is found at (5, 5).
-    assert any(abs(p["row"] - 5) < 2 and abs(p["col"] - 5) < 2 for p in points)
+def test_mesh_darkest_simple():
+    """A cell with two known values retains the darkest (highest) value."""
+    from src.extract import mesh_darkest
+    # 9x9, exactly one ~0.45-degree cell at ~0.05 degrees per pixel.
+    darkness = np.full((9, 9), 0.5, dtype=np.float64)
+    darkness[5, 5] = 0.9  # global maximum
+    transform = from_bounds(-5, 41, -4.55, 41.45, 9, 9)
+    points = mesh_darkest(darkness, transform, mesh_km=50)
+    # Mesh of 50 km / 0.05 deg per pixel = 9 px per cell, so one cell covers the grid.
+    # The maximum is found at (5, 5).
+    assert len(points) == 1
+    assert (points[0]["row"], points[0]["col"]) == (5, 5)
+    assert points[0]["darkness"] == pytest.approx(0.9)
 
 
-def test_mesh_minima_skips_nan():
+def test_mesh_darkest_skips_nan():
     """All-NaN cell produces no point."""
-    from src.extract import mesh_minima
+    from src.extract import mesh_darkest
     darkness = np.full((10, 10), np.nan, dtype=np.float64)
     transform = from_bounds(-5, 41, 10, 51, 10, 10)
-    points = mesh_minima(darkness, transform, mesh_km=50)
+    points = mesh_darkest(darkness, transform, mesh_km=50)
     assert points == []
 
 
-def test_mesh_minima_deterministic():
+def test_mesh_darkest_uniform_cell_chooses_first_finite_row_major():
+    """Equal maxima choose the first finite pixel in row-major order (D6)."""
+    from src.extract import mesh_darkest
+    darkness = np.full((3, 3), 0.8, dtype=np.float64)
+    darkness[0, 0] = np.nan
+    darkness[1, 1] = np.nan
+    transform = from_bounds(-5, 41, -4.85, 41.15, 3, 3)
+    points = mesh_darkest(darkness, transform, mesh_km=50)
+    assert len(points) == 1
+    assert (points[0]["row"], points[0]["col"]) == (0, 1)
+    assert points[0]["darkness"] == pytest.approx(0.8)
+
+
+def test_mesh_darkest_deterministic():
     """Same input twice returns same points (D6 tie-breaker)."""
-    from src.extract import mesh_minima
+    from src.extract import mesh_darkest
     darkness = np.random.default_rng(42).uniform(0.0, 1.0, (20, 20))
     transform = from_bounds(-5, 41, 10, 51, 20, 20)
-    a = mesh_minima(darkness, transform, mesh_km=50)
-    b = mesh_minima(darkness, transform, mesh_km=50)
+    a = mesh_darkest(darkness, transform, mesh_km=50)
+    b = mesh_darkest(darkness, transform, mesh_km=50)
     assert a == b
 
 
-def test_mesh_minima_cell_size():
+def test_mesh_darkest_cell_size():
     """A 100x100 array with mesh_km=50 (~0.45 deg, ~3-4 px) yields 500-1000 points."""
-    from src.extract import mesh_minima
+    from src.extract import mesh_darkest
     darkness = np.random.default_rng(0).uniform(0.0, 1.0, (100, 100))
     transform = from_bounds(-5, 41, 10, 51, 100, 100)
-    points = mesh_minima(darkness, transform, mesh_km=50)
+    points = mesh_darkest(darkness, transform, mesh_km=50)
     # ~15 deg lon / 0.45 deg/cell = 33 cols; 10 deg lat / 0.45 deg = 22 rows; ~726 cells
     assert 500 < len(points) < 1000
 
 
-def test_mesh_minima_transform():
+def test_mesh_darkest_transform():
     """Lat/lon output is reasonable for the transform."""
-    from src.extract import mesh_minima
+    from src.extract import mesh_darkest
     darkness = np.full((10, 10), 0.5, dtype=np.float64)
-    darkness[5, 5] = 0.1
+    darkness[5, 5] = 0.9
     transform = from_bounds(-5, 41, 10, 51, 10, 10)
-    points = mesh_minima(darkness, transform, mesh_km=50)
+    points = mesh_darkest(darkness, transform, mesh_km=50)
     assert len(points) >= 1
     p = points[0]
     # The point should be within the bbox of the transform

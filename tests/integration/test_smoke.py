@@ -10,7 +10,7 @@ from src.config import MESH_KM
 from src.convert import alr_to_bortle, alr_to_darkness
 from src.coverage import ensure_coverage
 from src.enrich import enrich_all
-from src.extract import mesh_minima, redundancy_filter
+from src.extract import mesh_darkest, redundancy_filter
 from src.tile_export import (
     classify_spots_into_tiles,
     enumerate_tiles_in_bbox,
@@ -95,7 +95,7 @@ def test_smoke_end_to_end(
     assert not np.all(np.isnan(darkness)), "Should have non-NaN pixels"
 
     # Step 2 (mesh scan only, skip NaN halo)
-    points = mesh_minima(
+    points = mesh_darkest(
         darkness,
         alr_result.profile["transform"],
         MESH_KM,
