@@ -17,16 +17,16 @@ pytest tests/unit/test_tile_id.py -xvs           # single module (tile naming)
 No `--cov`, no `mypy`, no `ruff`, no CI config — plain pytest.
 
 ## Architecture
-- **7 steps** in `run.py:44` — ALR `→` convert `→` mesh minima `→` redundancy filter `→` OSM coverage `→` enrich `→` tile export + publish
-- **Modules** in `src/` mirror pipeline steps: `alr.py`, `convert.py`, `extract.py` (mesh+filter), `coverage.py`, `enrich.py`, `tile_export.py`, `publish.py`
+- **Preflight plus 12 processing and publication stages** — radiance → ALR, ALR → darkness/Bortle, mesh scan, Natural Earth clip, redundancy filter, GeoNames coverage and `near`, GeoNames naming cascade, final enrichment, tile export/versioning, country-scoped publication, cluster generation, and commit/push. See `spec-pipeline.md` for the authoritative order and contracts.
+- **Modules** in `src/` mirror the pipeline: `alr.py`, `convert.py`, `extract.py`, `geography.py`, `coverage.py`, `geonames.py`, `enrich.py`, `tile_export.py`, `publish.py`, and `clusters.py`
 - **Config** in `src/config.py`: ALR tuning, Bortle thresholds, mesh/filter/tile constants
-- **Only region:** `france` in `regions.yaml` (bbox `[-5, 41, 10, 51]`, EPSG:3035)
+- **Regions:** `france` (bbox `[-6, 41, 8, 51]`) and `uk_ireland` (bbox `[-11, 49, 2, 55]`), both using EPSG:3035; country attribution comes from Natural Earth
 - **Tile IDs:** 3-digit zero-padded — `tile_id(42.7283, 1.6492)` → `"N042E001"`. This is the app contract. Do not change.
 
 ## Quirks
 - **nightskyquality fork** installed via Git tag (`git+https://github.com/mivek/nightskyquality.git@v1.0.0` in `requirements.txt`). Has a 666-pixel NaN halo — input must be >666px per side.
-- **OSM Overpass API** live calls in `coverage.py` and `enrich.py` — tests mock via `@patch("src.coverage.requests.get")`.
-- **Publish step** (step 7) does `git clone --depth 1 && git add/commit/push` via `subprocess`. Requires `SSH_AUTH_SOCK`. Use `--no-push` to skip.
+- **GeoNames inputs** are local: `cities500.zip` supplies locality coverage and `near`; versioned country-filtered extracts and their manifest supply spot naming.
+- **Publish stages** clone, audit, merge country blocks, regenerate clusters, and then `git add/commit/push` via `subprocess`. Requires `SSH_AUTH_SOCK`. Use `--no-push` to skip.
 - **No type-checking or linting configured** — `pyproject.toml` is minimal (name+version only).
 - **Validation** (§6): manually record Bortle at `validation/checkpoints.json` control points after each run. Tune `ALR_CALIB_C` in `src/config.py` if mismatch >±1 class.
 - **Large inputs** are sliced automatically if they exceed `--budget-mb` (default 500 MB). `TMPDIR` controls temp file location.

@@ -136,12 +136,12 @@ needed) `--prune-orphan-spots` in a disposable clone. A spot's stable `country`
 field, rather than `source_region`, controls replacement and makes publication
 independent of run order.
 
-Spot schema compatibility is strict for cluster generation: every spot must contain `id`, `lat`, `lon`, `darkness`, `bortle`, `near`, and `altitude`. A missing field is reported with its tile and spot index and aborts generation; it must not be silently ignored. Removing a field from the spot schema is therefore a data migration that must be handled before regenerating clusters. Extra source fields are ignored in the embedded cluster representative, whose contract remains the seven fields above.
+Spot schema compatibility is strict for cluster generation: every spot must contain `id`, `lat`, `lon`, `darkness`, `bortle`, `near`, `name`, `nameDistanceKm`, and `altitude`. A missing field is reported with its tile and spot index and aborts generation; it must not be silently ignored. Removing a field from the spot schema is therefore a data migration that must be handled before regenerating clusters. Extra source fields, including `country` and the GeoNames provenance fields, are ignored in the embedded cluster representative, whose contract is the nine fields above.
 
 Published tile spots additionally carry mandatory producer field `country`
 (ISO alpha-2). The app may treat it as optional while reading historical
-caches; cluster representatives continue to project only the existing seven
-fields. Country is assigned from the Natural Earth clip, not from a region
+caches; cluster representatives project only the nine fields listed above.
+Country is assigned from the Natural Earth clip, not from a region
 name, so splitting or regrouping regions does not orphan published spots.
 
 ## Published cluster files and cache identity

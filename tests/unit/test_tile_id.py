@@ -5,7 +5,7 @@ from src.tile_id import TILE_PATTERN, tile_id, tile_bounds
 
 
 def test_canonical_example():
-    """The example from spec-technique.md: (42.7283, 1.6492) → N042E001."""
+    """The public example: (42.7283, 1.6492) -> N042E001."""
     assert tile_id(42.7283, 1.6492) == "N042E001"
 
 

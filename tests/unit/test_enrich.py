@@ -95,16 +95,6 @@ def test_enrich_all_altitude_none():
         assert s["altitude"] is None
 
 
-# --- spec-technique.md ---
-
-
-def test_spec_technique_id_format():
-    """spec-technique.md uses coordinate-based ID format '42.7283_1.6492'."""
-    with open("spec-technique.md") as f:
-        content = f.read()
-    assert '"42.7283_1.6492"' in content
-
-
 # --- spot_id tests ---
 
 
