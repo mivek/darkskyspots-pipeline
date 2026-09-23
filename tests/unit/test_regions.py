@@ -75,13 +75,24 @@ def test_load_regions_accepts_multiple_codes_for_one_region(tmp_path):
     assert load_fixture_regions(path)["benelux"]["osm_country_code"] == ["BE", "NL", "LU"]
 
 
-def test_load_regions_rejects_duplicate_codes_across_regions(tmp_path):
+def test_load_regions_allows_duplicate_codes_across_disjoint_regions(tmp_path):
+    from src.regions import load_regions
     path = write_regions(
         tmp_path,
-        {"one": ([0, 0, 1, 1], "AA"), "two": ([1, 0, 2, 1], "AA")},
+        {"one": ([0, 0, 1, 1], "ES"), "two": ([2, 0, 3, 1], "ES")},
     )
-    with pytest.raises(ValueError, match="AA.*both regions"):
-        load_fixture_regions(path)
+    geography = FakeGeography({"ES": box(0, 0, 3, 1)})
+    assert set(load_regions(str(path), geography=geography)) == {"one", "two"}
+    assert set(load_fixture_regions(path)) == {"one", "two"}
+
+
+def test_load_regions_rejects_overlapping_extents_for_same_country(tmp_path):
+    from src.regions import load_regions
+    path = write_regions(tmp_path, {
+        "one": ([0, 0, 2, 2], "ES"), "two": ([1, 0, 3, 2], "ES"),
+    })
+    with pytest.raises(ValueError, match="[Pp]ublishable.*overlap"):
+        load_regions(str(path), geography=FakeGeography({"ES": box(0, 0, 3, 2)}))
 
 
 def test_load_regions_rejects_duplicate_codes_inside_region(tmp_path):

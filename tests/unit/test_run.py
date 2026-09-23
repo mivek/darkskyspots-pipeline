@@ -267,8 +267,8 @@ def test_run_merges_current_country_and_preserves_other_countries(tmp_path):
         "france": {"bbox": [-6, 41, 8, 51], "osm_country_code": ["FR"]},
         "neighbour": {"bbox": [0, 51, 1, 52], "osm_country_code": ["GB"]},
     }
-    old_owned = {"version": "2025.1", "tile": "N050E001", "spots": [{"id": "old", "country": "FR"}]}
-    old_non_owned = {"version": "2025.1", "tile": "N051E000", "spots": [{"id": "keep", "country": "GB"}]}
+    old_owned = {"version": "2025.1", "tile": "N050E001", "spots": [{"id": "old", "country": "FR", "lat": 48.5, "lon": 2.5}]}
+    old_non_owned = {"version": "2025.1", "tile": "N051E000", "spots": [{"id": "keep", "country": "GB", "lat": 51.5, "lon": 0.0}]}
 
     def clone_with_existing_tiles(_url, _branch, target_dir):
         spots_dir = Path(target_dir) / "spots"
@@ -295,7 +295,7 @@ def test_run_merges_current_country_and_preserves_other_countries(tmp_path):
         patch("run.ensure_coverage", return_value=[]), \
         patch("run.attach_near_town", return_value=[]), \
         patch("run.enrich_all", return_value=[]), \
-        patch("run.classify_spots_into_tiles", return_value={"N050E001": [{"id": "new", "country": "FR"}]}), \
+        patch("run.classify_spots_into_tiles", return_value={"N050E001": [{"id": "new", "country": "FR", "lat": 48.5, "lon": 2.5}]}), \
         patch("run.enumerate_tiles_in_bbox", return_value=["N050E001", "N050E002"]), \
         patch("run.clone_data_repo", side_effect=clone_with_existing_tiles), \
         patch("run.compute_new_version", return_value=("2025.2", True)) as mock_version, \
@@ -308,11 +308,11 @@ def test_run_merges_current_country_and_preserves_other_countries(tmp_path):
     old_arg, new_arg, year_arg = mock_version.call_args.args
     assert old_arg == {"N050E001": old_owned, "N051E000": old_non_owned}
     assert set(new_arg) == {"N050E001", "N050E002", "N051E000"}
-    assert new_arg["N050E001"]["spots"] == [{"id": "new", "country": "FR"}]
+    assert new_arg["N050E001"]["spots"] == [{"id": "new", "country": "FR", "lat": 48.5, "lon": 2.5}]
     assert new_arg["N050E002"]["spots"] == []
     assert new_arg["N051E000"] == old_non_owned
     assert year_arg == 2025
-    assert mock_copy.call_args.kwargs["country_codes"] == ["FR"]
+    assert mock_copy.call_args.kwargs["ownership"].owns(old_owned["spots"][0])
 
 
 @patch("run.load_places", return_value=[])
@@ -489,7 +489,7 @@ def test_multi_country_runtime_uses_one_filtered_index_and_only_configured_spots
         spot["country"] in {"GB", "IE"}
         for spot in tile_export.call_args.args[0]
     )
-    assert copy.call_args.kwargs["country_codes"] == ["GB", "IE"]
+    assert set(copy.call_args.kwargs["ownership"].countries) == {"GB", "IE"}
     commit.assert_called_once()
 
 
@@ -740,7 +740,9 @@ def test_publishing_audits_the_clone_before_raster_work(tmp_path):
     assert events == ["clone", "audit"]
 
 
-@pytest.mark.parametrize("problem_key", ["ambiguous", "unassignable"])
+@pytest.mark.parametrize("problem_key", [
+    "ambiguous", "unassignable", "outside_declared_extents", "ambiguous_ownership",
+])
 def test_audit_modes_reject_new_country_anomaly_categories(tmp_path, problem_key):
     """Ambiguous and unassignable spots are blocking audit findings."""
     from run import _audit_before_write, run_list_orphans
@@ -760,7 +762,9 @@ def test_audit_modes_reject_new_country_anomaly_categories(tmp_path, problem_key
         assert run_list_orphans(args) == 1
 
 
-@pytest.mark.parametrize("problem_key", ["ambiguous", "unassignable"])
+@pytest.mark.parametrize("problem_key", [
+    "ambiguous", "unassignable", "outside_declared_extents", "ambiguous_ownership",
+])
 def test_migration_guard_rejects_new_country_anomaly_categories(tmp_path, problem_key):
     from run import run_country_migration
 

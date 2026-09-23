@@ -22,9 +22,9 @@ Before raster processing, the orchestrator:
 - checks that the input GeoTIFF exists.
 
 For a remote publication, after the input existence check it clones the data
-repository and audits the existing `spots/` directory. Any missing, invalid,
-unconfigured, mismatched, ambiguous, or unassignable country tag stops the run
-before raster work.
+repository and audits the existing `spots/` directory. Country-tag anomalies,
+spots outside every declared regional extent, and ambiguous regional ownership
+stop the run before raster work.
 
 ## Processing Stages
 
@@ -157,19 +157,23 @@ envelopes. A first dataset version is `<year>.1`; a changed dataset increments
 the minor component, or starts at `<year>.1` when the year changes. Metadata
 changes alone do not bump the version.
 
-### 10. Country-scoped tile publication
+### 10. Geographic region publication
 
 In publishing mode, the current run's envelopes are copied into the cloned
-data repository. Publication is country-scoped, not bbox- or tile-owned:
+data repository. A region owns a spot when its country is configured in the
+region and its point is covered by that Natural Earth country polygon clipped
+to the region's current bbox:
 
-- every incoming spot must have a `country` in the current run's configured
-  country set;
-- the old spots for those countries are removed from every existing tile,
-  including tiles outside the current run's bbox;
-- the current country blocks are inserted into affected tiles;
-- spots belonging to other countries are preserved in the same tiles.
+- every incoming spot must belong to the publishing region;
+- old spots owned by that region are removed from every existing tile, including
+  tiles for which the current run has no replacement;
+- incoming spots are inserted into their tiles;
+- spots outside the region's current extent are preserved, even if they carry
+  the same country code. A reduced bbox can therefore leave orphans, which the
+  prepublication audit reports and blocks until explicitly resolved.
 
-Blocks are ordered deterministically by country. A tile remains in the
+Blocks are ordered deterministically by country, and shared-country blocks use
+stable spot ID order. A tile remains in the
 published repository when its merged spot list is non-empty; a tile emptied by
 the merge is deleted.
 
@@ -261,5 +265,5 @@ The current pipeline code does not make OSM or Overpass requests.
 - `--audit-country-tags` is read-only. `--migrate-country-tags` applies an
   explicitly requested country reclassification; remote migration also
   regenerates clusters before committing. `--prune-orphan-spots` additionally
-  deletes unresolved or unconfigured historical spots and is not implicit in
-  an audit.
+  deletes unresolved, unconfigured, or outside-region historical spots and is
+  not implicit in an audit or ordinary publication.

@@ -7,6 +7,8 @@ from collections.abc import Collection, Mapping
 import subprocess
 from pathlib import Path
 
+from .regions import RegionOwnership, build_region_ownerships
+
 
 logger = logging.getLogger(__name__)
 
@@ -29,10 +31,10 @@ def copy_spots_to_repo(
     local_spots_dir: str | Path | None,
     data_repo_dir: str | Path,
     *,
-    country_codes: Collection[str] | None = None,
+    ownership: RegionOwnership | None = None,
     envelopes: Mapping[str, dict] | None = None,
 ) -> dict[str, int]:
-    """Publish one country's envelopes while preserving neighbouring countries.
+    """Publish one region's envelopes while preserving spots outside its extent.
 
     ``envelopes`` is the preferred input: it is the current run's in-memory
     output and cannot accidentally contain stale files from a previous run.
@@ -44,8 +46,8 @@ def copy_spots_to_repo(
     therefore fails at the Python boundary rather than silently deleting a
     neighbour's spots.
     """
-    if country_codes is None or not country_codes:
-        raise ValueError("country_codes is required for country-scoped publication")
+    if ownership is None:
+        raise ValueError("ownership is required for geographic publication")
     if envelopes is None:
         if local_spots_dir is None:
             raise ValueError("envelopes or local_spots_dir is required")
@@ -55,24 +57,21 @@ def copy_spots_to_repo(
             for path in sorted(src.glob("*.json"))
         }
 
-    codes = {str(code).upper() for code in country_codes}
     _validate_unique_ids(envelopes)
     for tile_id, envelope in envelopes.items():
         for spot in envelope.get("spots", []):
-            country = str(spot.get("country", "")).upper()
-            if country not in codes:
+            if not ownership.owns(spot):
                 raise ValueError(
                     f"envelope {tile_id} contains spot {spot.get('id')!r} "
-                    f"outside published countries {sorted(codes)}"
+                    "outside the published region extent"
                 )
 
     dst = Path(data_repo_dir) / "spots"
     dst.mkdir(parents=True, exist_ok=True)
 
     old_envelopes: dict[str, dict] = {}
-    # A country may have historical spots outside today's raster envelope.
-    # Inspect all existing tiles and remove that country's old block even when
-    # the current run has no replacement tile there.
+    # Inspect every old tile: a region can have stale spots outside today's
+    # raster envelope but inside its currently declared geographic extent.
     for target in dst.glob("*.json"):
         try:
             existing = json.loads(target.read_text(encoding="utf-8"))
@@ -81,18 +80,18 @@ def copy_spots_to_repo(
         old_envelopes[target.stem] = existing
 
     merged_envelopes = merge_publication_envelopes(
-        old_envelopes, dict(envelopes), codes
+        old_envelopes, dict(envelopes), ownership
     )
     names_to_merge = {
         tile_id
         for tile_id, envelope in envelopes.items()
-        if any(str(spot.get("country", "")).upper() in codes
+        if any(ownership.owns(spot)
                for spot in envelope.get("spots", []))
     }
     names_to_merge.update(
         tile_id
         for tile_id, envelope in old_envelopes.items()
-        if any(str(spot.get("country", "")).upper() in codes
+        if any(ownership.owns(spot)
                for spot in envelope.get("spots", []))
     )
     changed = 0
@@ -110,21 +109,22 @@ def copy_spots_to_repo(
         if not target.exists() or target.read_text(encoding="utf-8") != content:
             target.write_text(content, encoding="utf-8")
             changed += 1
-    logger.info("Merged %d country publication tile(s), deleted %d", changed, deleted)
+    logger.info("Merged %d regional publication tile(s), deleted %d", changed, deleted)
     return {"changed": changed, "deleted": deleted}
 
 
 def merge_tile_envelopes(
     old: dict | None,
     new: dict,
-    country_codes: Collection[str],
+    ownership: RegionOwnership,
 ) -> dict:
-    """Return deterministic country-block merge without mutating inputs."""
-    codes = {str(code).upper() for code in country_codes}
+    """Replace only old spots owned by the current regional extent."""
     old_spots = list((old or {}).get("spots", []))
     new_spots = list(new.get("spots", []))
-    preserved = [spot for spot in old_spots if str(spot.get("country", "")).upper() not in codes]
-    incoming = [spot for spot in new_spots if str(spot.get("country", "")).upper() in codes]
+    preserved = [spot for spot in old_spots if not ownership.owns(spot)]
+    incoming = list(new_spots)
+    if any(not ownership.owns(spot) for spot in incoming):
+        raise ValueError("incoming spot outside the published region extent")
     _validate_unique_spots(old_spots, context="old envelope")
     _validate_unique_spots(new_spots, context="new envelope")
     # Country blocks are stable across run order; preserve pipeline order in
@@ -133,8 +133,18 @@ def merge_tile_envelopes(
     for spot in preserved + incoming:
         key = str(spot.get("country", "")).upper()
         blocks.setdefault(key, []).append(spot)
-    ordered = [spot for key in sorted(blocks) for spot in blocks[key]]
-    # An empty current-country envelope is not a publication event for this
+    preserved_codes = {str(spot.get("country", "")).upper() for spot in preserved}
+    incoming_codes = {str(spot.get("country", "")).upper() for spot in incoming}
+    shared_in_tile = preserved_codes & incoming_codes & ownership.shared_codes
+    ordered = [
+        spot
+        for key in sorted(blocks)
+        for spot in (
+            sorted(blocks[key], key=lambda item: str(item.get("id", "")))
+            if key in shared_in_tile else blocks[key]
+        )
+    ]
+    # An empty current-region envelope is not a publication event for this
     # tile.  Do not let its run timestamp/source rewrite a neighbour-only tile.
     metadata_source = new if incoming else {"tile": new.get("tile", (old or {}).get("tile"))}
     envelope = _stable_envelope_metadata(old, metadata_source)
@@ -182,18 +192,17 @@ def _stable_envelope_metadata(old: dict | None, new: dict) -> dict:
 def merge_publication_envelopes(
     old_envelopes: Mapping[str, dict],
     new_envelopes: Mapping[str, dict],
-    country_codes: Collection[str],
+    ownership: RegionOwnership,
 ) -> dict[str, dict]:
     """Purely merge a complete current run into a published dataset.
 
-    Tiles are considered as a set, so a country's previous spots are removed
+    Tiles are considered as a set, so a region's previous spots are removed
     even when its current run has no replacement in that tile.  Empty result
     tiles are omitted, which is the publication instruction to delete them.
     Inputs are never mutated and output ordering is independent of run order.
     """
-    codes = {str(code).upper() for code in country_codes}
-    if not codes:
-        raise ValueError("at least one country code is required")
+    if not ownership.countries:
+        raise ValueError("at least one country geometry is required")
     _validate_unique_ids(old_envelopes)
     _validate_unique_ids(new_envelopes)
     result: dict[str, dict] = {}
@@ -202,9 +211,10 @@ def merge_publication_envelopes(
         new = new_envelopes.get(tile_id)
         if new is None:
             new = {"tile": tile_id, "spots": []}
-        merged = merge_tile_envelopes(old, new, codes)
+        merged = merge_tile_envelopes(old, new, ownership)
         if merged.get("spots"):
             result[tile_id] = merged
+    _validate_unique_ids(result)
     return result
 
 
@@ -232,15 +242,6 @@ def _validate_unique_ids(envelopes: Mapping[str, dict]) -> None:
                     f"duplicate spot id {spot_id!r} in tiles {previous} and {tile_id}"
                 )
             seen[spot_id] = str(tile_id)
-
-
-def _region_country_codes(regions: Mapping[str, dict]) -> set[str]:
-    codes: set[str] = set()
-    for region in regions.values():
-        raw = region.get("osm_country_code", [])
-        values = raw if isinstance(raw, (list, tuple, set)) else [raw]
-        codes.update(str(code).upper() for code in values if code)
-    return codes
 
 
 def _spot_analysis(spot: dict, geography, configured: set[str]) -> dict:
@@ -290,20 +291,22 @@ def _spot_analysis(spot: dict, geography, configured: set[str]) -> dict:
 def plan_country_tag_migration(
     envelopes: Mapping[str, dict],
     geography,
-    configured_codes: Collection[str],
+    regions: Mapping[str, dict],
     *,
     delete_orphans: bool = False,
 ) -> dict:
     """Pure migration/audit planner over in-memory tile envelopes.
 
     The returned envelopes are deep enough not to mutate the input spots.  A
-    spot with exactly one geographic country is reclassified; unconfigured,
-    maritime and ambiguous spots remain untouched unless ``delete_orphans`` is
-    requested.  Ambiguous points are never auto-assigned.
+    spot with exactly one geographic country is reclassified. Unconfigured,
+    maritime and outside-region spots remain untouched unless ``delete_orphans``
+    is requested. Country-ambiguous points are never auto-assigned; points with
+    ambiguous regional ownership block migration before any write.
     """
     import copy
 
-    configured = {str(code).upper() for code in configured_codes}
+    ownerships = build_region_ownerships(dict(regions), geography=geography)
+    configured = {code for ownership in ownerships.values() for code in ownership.countries}
     projected = {tile_id: copy.deepcopy(envelope) for tile_id, envelope in envelopes.items()}
     report = {
         "total_files": len(envelopes),
@@ -315,6 +318,8 @@ def plan_country_tag_migration(
         "mismatched": 0,
         "ambiguous": 0,
         "unassignable": 0,
+        "outside_declared_extents": 0,
+        "ambiguous_ownership": 0,
         # Projection-oriented counters.  These are deliberately distinct
         # from the current tag-state counters above: a missing tag can be
         # reclassifiable, and an untagged spot can resolve to an unconfigured
@@ -339,6 +344,17 @@ def plan_country_tag_migration(
             if kind in {"unconfigured", "mismatched", "ambiguous", "unassignable", "valid"}:
                 report[kind] += 1
             resolved = analysis["resolved"]
+            owner_count = 0
+            if resolved and resolved in configured:
+                resolved_spot = {**spot, "country": resolved}
+                owner_count = sum(
+                    ownership.owns(resolved_spot)
+                    for ownership in ownerships.values()
+                )
+                if owner_count == 0:
+                    report["outside_declared_extents"] += 1
+                elif owner_count > 1:
+                    report["ambiguous_ownership"] += 1
             if resolved and len(analysis["matches"]) == 1:
                 if resolved in configured:
                     if analysis["tag"] != resolved:
@@ -347,7 +363,10 @@ def plan_country_tag_migration(
                         report["correctable_mismatched"] += 1
                 else:
                     report["resolved_unconfigured"] += 1
-            if resolved and len(analysis["matches"]) == 1 and resolved in configured:
+            if (delete_orphans and resolved in configured and owner_count == 0):
+                report["deleted"] += 1
+                changed_files.add(tile_id)
+            elif resolved and len(analysis["matches"]) == 1 and resolved in configured:
                 if spot.get("country") != resolved:
                     updated = copy.deepcopy(spot)
                     updated["country"] = resolved
@@ -444,10 +463,9 @@ def audit_country_spots(
 
     geography = geography or load_geography()
     envelopes = _read_envelopes(spots_dir)
-    configured = _region_country_codes(regions)
-    migration = plan_country_tag_migration(envelopes, geography, configured)
+    migration = plan_country_tag_migration(envelopes, geography, regions)
     pruned = plan_country_tag_migration(
-        envelopes, geography, configured, delete_orphans=True
+        envelopes, geography, regions, delete_orphans=True
     )
     report = migration["report"]
     # Keep the legacy keys as counts so callers can gate publication without
@@ -456,7 +474,7 @@ def audit_country_spots(
     result = {key: report.get(key, 0) for key in (
         "missing", "invalid", "unconfigured", "mismatched", "ambiguous", "valid",
         "unassignable", "reclassifiable_to_configured", "resolved_unconfigured",
-        "correctable_mismatched",
+        "correctable_mismatched", "outside_declared_extents", "ambiguous_ownership",
     )}
     result["summary"] = report
     result["projection"] = {
@@ -472,7 +490,7 @@ def migrate_country_tags(
     geography=None,
     data_dir=None,
     delete_orphans: bool = False,
-    configured_codes: Collection[str] | None = None,
+    regions: Mapping[str, dict],
 ) -> dict:
     """Apply an already fully planned country migration atomically by plan.
 
@@ -485,9 +503,11 @@ def migrate_country_tags(
     directory = Path(spots_dir)
     envelopes = _read_envelopes(directory)
     planned = plan_country_tag_migration(
-        envelopes, geography, configured_codes or (), delete_orphans=delete_orphans
+        envelopes, geography, regions, delete_orphans=delete_orphans
     )
     result = planned["report"]
+    if result["ambiguous_ownership"]:
+        raise ValueError("Historical spots have ambiguous regional ownership")
     for tile_id, envelope in planned["envelopes"].items():
         if tile_id not in envelopes or envelope != envelopes[tile_id]:
             (directory / f"{tile_id}.json").write_text(

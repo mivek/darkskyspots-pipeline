@@ -62,9 +62,9 @@ commune avant toute régénération ou publication.
 | `--no-push` | No | `false` | Skip step 7 (publish). Output stays in `/output/spots/`. |
 | `--no-clusters` | No | `false` | Skip local cluster generation. Rejected for published runs; use only with `--no-push`. |
 | `--regenerate-clusters` | No | `false` | Published mode: clone/audit the complete repository, write clusters/, then commit/push; requires --year and --data-repo-url. With --no-push: read output/spots/, write clusters-local/, and perform no clone, audit, commit, or push; requires only --year. |
-| `--audit-country-tags` | No | `false` | Strictly read-only audit of missing, invalid, unconfigured, mismatched, ambiguous, and unassignable spots, with a projected migration summary. `--list-orphans` is a deprecated alias. |
+| `--audit-country-tags` | No | `false` | Strictly read-only audit of country tags and geographic region ownership, with a projected migration and prune summary. `--list-orphans` is a deprecated alias. |
 | `--migrate-country-tags` | No | `false` | Explicitly reclassify historical spots with Natural Earth geometry. Does not delete unresolved spots. |
-| `--prune-orphan-spots` | No | `false` | Explicitly delete unresolved or unconfigured historical spots; use with `--migrate-country-tags`. |
+| `--prune-orphan-spots` | No | `false` | Explicitly delete unresolved, unconfigured, or outside-region historical spots; use with `--migrate-country-tags`. |
 | `--input-dir` | No | `./input` | Directory containing per-region subdirectories with GeoTIFFs. |
 | `--output-dir` | No | `./output` | Directory for output JSON files (subdir `spots/` is created). |
 | `--budget-mb` | No | `500.0` | RAM budget for loading the input GeoTIFF (MB). If exceeded, the input is processed in slices. |
@@ -87,7 +87,8 @@ The three input flags are mode-dependent, not globally required:
 separate explicit flags above.
 
 The audit reports current tag-state counters (`missing`, `invalid`,
-`unconfigured`, `mismatched`, `ambiguous`, and `unassignable`) plus projected
+`unconfigured`, `mismatched`, `ambiguous`, and `unassignable`) and ownership
+counters (`outside_declared_extents`, `ambiguous_ownership`) plus projected
 actions. `reclassifiable_to_configured` counts spots that can receive a unique
 configured country, `resolved_unconfigured` counts spots resolving uniquely to
 a country with no configured producer, and `correctable_mismatched` counts
@@ -99,7 +100,7 @@ rewritten/deleted files and final spot counts.
 
 The data repository is the source of truth for published generation. The order
 is: clone; audit country tags immediately after clone; process the raster;
-merge the current region's country blocks into every affected tile; generate
+replace the spots owned by the current region's geographic extent; generate
 clusters from the complete clone; commit and push once. An audit failure stops
 publication until an explicit migration has been reviewed.
 
@@ -130,11 +131,14 @@ after land/country clipping and before redundancy. The same filtered list is
 used for coverage, naming, and tile export. There is no coastal buffer; islands
 inside the configured countries are retained.
 
-Changing a published country configuration is a spot-level migration. Run the
+Changing a published region bbox or country configuration is a spot-level
+migration. Run the
 read-only country audit first, then review `--migrate-country-tags` and (only if
-needed) `--prune-orphan-spots` in a disposable clone. A spot's stable `country`
-field, rather than `source_region`, controls replacement and makes publication
-independent of run order.
+needed) `--prune-orphan-spots` in a disposable clone. Ownership is recomputed
+from each spot's country and coordinates against the current Natural Earth
+country polygons clipped by region bboxes. A reduced bbox leaves old spots
+outside it untouched by publication; the audit blocks until they are assigned
+to another region or explicitly pruned.
 
 Spot schema compatibility is strict for cluster generation: every spot must contain `id`, `lat`, `lon`, `darkness`, `bortle`, `near`, `name`, `nameDistanceKm`, and `altitude`. A missing field is reported with its tile and spot index and aborts generation; it must not be silently ignored. Removing a field from the spot schema is therefore a data migration that must be handled before regenerating clusters. Extra source fields, including `country` and the GeoNames provenance fields, are ignored in the embedded cluster representative, whose contract is the nine fields above.
 

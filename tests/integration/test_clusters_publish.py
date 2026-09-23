@@ -10,6 +10,15 @@ from rasterio.transform import from_bounds
 from src.clusters import write_cluster_files
 
 
+class _CodeOwnership:
+    def __init__(self, codes):
+        self.countries = {code: None for code in codes}
+        self.shared_codes = frozenset()
+
+    def owns(self, spot):
+        return spot.get("country") in self.countries
+
+
 def _spot(spot_id, lat, lon):
     return {
         "id": spot_id, "country": "FR", "lat": lat, "lon": lon,
@@ -96,8 +105,8 @@ def test_a_then_b_scoped_publication_preserves_a_tiles(tmp_path):
     _write_envelope(staging_a, "N048E002", [spot_a])
     _write_envelope(staging_b, "N048E002", [spot_b])
 
-    copy_spots_to_repo(staging_a, clone, country_codes=["FR"])
-    copy_spots_to_repo(staging_b, clone, country_codes=["AD"])
+    copy_spots_to_repo(staging_a, clone, ownership=_CodeOwnership(["FR"]))
+    copy_spots_to_repo(staging_b, clone, ownership=_CodeOwnership(["AD"]))
 
     a_envelope = json.loads((clone / "spots" / "N048E002.json").read_text())
     assert {spot["id"] for spot in a_envelope["spots"]} == {"a", "b"}
@@ -118,13 +127,13 @@ def test_gb_ie_publication_regenerates_global_clusters_from_all_tiles(tmp_path):
     copy_spots_to_repo(
         None,
         repo,
-        country_codes=["FR"],
+        ownership=_CodeOwnership(["FR"]),
         envelopes={"N050W001": {"tile": "N050W001", "spots": [fr]}},
     )
     copy_spots_to_repo(
         None,
         repo,
-        country_codes=["GB", "IE"],
+        ownership=_CodeOwnership(["GB", "IE"]),
         envelopes={
             "N050W001": {"tile": "N050W001", "spots": [gb]},
             "N053W006": {"tile": "N053W006", "spots": [ie]},
