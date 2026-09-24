@@ -26,7 +26,7 @@ def create_parser() -> argparse.ArgumentParser:
     modes.add_argument(
         "--audit-country-tags",
         action="store_true",
-        help="Read-only audit of spot country tags",
+        help="Read-only audit of spot country tags and regional ownership",
     )
     modes.add_argument(
         "--migrate-country-tags",
@@ -36,7 +36,7 @@ def create_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--prune-orphan-spots",
         action="store_true",
-        help="Explicitly delete unresolved/unconfigured historical spots",
+        help="Explicitly delete unresolved, unconfigured, or outside-region historical spots",
     )
     # Keep the old spelling parseable solely to provide a safe migration error;
     # it is never accepted as an operational alias.

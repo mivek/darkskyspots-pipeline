@@ -1,14 +1,57 @@
 """regions.yaml loader and region resolver."""
 import math
 import re
+from dataclasses import dataclass
 
 import yaml
-from shapely.geometry import box
+from shapely.geometry import Point, box
 from shapely.ops import unary_union
 
 from .geography import load_geography, validate_country_codes
 
 REQUIRED_FIELDS = {"bbox", "equal_area_epsg", "admin_level", "osm_country_code"}
+
+
+@dataclass(frozen=True)
+class RegionOwnership:
+    """Current publishable geometry for one region, indexed by country code."""
+
+    countries: dict[str, object]
+    shared_codes: frozenset[str] = frozenset()
+
+    def owns(self, spot: dict) -> bool:
+        country = str(spot.get("country", "")).upper()
+        geometry = self.countries.get(country)
+        if geometry is None:
+            return False
+        try:
+            point = Point(float(spot["lon"]), float(spot["lat"]))
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ValueError(f"Spot {spot.get('id')!r} has invalid coordinates") from exc
+        return geometry.covers(point)
+
+
+def build_region_ownership(region: dict, *, geography=None, shared_codes=()) -> RegionOwnership:
+    """Clip each configured country's Natural Earth geometry to the current bbox."""
+    geo = geography or load_geography()
+    bbox = box(*region["bbox"])
+    return RegionOwnership(
+        {code: geo.countries[code].intersection(bbox) for code in region["osm_country_code"]},
+        frozenset(shared_codes),
+    )
+
+
+def build_region_ownerships(regions: dict[str, dict], *, geography=None) -> dict[str, RegionOwnership]:
+    geo = geography or load_geography()
+    counts: dict[str, int] = {}
+    for region in regions.values():
+        for code in region["osm_country_code"]:
+            counts[code] = counts.get(code, 0) + 1
+    shared = {code for code, count in counts.items() if count > 1}
+    return {
+        name: build_region_ownership(region, geography=geo, shared_codes=shared)
+        for name, region in regions.items()
+    }
 
 
 def load_regions(
@@ -34,7 +77,6 @@ def load_regions(
         data = yaml.safe_load(f)
     if not isinstance(data, dict):
         raise ValueError(f"regions.yaml must be a dict, got {type(data).__name__}")
-    country_owners: dict[str, str] = {}
     for name, region in data.items():
         _validate_region(name, region, allow_legacy_geometry=allow_legacy_geometry)
         # Accept the former scalar spelling while exposing one canonical list
@@ -50,14 +92,6 @@ def load_regions(
             raise ValueError(f"Region {name!r}: osm_country_code entries must be ISO alpha-2 codes")
         if len(set(normalised)) != len(normalised):
             raise ValueError(f"Region {name!r}: osm_country_code contains duplicates")
-        for code in normalised:
-            previous = country_owners.get(code)
-            if previous is not None:
-                raise ValueError(
-                    f"Country code {code} is configured in both regions "
-                    f"{previous!r} and {name!r}"
-                )
-            country_owners[code] = name
         region["osm_country_code"] = normalised
     if validate_partition:
         validate_publishable_partition(data, geography=geography)

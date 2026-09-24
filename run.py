@@ -44,7 +44,7 @@ from src.publish import (
     migrate_country_tags,
 )
 from src.clusters import write_cluster_files
-from src.regions import get_region, load_regions
+from src.regions import build_region_ownerships, get_region, load_regions
 from src.geography import classify_candidates, validate_country_codes
 from src.tile_export import (
     classify_spots_into_tiles,
@@ -63,6 +63,8 @@ AUDIT_PROBLEM_KEYS = (
     "mismatched",
     "ambiguous",
     "unassignable",
+    "outside_declared_extents",
+    "ambiguous_ownership",
 )
 
 
@@ -160,6 +162,7 @@ def run(args) -> int:
         logger.info("Region: %s (%s)", region["name"], args.region)
 
         country_codes = _region_country_codes(region)
+        ownership = build_region_ownerships(load_regions())[args.region]
         # This is intentionally before input/raster handling.  A stale or
         # incomplete filtered extract must never yield a partial run.
         _validate_geonames_inputs(country_codes)
@@ -324,7 +327,7 @@ def run(args) -> int:
 
             comparison_envelopes = {
                 tile_id_str: merge_tile_envelopes(
-                    old_envelopes.get(tile_id_str), env, country_codes
+                    old_envelopes.get(tile_id_str), env, ownership
                 )
                 for tile_id_str, env in new_envelopes.items()
             }
@@ -333,7 +336,7 @@ def run(args) -> int:
                     stale = merge_tile_envelopes(
                         envelope,
                         {"tile": tile_id_str, "spots": []},
-                        country_codes,
+                        ownership,
                     )
                     if stale.get("spots"):
                         comparison_envelopes[tile_id_str] = stale
@@ -361,7 +364,7 @@ def run(args) -> int:
                 copy_spots_to_repo(
                     None,
                     data_repo_dir,
-                    country_codes=country_codes,
+                    ownership=ownership,
                     envelopes=new_envelopes,
                 )
                 if not getattr(args, "no_clusters", False):
@@ -428,13 +431,14 @@ def _ensure_clone_is_not_output(data_repo_dir: Path, output_dir: Path) -> None:
 
 
 def _audit_before_write(spots_dir: Path, regions: dict[str, dict]) -> bool:
-    """Gate publication on country-level anomalies, without mutating files."""
+    """Gate publication on country and regional anomalies without writing."""
     audit = audit_country_spots(spots_dir, regions)
     if _audit_has_problems(audit):
         logger.error(
             "Country audit failed: missing=%s invalid=%s unconfigured=%s mismatched=%s "
-            "ambiguous=%s unassignable=%s; "
-            "run --migrate-country-tags then --prune-orphan-spots explicitly",
+            "ambiguous=%s unassignable=%s outside_declared_extents=%s "
+            "ambiguous_ownership=%s; "
+            "review --audit-country-tags; migrate tags or explicitly prune eligible orphans",
             *(_audit_count(audit, key) for key in AUDIT_PROBLEM_KEYS),
         )
         return False
@@ -526,11 +530,6 @@ def run_country_migration(args) -> int:
     """
     try:
         regions = load_regions()
-        configured = {
-            code
-            for region in regions.values()
-            for code in (region["osm_country_code"] if isinstance(region["osm_country_code"], (list, tuple)) else [region["osm_country_code"]])
-        }
         if args.no_push:
             spots_dir = Path(args.output_dir) / "spots"
             if not spots_dir.is_dir():
@@ -538,7 +537,7 @@ def run_country_migration(args) -> int:
                 return 1
             report = migrate_country_tags(
                 spots_dir,
-                configured_codes=configured,
+                regions=regions,
                 delete_orphans=getattr(args, "prune_orphan_spots", False),
             )
         else:
@@ -547,12 +546,12 @@ def run_country_migration(args) -> int:
                 clone_data_repo(args.data_repo_url, args.data_repo_branch, str(clone_dir))
                 report = migrate_country_tags(
                     clone_dir / "spots",
-                    configured_codes=configured,
+                    regions=regions,
                     delete_orphans=getattr(args, "prune_orphan_spots", False),
                 )
                 audit = audit_country_spots(clone_dir / "spots", regions)
-                if not getattr(args, "prune_orphan_spots", False) and _audit_has_problems(audit):
-                    logger.error("Migration left unresolved spots; use --prune-orphan-spots explicitly")
+                if _audit_has_problems(audit):
+                    logger.error("Migration left unresolved spots; review the audit and use --prune-orphan-spots where applicable")
                     return 1
                 write_cluster_files(
                     clone_dir / "spots",

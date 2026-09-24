@@ -8,6 +8,45 @@ import sys
 from unittest.mock import MagicMock, patch
 
 import pytest
+from shapely.geometry import box
+
+
+class _CodeOwnership:
+    """Test double for legacy country-block examples without coordinates."""
+
+    def __init__(self, codes):
+        self.countries = {code: None for code in codes}
+        self.shared_codes = frozenset()
+
+    def owns(self, spot):
+        return spot.get("country") in self.countries
+
+
+def _ownership(codes):
+    return _CodeOwnership(codes)
+
+
+def _regions(codes):
+    return {"test": {"bbox": [-180, -90, 180, 90], "osm_country_code": codes}}
+
+
+class _GeometryGeography:
+    def __init__(self, countries):
+        self.countries = countries
+
+    def country_candidates(self, point):
+        return sorted(code for code, geometry in self.countries.items() if geometry.covers(point))
+
+
+def _es_regions():
+    return {
+        "canaries": {"bbox": [-19, 27, -13, 30], "osm_country_code": ["ES"]},
+        "mainland": {"bbox": [-10, 35, 5, 45], "osm_country_code": ["ES"]},
+    }
+
+
+def _es_spot(spot_id, lat, lon):
+    return {"id": spot_id, "country": "ES", "lat": lat, "lon": lon}
 
 
 def test_bump_version_changed():
@@ -98,7 +137,7 @@ def test_copy_spots_to_repo_merges_country_and_preserves_neighbor(tmp_path):
     incoming = {"N001E001": {"tile": "N001E001", "version": "2", "spots": [
         {"id": "fr-new", "country": "FR"},
     ]}}
-    copy_spots_to_repo(None, dst, country_codes=["FR"], envelopes=incoming)
+    copy_spots_to_repo(None, dst, ownership=_ownership(["FR"]), envelopes=incoming)
     result = json.loads((dst / "spots" / "N001E001.json").read_text())
     assert [spot["id"] for spot in result["spots"]] == ["ES".lower(), "fr-new"]
 
@@ -124,7 +163,7 @@ def test_multi_country_publication_replaces_only_gb_ie_and_preserves_fr(tmp_path
     copy_spots_to_repo(
         None,
         repo,
-        country_codes=["GB", "IE"],
+        ownership=_ownership(["GB", "IE"]),
         envelopes={
             "N050W001": {
                 "tile": "N050W001",
@@ -165,9 +204,9 @@ def test_empty_gb_ie_envelope_is_deterministic_and_keeps_neighbor(tmp_path):
             "spots": [],
         }
     }
-    expected = merge_publication_envelopes(old, empty_run, ["GB", "IE"])
+    expected = merge_publication_envelopes(old, empty_run, _ownership(["GB", "IE"]))
     assert expected == old
-    assert merge_publication_envelopes(old, empty_run, ["IE", "GB"]) == expected
+    assert merge_publication_envelopes(old, empty_run, _ownership(["IE", "GB"])) == expected
 
     repo = tmp_path / "repo"
     spots_dir = repo / "spots"
@@ -175,9 +214,9 @@ def test_empty_gb_ie_envelope_is_deterministic_and_keeps_neighbor(tmp_path):
     path = spots_dir / "N050W001.json"
     original = json.dumps(old["N050W001"], ensure_ascii=False) + "\n"
     path.write_text(original, encoding="utf-8")
-    copy_spots_to_repo(None, repo, country_codes=["GB", "IE"], envelopes=empty_run)
+    copy_spots_to_repo(None, repo, ownership=_ownership(["GB", "IE"]), envelopes=empty_run)
     assert path.read_text(encoding="utf-8") == original
-    copy_spots_to_repo(None, repo, country_codes=["IE", "GB"], envelopes=empty_run)
+    copy_spots_to_repo(None, repo, ownership=_ownership(["IE", "GB"]), envelopes=empty_run)
     assert path.read_text(encoding="utf-8") == original
 
 
@@ -193,23 +232,23 @@ def test_merge_publication_is_commutative_and_detects_duplicate_ids():
     a = {"T": {"version": "1", "spots": [{"id": "a", "country": "FR"}]}}
     b = {"T": {"version": "1", "spots": [{"id": "b", "country": "AD"}]}}
     ab = merge_publication_envelopes(
-        merge_publication_envelopes({}, a, ["FR"]), b, ["AD"]
+        merge_publication_envelopes({}, a, _ownership(["FR"])), b, _ownership(["AD"])
     )
     ba = merge_publication_envelopes(
-        merge_publication_envelopes({}, b, ["AD"]), a, ["FR"]
+        merge_publication_envelopes({}, b, _ownership(["AD"])), a, _ownership(["FR"])
     )
     assert ab == ba
     duplicate = {"T": {"spots": [{"id": "a", "country": "FR"}, {"id": "a", "country": "FR"}]}}
     with pytest.raises(ValueError, match="duplicate spot id"):
-        merge_publication_envelopes({}, duplicate, ["FR"])
+        merge_publication_envelopes({}, duplicate, _ownership(["FR"]))
 
 
 def test_merge_publication_stabilizes_metadata_across_run_order():
     from src.publish import merge_publication_envelopes
     a = {"T": {"version": "2026.2", "source": "z", "generated": "2026-02-02", "tile": "T", "spots": [{"id": "a", "country": "FR"}]}}
     b = {"T": {"version": "2026.1", "source": "a", "generated": "2026-01-01", "tile": "T", "spots": [{"id": "b", "country": "AD"}]}}
-    ab = merge_publication_envelopes(merge_publication_envelopes({}, a, ["FR"]), b, ["AD"])
-    ba = merge_publication_envelopes(merge_publication_envelopes({}, b, ["AD"]), a, ["FR"])
+    ab = merge_publication_envelopes(merge_publication_envelopes({}, a, _ownership(["FR"])), b, _ownership(["AD"]))
+    ba = merge_publication_envelopes(merge_publication_envelopes({}, b, _ownership(["AD"])), a, _ownership(["FR"]))
     assert ab == ba
     assert ab["T"]["version"] == "2026.2"
     assert ab["T"]["source"] == "a"
@@ -231,9 +270,123 @@ def test_real_natural_earth_andorra_and_france_share_merged_tile():
         {"id": "ad", "country": "AD", "lat": 42.55, "lon": 1.55},
     ]}}
     merged = merge_publication_envelopes(
-        merge_publication_envelopes({}, france, ["FR"]), andorra, ["AD"]
+        merge_publication_envelopes({}, france, _ownership(["FR"])), andorra, _ownership(["AD"])
     )
     assert {spot["country"] for spot in merged["N042E001"]["spots"]} == {"AD", "FR"}
+
+
+@pytest.mark.parametrize("first", ["canaries", "mainland"])
+def test_two_es_regions_publish_without_erasing_each_other(tmp_path, first):
+    from shapely.ops import unary_union
+    from src.publish import copy_spots_to_repo
+    from src.regions import build_region_ownerships
+
+    geo = _GeometryGeography({"ES": unary_union([
+        box(-18, 27, -13, 30), box(-10, 35, 5, 45),
+    ])})
+    ownerships = build_region_ownerships(_es_regions(), geography=geo)
+    runs = {
+        "canaries": {"N028W018": {"tile": "N028W018", "spots": [
+            _es_spot("canary", 28.5, -17.5),
+        ]}},
+        "mainland": {"N040W004": {"tile": "N040W004", "spots": [
+            _es_spot("mainland", 40.5, -3.5),
+        ]}},
+    }
+    with pytest.raises(ValueError, match="outside the published region extent"):
+        copy_spots_to_repo(None, tmp_path, ownership=ownerships["mainland"], envelopes=runs["canaries"])
+    assert not (tmp_path / "spots").exists()
+    order = [first, "mainland" if first == "canaries" else "canaries"]
+    for name in order:
+        copy_spots_to_repo(None, tmp_path, ownership=ownerships[name], envelopes=runs[name])
+    assert {path.stem for path in (tmp_path / "spots").glob("*.json")} == {
+        "N028W018", "N040W004",
+    }
+    copy_spots_to_repo(None, tmp_path, ownership=ownerships["mainland"], envelopes={
+        "N040W004": {"tile": "N040W004", "spots": [_es_spot("mainland-new", 40.6, -3.6)]},
+    })
+    assert [s["id"] for s in json.loads((tmp_path / "spots" / "N028W018.json").read_text())["spots"]] == ["canary"]
+    assert [s["id"] for s in json.loads((tmp_path / "spots" / "N040W004.json").read_text())["spots"]] == ["mainland-new"]
+    copy_spots_to_repo(None, tmp_path, ownership=ownerships["mainland"], envelopes={})
+    assert (tmp_path / "spots" / "N028W018.json").exists()
+    assert not (tmp_path / "spots" / "N040W004.json").exists()
+
+
+def test_same_country_spots_in_shared_tile_have_stable_order():
+    from src.publish import merge_publication_envelopes
+    from src.regions import RegionOwnership
+
+    west = RegionOwnership({"ES": box(0, 0, 0.5, 1)}, frozenset({"ES"}))
+    east = RegionOwnership({"ES": box(0.5, 0, 1, 1)}, frozenset({"ES"}))
+    a = {"T": {"tile": "T", "spots": [
+        _es_spot("z-west", 0.5, 0.25), _es_spot("b-west", 0.6, 0.25),
+    ]}}
+    b = {"T": {"tile": "T", "spots": [_es_spot("a-east", 0.5, 0.75)]}}
+    a_only = merge_publication_envelopes({}, a, west)
+    assert [s["id"] for s in a_only["T"]["spots"]] == ["z-west", "b-west"]
+    ab = merge_publication_envelopes(a_only, b, east)
+    ba = merge_publication_envelopes(merge_publication_envelopes({}, b, east), a, west)
+    assert ab == ba
+    assert [s["id"] for s in ab["T"]["spots"]] == ["a-east", "b-west", "z-west"]
+
+
+def test_shrunken_bbox_preserves_old_spot_but_audit_projects_explicit_prune(tmp_path):
+    from src.publish import audit_country_spots, merge_publication_envelopes, migrate_country_tags
+    from src.regions import build_region_ownership
+
+    geo = _GeometryGeography({"ES": box(0, 0, 3, 1)})
+    regions = {"mainland": {"bbox": [0, 0, 1, 1], "osm_country_code": ["ES"]}}
+    ownership = build_region_ownership(regions["mainland"], geography=geo)
+    old = {
+        "T0": {"tile": "T0", "spots": [_es_spot("inside-old", 0.5, 0.5)]},
+        "T2": {"tile": "T2", "spots": [_es_spot("outside-old", 0.5, 2.5)]},
+    }
+    new = {"T0": {"tile": "T0", "spots": [_es_spot("inside-new", 0.6, 0.6)]}}
+    merged = merge_publication_envelopes(old, new, ownership)
+    assert [s["id"] for s in merged["T0"]["spots"]] == ["inside-new"]
+    assert merged["T2"] == old["T2"]
+
+    spots_dir = tmp_path / "spots"
+    spots_dir.mkdir()
+    for tile_id, envelope in old.items():
+        (spots_dir / f"{tile_id}.json").write_text(json.dumps(envelope))
+    before = {p.name: p.read_bytes() for p in spots_dir.glob("*.json")}
+    audit = audit_country_spots(spots_dir, regions, geography=geo)
+    assert audit["outside_declared_extents"] == 1
+    assert audit["projection"]["migration_only"]["deleted"] == 0
+    assert audit["projection"]["migration_and_prune"]["deleted"] == 1
+    assert audit["projection"]["migration_and_prune"]["deleted_files"] == 1
+    assert {p.name: p.read_bytes() for p in spots_dir.glob("*.json")} == before
+    from run import _audit_before_write
+    with patch("run.audit_country_spots", side_effect=lambda path, configured: audit_country_spots(
+        path, configured, geography=geo,
+    )):
+        assert _audit_before_write(spots_dir, regions) is False
+    assert {p.name: p.read_bytes() for p in spots_dir.glob("*.json")} == before
+
+    migrate_country_tags(spots_dir, geography=geo, regions=regions)
+    assert {p.name: p.read_bytes() for p in spots_dir.glob("*.json")} == before
+    migrate_country_tags(spots_dir, geography=geo, regions=regions, delete_orphans=True)
+    assert (spots_dir / "T0.json").exists()
+    assert not (spots_dir / "T2.json").exists()
+
+
+def test_shared_boundary_spot_reports_ambiguous_ownership(tmp_path):
+    from src.publish import audit_country_spots, migrate_country_tags
+
+    geo = _GeometryGeography({"ES": box(0, 0, 2, 1)})
+    regions = {
+        "west": {"bbox": [0, 0, 1, 1], "osm_country_code": ["ES"]},
+        "east": {"bbox": [1, 0, 2, 1], "osm_country_code": ["ES"]},
+    }
+    spots_dir = tmp_path / "spots"
+    spots_dir.mkdir()
+    _write_envelope(spots_dir / "T.json", "T", [_es_spot("boundary", 0.5, 1)])
+    original = (spots_dir / "T.json").read_bytes()
+    assert audit_country_spots(spots_dir, regions, geography=geo)["ambiguous_ownership"] == 1
+    with pytest.raises(ValueError, match="ambiguous regional ownership"):
+        migrate_country_tags(spots_dir, geography=geo, regions=regions, delete_orphans=True)
+    assert (spots_dir / "T.json").read_bytes() == original
 
 
 class _FakeGeography:
@@ -241,6 +394,7 @@ class _FakeGeography:
 
     def __init__(self, matches):
         self.matches = matches
+        self.countries = {code: box(-180, -90, 180, 90) for code in self.country_codes}
 
     def country_candidates(self, point):
         return self.matches.get((round(point.y, 3), round(point.x, 3)), [])
@@ -263,7 +417,7 @@ def test_migration_reclassifies_corrects_preserves_and_prunes(tmp_path):
         (1, 1): ["FR"], (2, 2): ["FR"], (3, 3): ["AD"],
         (4, 4): [], (5, 5): ["FR", "ES"],
     })
-    report = migrate_country_tags(spots, geography=geo, configured_codes=["FR"])
+    report = migrate_country_tags(spots, geography=geo, regions=_regions(["FR"]))
     assert report["reclassified"] == 2
     after = json.loads((spots / "T.json").read_text())["spots"]
     assert {s["id"] for s in after} == {"missing", "wrong", "unconfigured", "sea", "ambiguous"}
@@ -271,7 +425,7 @@ def test_migration_reclassifies_corrects_preserves_and_prunes(tmp_path):
     assert {s["id"]: s.get("country") for s in after}["wrong"] == "FR"
 
     report = migrate_country_tags(
-        spots, geography=geo, configured_codes=["FR"], delete_orphans=True
+        spots, geography=geo, regions=_regions(["FR"]), delete_orphans=True
     )
     assert report["deleted"] == 3
     after = json.loads((spots / "T.json").read_text())["spots"]
@@ -288,7 +442,7 @@ def test_migration_prunes_configured_tag_resolved_to_unconfigured_country(tmp_pa
     report = migrate_country_tags(
         spots,
         geography=_FakeGeography({(3, 3): ["AD"]}),
-        configured_codes=["FR"],
+        regions=_regions(["FR"]),
         delete_orphans=True,
     )
     assert report["deleted"] == 1
@@ -304,7 +458,7 @@ def test_audit_returns_projection_without_mutating_files(tmp_path):
     before = path.read_bytes()
     before_mtime = path.stat().st_mtime_ns
     result = audit_country_spots(
-        spots, {"france": {"osm_country_code": ["FR"]}},
+        spots, _regions(["FR"]),
         geography=_FakeGeography({(1, 1): ["FR"]}),
     )
     assert result["mismatched"] == 1
@@ -379,7 +533,7 @@ def test_audit_distinguishes_missing_invalid_ambiguous_and_unassignable(tmp_path
         {"id": "sea", "country": "FR", "lat": 3, "lon": 3},
     ])
     result = audit_country_spots(
-        spots, {"france": {"osm_country_code": ["FR"]}},
+        spots, _regions(["FR"]),
         geography=_FakeGeography({(1, 1): ["FR"], (2, 2): ["FR", "ES"], (3, 3): []}),
     )
     assert result["missing"] == 1
@@ -398,7 +552,7 @@ def test_audit_reports_untagged_spot_resolved_to_unconfigured_country(tmp_path):
     spots.mkdir()
     _write_envelope(spots / "A.json", "A", [{"id": "ad", "lat": 1, "lon": 1}])
     result = audit_country_spots(
-        spots, {"france": {"osm_country_code": ["FR"]}},
+        spots, _regions(["FR"]),
         geography=_FakeGeography({(1, 1): ["AD"]}),
     )
     assert result["missing"] == 1
@@ -439,7 +593,7 @@ def test_audit_success_preserves_content_sha_mtime_and_git_status(tmp_path):
     _init_test_git_repo(repo)
     before = _git_snapshot(repo)
     audit_country_spots(
-        spots, {"france": {"osm_country_code": ["FR"]}},
+        spots, _regions(["FR"]),
         geography=_FakeGeography({(1, 1): ["FR"]}),
     )
     assert _git_snapshot(repo) == before
@@ -456,7 +610,7 @@ def test_audit_error_mid_scan_preserves_content_sha_mtime_and_git_status(tmp_pat
     before = _git_snapshot(repo)
     with pytest.raises(json.JSONDecodeError):
         audit_country_spots(
-            spots, {"france": {"osm_country_code": ["FR"]}},
+            spots, _regions(["FR"]),
             geography=_FakeGeography({(1, 1): ["FR"]}),
         )
     assert _git_snapshot(repo) == before
@@ -479,7 +633,7 @@ def test_migration_error_after_first_file_is_non_mutating(tmp_path):
     with pytest.raises(RuntimeError, match="mid-migration failure"):
         migrate_country_tags(
             spots, geography=ExplodingGeography({(1, 1): ["FR"]}),
-            configured_codes=["FR"],
+            regions=_regions(["FR"]),
         )
     assert {path: path.read_bytes() for path in spots.glob("*.json")} == before
 
@@ -493,7 +647,7 @@ def test_copy_uses_memory_and_ignores_stale_staging_file(tmp_path):
     (repo / "spots").mkdir(parents=True)
     _write_envelope(repo / "spots" / "T.json", "T", [{"id": "old", "country": "FR"}])
     current = {"T": {"tile": "T", "version": "2", "spots": [{"id": "fresh", "country": "FR"}]}}
-    copy_spots_to_repo(staging, repo, country_codes=["FR"], envelopes=current)
+    copy_spots_to_repo(staging, repo, ownership=_ownership(["FR"]), envelopes=current)
     ids = [s["id"] for s in json.loads((repo / "spots" / "T.json").read_text())["spots"]]
     assert ids == ["fresh"]
 
@@ -506,7 +660,7 @@ def test_empty_current_envelope_does_not_rewrite_neighbor_tile(tmp_path):
     original = b'{"version":"1","generated":"old","tile":"T","spots":[{"id":"es","country":"ES"}]}\n'
     path.write_bytes(original)
     copy_spots_to_repo(
-        None, repo, country_codes=["FR"],
+        None, repo, ownership=_ownership(["FR"]),
         envelopes={"T": {"version": "2", "generated": "new", "tile": "T", "spots": []}},
     )
     assert path.read_bytes() == original
