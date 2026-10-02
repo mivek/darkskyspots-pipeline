@@ -10,3 +10,9 @@ uk_ireland:
   admin_level: 8
   osm_country_code: ["GB", "IE"]
   name: "Angleterre, Pays de Galles et Irlande (≤55°N)"
+canaries:
+  bbox: [-19, 27, -13, 30]
+  equal_area_epsg: 6933
+  admin_level: 8
+  osm_country_code: ["ES"]
+  name: "Îles Canaries"
