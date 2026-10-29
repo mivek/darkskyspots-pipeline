@@ -7,7 +7,7 @@ format) belongs to the app.
 """
 
 
-def enrich_spot(spot: dict) -> dict:
+def enrich_spot(spot: dict, elevation_sampler=None) -> dict:
     """Enrich a single spot without discarding the naming contract.
 
     ``near`` may be empty for isolated, but valid, land spots.  ``name`` and
@@ -18,13 +18,14 @@ def enrich_spot(spot: dict) -> dict:
     enriched = dict(spot)
     enriched["id"] = spot_id(enriched["lat"], enriched["lon"])
     enriched["near"] = spot.get("near")
-    enriched["altitude"] = None
+    enriched["altitude"] = (elevation_sampler.sample(enriched["lat"], enriched["lon"])
+                            if elevation_sampler is not None else None)
     enriched.pop("row", None)
     enriched.pop("col", None)
     return enriched
 
 
-def enrich_all(spots: list[dict], naming_index=None) -> list[dict]:
+def enrich_all(spots: list[dict], naming_index=None, elevation_sampler=None) -> list[dict]:
     """Enrich a batch, optionally attaching GeoNames names first.
 
     The optional index keeps this helper convenient for callers that already
@@ -33,7 +34,7 @@ def enrich_all(spots: list[dict], naming_index=None) -> list[dict]:
     neither path mutates the caller's list.
     """
     named = naming_index.enrich_spots(spots) if naming_index is not None else spots
-    return [enrich_spot(s) for s in named]
+    return [enrich_spot(s, elevation_sampler) for s in named]
 
 
 def spot_id(lat: float, lon: float) -> str:

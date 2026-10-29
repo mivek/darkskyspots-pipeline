@@ -1,6 +1,6 @@
 # darkskyspots-pipeline
 
-Local Python batch pipeline that transforms VIIRS radiance GeoTIFFs into per-tile JSON spot files for the ["ciel nocturne"](../app-dark-sky) mobile app.
+Local Python batch pipeline that transforms VIIRS radiance GeoTIFFs into per-tile JSON spot files for the [Dark Sky](../app-dark-sky) mobile app.
 
 **Input:** VIIRS radiance GeoTIFF (NASA Black Marble / lightpollutionmap raw) + OSM data.  
 **Processing:** ALR (All-sky Light pollution Ratio) via the [`nightskyquality`](https://github.com/mivek/nightskyquality) package.  
@@ -23,11 +23,11 @@ python run.py \
 
 Output appears in `/output/spots/`. Publication also generates global clusters after copying the current region into the cloned data repository. Add `--no-push` to keep the run local.
 
-### Angleterre, Pays de Galles et Irlande
+### England, Wales and Ireland
 
-La région `uk_ireland` couvre le Royaume-Uni et l’Irlande au sud de 55°N,
-avec la bbox de travail entière `[-11, 49, 2, 55]`. Le raster d’entrée doit
-être préparé avec 300 km de contexte :
+The `uk_ireland` region covers the United Kingdom and Ireland south of 55°N,
+with the integer working bbox `[-11, 49, 2, 55]`. Prepare the input raster
+with 300 km of context:
 
 ```bash
 python make_region_input.py \
@@ -45,11 +45,10 @@ python run.py \
     --no-clusters
 ```
 
-Ce premier run est une prépublication : il n’effectue aucun clone, commit ou
-push. Une emprise ALR valide insuffisante ne déclenche pas automatiquement un
-run à 350 km. Ce contexte élargi modifie potentiellement les valeurs de
-darkness ; il nécessite une décision manuelle et une comparaison sur la zone
-commune avant toute régénération ou publication.
+This first run is a prepublication: it does not clone, commit, or push. An
+insufficient valid ALR extent does not automatically trigger a 350 km run.
+The wider context may change darkness values, so it requires a manual decision
+and a comparison over the shared area before regeneration or publication.
 
 ## CLI reference
 
@@ -159,12 +158,13 @@ The `data/` directory contains:
 - **`cities500.txt`** — extracted on first pipeline run (gitignored, ~50 MB).
 - **`natural_earth/`** — versioned Natural Earth v5.1.1 1:10m land and
   admin-0 country layers. They are loaded locally; runs never download them.
-- **`geonames/extracts/*.tsv` et `geonames/manifest.yaml`** — extractions
-  GeoNames filtrées par codes, versionnées avec leur manifeste. Les archives
-  nationales sources ne sont pas des entrées runtime ; le manifeste indique
-  leur URL et leur chemin pour une réextraction en cas de divergence de codes.
-
-No other data files are required.
+- **`geonames/extracts/*.tsv` and `geonames/manifest.yaml`** — code-filtered
+  GeoNames extracts and their versioned manifest. Country source archives are
+  not runtime inputs; the manifest records their URLs and paths for extraction
+  when feature codes change.
+- **`elevation/manifests/`** — versioned regional Copernicus DEM and water-mask
+  manifests. The corresponding raster files are stored separately in the local
+  elevation cache.
 
 ## Input
 
@@ -257,3 +257,66 @@ The dated investigation and decision are recorded in
 - **Light pollution map redistribution:** Jurij Stare, [lightpollutionmap.info](https://www.lightpollutionmap.info).
 - **Place names and administrative boundaries:** OpenStreetMap contributors (ODbL).
 - **Populated places (GeoNames):** [GeoNames](https://www.geonames.org) data used under the [Creative Commons Attribution 4.0 License](https://creativecommons.org/licenses/by/4.0/). Data is sourced from the [cities500](https://download.geonames.org/export/dump/cities500.zip) export.
+
+## Spot elevation
+
+Preparation uses Copernicus DEM GLO-30 DGED and its water body mask (WBM),
+with GLO-90 as a fallback. The DEM is a surface model: trees, buildings,
+slopes, and artifacts can affect the elevation. The WBM distinguishes land,
+ocean, lakes, and rivers. Water and NoData pixels yield `null`; valid land
+values, including zero and negative elevations, are retained. Coastal results
+remain subject to the mask's resolution. Reports count ocean, lake, and river
+samples separately.
+
+Install [CopernicusDemDownloader](https://github.com/Alos-no/Copernicus-DEM-Downloader)
+and set `CDSE_ACCESS_KEY` and `CDSE_SECRET_KEY` to your Copernicus Data Space
+S3 credentials. Before a pipeline run, execute:
+
+```bash
+darkspots/bin/python tools/prepare_elevation.py --region france --dry-run
+darkspots/bin/python tools/prepare_elevation.py --region france
+```
+
+Repeat for each region. The command creates a versionable manifest at
+`data/elevation/manifests/<region>.json`, with file sizes and SHA-256 hashes,
+and stores the large rasters in `input/elevation/` (ignored by Git). Review and
+version the manifest: subsequent runs verify each file locally and do not
+access the network. A source change requires preparation and manifest review
+again. If GLO-30 tiles are missing, verify their absence in the CDSE catalogue
+before rerunning with `--allow-glo90`. The DEM and WBM must come from the same
+product version.
+
+To compare Copernicus with the ASTER witness **at the witness coordinates**:
+
+```bash
+darkspots/bin/python tools/check_elevation.py > /tmp/elevation-check.json
+```
+
+The report includes exclusions, differences, and coverage; the command fails
+if fewer than 90% of the points can be compared. To migrate existing spots,
+prepare all their regions, then run the following on a local copy of the data
+repository:
+
+```bash
+darkspots/bin/python tools/migrate_elevation.py --repo /path/to/data-repo
+```
+
+The migration preserves other spot fields and regenerates all clusters with a
+new `generated` value. Review the diff before publication. Representatives
+contain `altitude`, and the new `generated` value invalidates client caches.
+The script does not publish the results itself.
+
+Copernicus DEM © DLR e.V. 2010–2014 and © Airbus Defence and Space GmbH
+2014–2018, provided under COPERNICUS by the European Union and ESA.
+[Product and terms](https://dataspace.copernicus.eu/explore-data/data-collections/copernicus-contributing-missions/collections-description/COP-DEM).
+
+Also check the summits at their verified geographic coordinates:
+
+```bash
+darkspots/bin/python tools/sample_elevation.py --manifest data/elevation/manifests/canaries.json --lat 28.258 --lon -16.644
+darkspots/bin/python tools/sample_elevation.py --manifest data/elevation/manifests/canaries.json --lat 28.272 --lon -16.642
+```
+
+These rounded coordinates approximately locate Pico Viejo and Teide; compare
+the results to about 3,135 m and over 3,700 m, respectively. An imprecise
+position on a slope can lead to a substantial difference.

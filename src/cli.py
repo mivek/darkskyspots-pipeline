@@ -50,6 +50,8 @@ def create_parser() -> argparse.ArgumentParser:
     parser.add_argument("--input-dir", type=str, default="./input", help="Directory with input GeoTIFFs")
     parser.add_argument("--output-dir", type=str, default="./output", help="Directory for output JSONs")
     parser.add_argument("--budget-mb", type=float, default=500.0, help="RAM budget for input loading (MB)")
+    parser.add_argument("--dem-manifest-dir", default="data/elevation/manifests", help="Regional DEM manifests")
+    parser.add_argument("--dem-cache-dir", default="input/elevation", help="Local DEM and water mask cache")
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose logging")
     return parser
 
