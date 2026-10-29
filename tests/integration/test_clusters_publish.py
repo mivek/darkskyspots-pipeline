@@ -65,6 +65,7 @@ def test_published_clusters_read_spots_after_current_region_copy(tmp_path):
         return {}
 
     with ExitStack() as stack:
+        stack.enter_context(patch("run.ElevationSampler"))
         stack.enter_context(patch("run.clone_data_repo", side_effect=clone))
         stack.enter_context(patch("run._validate_geonames_inputs"))
         stack.enter_context(patch("run._load_geonames_index", return_value=MagicMock()))

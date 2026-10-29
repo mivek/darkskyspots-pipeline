@@ -26,6 +26,7 @@ from src.config import (
 )
 from src.coverage import attach_near_town, ensure_coverage, load_places
 from src.enrich import enrich_all
+from src.elevation import ElevationSampler
 from src.geonames import (
     GeoNamesIndex,
     NAMING_FEATURE_CODES,
@@ -167,6 +168,9 @@ def run(args) -> int:
         # incomplete filtered extract must never yield a partial run.
         _validate_geonames_inputs(country_codes)
 
+        with ElevationSampler(Path(args.dem_manifest_dir) / f"{args.region}.json", args.dem_cache_dir):
+            pass
+
         input_path = Path(args.input_dir) / args.region / f"{args.year}.tif"
         if not input_path.exists():
             logger.error("Input not found: %s", input_path)
@@ -277,7 +281,9 @@ def run(args) -> int:
         named = naming_index.enrich_spots(covered)
         if any(not isinstance(spot.get("name"), str) or not spot["name"].strip() for spot in named):
             raise ValueError("GeoNames naming cascade produced an empty name")
-        enriched = enrich_all(named)
+        with ElevationSampler(Path(args.dem_manifest_dir) / f"{args.region}.json", args.dem_cache_dir) as sampler:
+            enriched = enrich_all(named, elevation_sampler=sampler)
+            logger.info("  Elevation sample counts: %s", dict(sampler.counts))
         logger.info("  Enriched %d spots", len(enriched))
 
         # Step 6: Tile export + version

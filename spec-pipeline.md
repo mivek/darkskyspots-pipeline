@@ -131,8 +131,10 @@ The naming stage adds `name`, `nameDistanceKm`, `nameFeatureCode`,
 ### 8. Final spot enrichment
 
 `src/enrich.py` creates the deterministic coordinate-based `id`, preserves
-`near`, sets `altitude` to `null`, and removes the transient raster `row` and
-`col` fields. It does not call a network service or derive elevation.
+`near`, samples altitude from locally prepared Copernicus DEM and water-mask
+rasters, and removes the transient raster `row` and `col` fields. Water and
+NoData yield `null`; valid land elevations, including zero and negative values,
+are rounded to metres. No network service is called during enrichment.
 
 ### 9. Tile assignment and versioning
 
@@ -234,7 +236,7 @@ produced by the pipeline has these fields:
 | `nameFeatureCode` | GeoNames feature code selected by the cascade |
 | `nameFeatureClass` | GeoNames feature class selected by the cascade |
 | `nameGeoNameId` | GeoNames identifier selected by the cascade |
-| `altitude` | Always `null` in the current pipeline |
+| `altitude` | Integer metres from Copernicus DEM for valid land pixels, otherwise `null` |
 
 The transient `row` and `col` fields are not published. The tile envelope's
 `country` values are the basis for future country-scoped replacement.

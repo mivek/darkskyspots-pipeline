@@ -1,5 +1,9 @@
 # Dark Sky Spots Pipeline — Agent Guide
 
+## Repository conventions
+- Keep `README.md` entirely in English.
+- Use Conventional Commits for commit messages.
+
 ## Entrypoint
 ```bash
 # One-shot batch pipeline (not a server, not long-running)

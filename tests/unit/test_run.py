@@ -21,6 +21,11 @@ def mock_filtered_geonames_api(monkeypatch):
     import run
 
     monkeypatch.setattr(run, "validate_geonames_manifest", lambda **_kwargs: None)
+    sampler = MagicMock()
+    sampler.__enter__.return_value = sampler
+    sampler.counts = {}
+    sampler.sample.return_value = 123
+    monkeypatch.setattr(run, "ElevationSampler", lambda *args, **kwargs: sampler)
 
     index = MagicMock()
     index.enrich_spots.side_effect = lambda spots: [
@@ -438,7 +443,7 @@ def test_multi_country_runtime_uses_one_filtered_index_and_only_configured_spots
         places = stack.enter_context(patch("run.load_places", return_value=[]))
         stack.enter_context(patch("run.ensure_coverage", return_value=candidates))
         stack.enter_context(patch("run.attach_near_town", return_value=candidates))
-        stack.enter_context(patch("run.enrich_all", side_effect=lambda spots: spots))
+        stack.enter_context(patch("run.enrich_all", side_effect=lambda spots, **kwargs: spots))
         tile_export = stack.enter_context(
             patch("run.classify_spots_into_tiles", return_value={})
         )
@@ -587,7 +592,7 @@ def test_nominal_bbox_filter_blocks_halo_candidates_from_all_publish_steps(
         stack.enter_context(
             patch("run.GeoNamesIndex.from_filtered_extracts", return_value=naming_index)
         )
-        stack.enter_context(patch("run.enrich_all", side_effect=lambda spots: spots))
+        stack.enter_context(patch("run.enrich_all", side_effect=lambda spots, **kwargs: spots))
         stack.enter_context(
             patch("run.classify_spots_into_tiles", side_effect=capture_tiles)
         )
