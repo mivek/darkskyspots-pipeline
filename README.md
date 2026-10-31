@@ -268,9 +268,16 @@ values, including zero and negative elevations, are retained. Coastal results
 remain subject to the mask's resolution. Reports count ocean, lake, and river
 samples separately.
 
-Install [CopernicusDemDownloader](https://github.com/Alos-no/Copernicus-DEM-Downloader)
-and set `CDSE_ACCESS_KEY` and `CDSE_SECRET_KEY` to your Copernicus Data Space
-S3 credentials. Before a pipeline run, execute:
+Install the Python dependencies from `requirements.txt`, including `boto3`.
+Create Copernicus Data Space S3 credentials and set `CDSE_ACCESS_KEY` and
+`CDSE_SECRET_KEY` in your environment. The preparation tool connects directly
+to the [CDSE catalogue](https://documentation.dataspace.copernicus.eu/Data/Others/CCM.html)
+to resolve each delivery and grid cell, then uses the returned S3 paths to
+access the [CDSE S3 endpoint](https://documentation.dataspace.copernicus.eu/APIs/S3.html).
+Access to Copernicus DEM requires registration for Copernicus Contributing
+Missions (CCM) in the CDSE account profile; a valid S3 login alone does not
+guarantee access to the dataset.
+Before a pipeline run, execute:
 
 ```bash
 darkspots/bin/python tools/prepare_elevation.py --region france --dry-run
@@ -283,8 +290,10 @@ and stores the large rasters in `input/elevation/` (ignored by Git). Review and
 version the manifest: subsequent runs verify each file locally and do not
 access the network. A source change requires preparation and manifest review
 again. If GLO-30 tiles are missing, verify their absence in the CDSE catalogue
-before rerunning with `--allow-glo90`. The DEM and WBM must come from the same
-product version.
+before rerunning with `--allow-glo90`. A failed S3 request or an incomplete
+pair stops preparation instead of selecting a fallback. The DEM and WBM must
+come from the same product version. `--dry-run` lists the selected files and
+their total size without downloading files or writing a manifest.
 
 To compare Copernicus with the ASTER witness **at the witness coordinates**:
 
