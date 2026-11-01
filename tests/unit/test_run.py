@@ -25,6 +25,8 @@ def mock_filtered_geonames_api(monkeypatch):
     sampler.__enter__.return_value = sampler
     sampler.counts = {}
     sampler.sample.return_value = 123
+    sampler.wbm_classes.side_effect = lambda lats, lons: np.zeros(len(lats), dtype=np.int16)
+    sampler.wbm_io = {}
     monkeypatch.setattr(run, "ElevationSampler", lambda *args, **kwargs: sampler)
 
     index = MagicMock()
@@ -79,6 +81,33 @@ def _write_input(tmp_path, region="france"):
     input_dir = tmp_path / "input" / region
     input_dir.mkdir(parents=True, exist_ok=True)
     (input_dir / "2025.tif").write_bytes(b"input")
+
+
+def test_normal_generation_passes_mandatory_wbm_qualification(tmp_path):
+    import run as pipeline
+    from rasterio.transform import from_bounds
+    from src.selection import CandidateQualifier
+    _write_input(tmp_path)
+    args = _make_args(tmp_path, no_clusters=True)
+    with ExitStack() as stack:
+        collaborators = [stack.enter_context(p) for p in _mock_raster_steps(from_bounds(-5, 41, 10, 51, 2, 2))]
+        assert pipeline.run(args) == 0
+    qualification = collaborators[3].call_args.kwargs['qualify']
+    assert isinstance(qualification, CandidateQualifier)
+    assert qualification.water is True and qualification.sampler is not None
+    assert collaborators[3].call_args.kwargs['crs'] == qualification.crs
+
+
+def test_corrupt_terrain_stops_before_alr_without_legacy_fallback(tmp_path, monkeypatch, caplog):
+    import run as pipeline
+    _write_input(tmp_path)
+    def corrupt(*_args, **_kwargs):
+        raise ValueError('Corrupt elevation wbm: test')
+    monkeypatch.setattr(pipeline, 'ElevationSampler', corrupt)
+    with patch('run.slice_and_compute') as alr:
+        assert pipeline.run(_make_args(tmp_path, no_clusters=True)) == 1
+    alr.assert_not_called()
+    assert 'Corrupt elevation wbm' in caplog.text
 
 
 def _mock_raster_steps(transform):

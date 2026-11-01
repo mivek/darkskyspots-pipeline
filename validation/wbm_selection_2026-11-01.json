@@ -1,0 +1,5914 @@
+{
+  "reference_commit": "1502e353ef7f88aa63a95deb5678e7af33b9b028",
+  "implementation_source_sha256": {
+    "src/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "src/alr.py": "3ffa66c14ee96b55fe040bdfeba0a1465312b0df8191fc2567ee91bcf1c117cb",
+    "src/cli.py": "baa7c18a8e8d286c2c9d93bd2fe667543392e38ef932baad1e2feffd57530068",
+    "src/clusters.py": "c848c34651850cdae4fb21fbd89eb562fc5e11726e1a629e8a1b0dc394e55f60",
+    "src/config.py": "72e429f23bde58d7307db8dcaa7df8cb25ef1fb2d5fe7b1b5188ee375ffe0eab",
+    "src/convert.py": "6b4a84bca92b816ff0d918ca79751b2c6f344b15b68a947a066dfb9dbbc89eb7",
+    "src/coverage.py": "d0dffbca0d583a18bb50144597155c23bd0ac75de7584a46837e5c69f0557e68",
+    "src/elevation.py": "9d677ca461038b4134bee32fbab16d0d2ca4446b9c944605aebc7b92dfe4d17f",
+    "src/enrich.py": "dd516b1ae653460ede580c535224981aa676acc4ff70654f0ac619b1653d9a8f",
+    "src/extract.py": "33c71e3a2adeeb78c5fc91e93d4635e2877564fa0557a2819e3d738efa292115",
+    "src/geography.py": "10639d8e406f945b89ebc62c9a728b0ce2417f042c48721abf39df49c3a7d6fd",
+    "src/geonames.py": "b1148f8f718e503fbab5b1c1ddfb58729a988fe58211c4e443378fe3d3b59ee8",
+    "src/publish.py": "70fe83dfa220358faefb64a7796b6893ce2aebe3af8db45232301eaa0129d812",
+    "src/regions.py": "bc6ffdb19c9aee4e2a2eef95158b4bd0911a050ad0382114d411ca2dc2f9183c",
+    "src/selection.py": "8658e8285e24664a0836538c13465a93e58cea9c144f7996ba1c28cd0940c402",
+    "src/tile_export.py": "bd334de3ff05642e5b8d424a81cb47b05d312fdee8e315d449c4ac35d7bfe774",
+    "src/tile_id.py": "7ab76f40beea8454b0618e309d488de791f58b0362f337db9a71cbbc534ecf38",
+    "src/utils.py": "0e1a13547c763a5cfec96ed44d1f38a0bc78c50e7b8366a897336d322182aa51",
+    "src/validation.py": "a586c037f0b1702fbedd900cead29f19a53e09fe555aa2c13a16770be460e4a8",
+    "run.py": "16d898a12fa7b70c3ad4001ba5167c146a1b21be58289200709e97c42db1e523",
+    "regions.yaml": "b066f6a76a65b5ecbd14bd71a9d5dbd420828bacda82fd6468d28f2d668de50d",
+    "tools/compare_wbm.py": "a0cda1a7aa10582ddf928e8aa919a2e4a6b4689f72bbb20e3f75fef7f27c975a",
+    "tools/audit_wbm_osm.py": "559d627b9de079dade2680599a2f506512886040bf4b11dd31df601e94390253",
+    "tools/check_wbm_results.py": "bc0da78eb32f9b6aca9b7c62d8a715c94d0aa61b5f5aa933c94650bd30f3c167",
+    "tests/fixtures/wbm_selection_cases.json": "31a8dc723c741cb96932e2cf1f7a909a146a5a82fa9adb4f3f7d077b50068084"
+  },
+  "environment": {
+    "python": "3.14.4 (main, Aug 20 2026, 10:41:58) [GCC 15.2.0]",
+    "platform": "Linux-7.0.0-42-generic-x86_64-with-glibc2.43",
+    "packages": {
+      "numpy": "2.5.4",
+      "scipy": "1.18.1",
+      "rasterio": "1.5.2",
+      "shapely": "2.2.0",
+      "pyshp": "3.1.6",
+      "nightskyquality": "0.1.0"
+    }
+  },
+  "WBM_NoData_candidates": {
+    "france": 0,
+    "uk_ireland": 0,
+    "canaries": 0
+  },
+  "artifacts_root": "/tmp/darksky-wbm-simulation",
+  "historical_A": {
+    "france": {
+      "published_count": 2189,
+      "A_count": 2189,
+      "common": 2189,
+      "removed": [],
+      "added": [],
+      "differences": [],
+      "exact": true,
+      "compatible": true,
+      "darkness_absolute_tolerance": 1e-12,
+      "note": "All non-darkness fields must match exactly. Last-bit darkness differences are recorded, never attributed to WBM."
+    },
+    "uk_ireland": {
+      "published_count": 1179,
+      "A_count": 1179,
+      "common": 1179,
+      "removed": [],
+      "added": [],
+      "differences": [],
+      "exact": true,
+      "compatible": true,
+      "darkness_absolute_tolerance": 1e-12,
+      "note": "All non-darkness fields must match exactly. Last-bit darkness differences are recorded, never attributed to WBM."
+    },
+    "canaries": {
+      "published_count": 54,
+      "A_count": 54,
+      "common": 54,
+      "removed": [],
+      "added": [],
+      "differences": [
+        {
+          "id": "27.7812_-17.9979",
+          "fields": {
+            "darkness": {
+              "published": 0.9946336869736958,
+              "A": 0.994633686973714
+            }
+          }
+        },
+        {
+          "id": "27.8354_-15.7063",
+          "fields": {
+            "darkness": {
+              "published": 0.30734173881777893,
+              "A": 0.3073417388177754
+            }
+          }
+        },
+        {
+          "id": "27.8354_-15.7521",
+          "fields": {
+            "darkness": {
+              "published": 0.36384545673028756,
+              "A": 0.36384545673028235
+            }
+          }
+        },
+        {
+          "id": "27.9313_-15.5229",
+          "fields": {
+            "darkness": {
+              "published": 0.19794086343206474,
+              "A": 0.1979408634320663
+            }
+          }
+        },
+        {
+          "id": "27.9771_-15.6604",
+          "fields": {
+            "darkness": {
+              "published": 0.3474009219588352,
+              "A": 0.3474009219588374
+            }
+          }
+        },
+        {
+          "id": "27.9854_-15.7979",
+          "fields": {
+            "darkness": {
+              "published": 0.49269712254107356,
+              "A": 0.4926971225410751
+            }
+          }
+        },
+        {
+          "id": "28.0104_-15.3896",
+          "fields": {
+            "darkness": {
+              "published": 0.08041461497462754,
+              "A": 0.08041461497463509
+            }
+          }
+        },
+        {
+          "id": "28.0229_-16.6271",
+          "fields": {
+            "darkness": {
+              "published": 0.24972935129906593,
+              "A": 0.24972935129905793
+            }
+          }
+        },
+        {
+          "id": "28.0688_-17.3104",
+          "fields": {
+            "darkness": {
+              "published": 0.8461539400132883,
+              "A": 0.8461539400132749
+            }
+          }
+        },
+        {
+          "id": "28.0729_-15.5688",
+          "fields": {
+            "darkness": {
+              "published": 0.17062934620262982,
+              "A": 0.17062934620263392
+            }
+          }
+        },
+        {
+          "id": "28.0938_-17.1438",
+          "fields": {
+            "darkness": {
+              "published": 0.7256621248438373,
+              "A": 0.7256621248438206
+            }
+          }
+        },
+        {
+          "id": "28.1104_-14.3771",
+          "fields": {
+            "darkness": {
+              "published": 0.6886281065724014,
+              "A": 0.6886281065723734
+            }
+          }
+        },
+        {
+          "id": "28.1562_-15.6604",
+          "fields": {
+            "darkness": {
+              "published": 0.3153940967501905,
+              "A": 0.31539409675019014
+            }
+          }
+        },
+        {
+          "id": "28.1562_-16.5813",
+          "fields": {
+            "darkness": {
+              "published": 0.34746906732062255,
+              "A": 0.34746906732062477
+            }
+          }
+        },
+        {
+          "id": "28.1562_-16.7604",
+          "fields": {
+            "darkness": {
+              "published": 0.3106176939395108,
+              "A": 0.31061769393951466
+            }
+          }
+        },
+        {
+          "id": "28.2021_-17.2188",
+          "fields": {
+            "darkness": {
+              "published": 0.8049262257482958,
+              "A": 0.8049262257482954
+            }
+          }
+        },
+        {
+          "id": "28.2021_-17.3104",
+          "fields": {
+            "darkness": {
+              "published": 0.897929562978987,
+              "A": 0.8979295629789722
+            }
+          }
+        },
+        {
+          "id": "28.2479_-16.4854",
+          "fields": {
+            "darkness": {
+              "published": 0.4126792461840495,
+              "A": 0.4126792461840527
+            }
+          }
+        },
+        {
+          "id": "28.2479_-16.6563",
+          "fields": {
+            "darkness": {
+              "published": 0.44403712517894656,
+              "A": 0.44403712517895366
+            }
+          }
+        },
+        {
+          "id": "28.2729_-14.1104",
+          "fields": {
+            "darkness": {
+              "published": 0.7327096188262109,
+              "A": 0.732709618826185
+            }
+          }
+        },
+        {
+          "id": "28.2938_-14.1938",
+          "fields": {
+            "darkness": {
+              "published": 0.7636371795722973,
+              "A": 0.7636371795722792
+            }
+          }
+        },
+        {
+          "id": "28.2979_-13.9229",
+          "fields": {
+            "darkness": {
+              "published": 0.7110687681662221,
+              "A": 0.7110687681662176
+            }
+          }
+        },
+        {
+          "id": "28.2979_-16.4396",
+          "fields": {
+            "darkness": {
+              "published": 0.34289806518777444,
+              "A": 0.342898065187774
+            }
+          }
+        },
+        {
+          "id": "28.3021_-16.8063",
+          "fields": {
+            "darkness": {
+              "published": 0.497060224821251,
+              "A": 0.49706022482127
+            }
+          }
+        },
+        {
+          "id": "28.3396_-16.8521",
+          "fields": {
+            "darkness": {
+              "published": 0.5381719634447694,
+              "A": 0.5381719634447792
+            }
+          }
+        },
+        {
+          "id": "28.3854_-16.6688",
+          "fields": {
+            "darkness": {
+              "published": 0.4131936110273138,
+              "A": 0.41319361102732566
+            }
+          }
+        },
+        {
+          "id": "28.3896_-16.3479",
+          "fields": {
+            "darkness": {
+              "published": 0.1965195690474093,
+              "A": 0.19651956904740375
+            }
+          }
+        },
+        {
+          "id": "28.4771_-14.0563",
+          "fields": {
+            "darkness": {
+              "published": 0.7348025277246186,
+              "A": 0.7348025277246115
+            }
+          }
+        },
+        {
+          "id": "28.4771_-14.1021",
+          "fields": {
+            "darkness": {
+              "published": 0.7933545200533397,
+              "A": 0.7933545200533326
+            }
+          }
+        },
+        {
+          "id": "28.5229_-16.2146",
+          "fields": {
+            "darkness": {
+              "published": 0.27274845904669587,
+              "A": 0.27274845904670375
+            }
+          }
+        },
+        {
+          "id": "28.5229_-16.3021",
+          "fields": {
+            "darkness": {
+              "published": 0.18883643412551832,
+              "A": 0.1888364341255223
+            }
+          }
+        },
+        {
+          "id": "28.5229_-16.3938",
+          "fields": {
+            "darkness": {
+              "published": 0.2601356787191146,
+              "A": 0.26013567871911336
+            }
+          }
+        },
+        {
+          "id": "28.5688_-16.1229",
+          "fields": {
+            "darkness": {
+              "published": 0.5098604722035034,
+              "A": 0.5098604722035078
+            }
+          }
+        },
+        {
+          "id": "28.5688_-16.1688",
+          "fields": {
+            "darkness": {
+              "published": 0.4367985035648615,
+              "A": 0.43679850356486993
+            }
+          }
+        },
+        {
+          "id": "28.5729_-17.8604",
+          "fields": {
+            "darkness": {
+              "published": 0.9483272777085362,
+              "A": 0.9483272777085355
+            }
+          }
+        },
+        {
+          "id": "28.5938_-14.0104",
+          "fields": {
+            "darkness": {
+              "published": 0.7431871081403947,
+              "A": 0.7431871081403838
+            }
+          }
+        },
+        {
+          "id": "28.6188_-14.0104",
+          "fields": {
+            "darkness": {
+              "published": 0.7340409413956683,
+              "A": 0.7340409413956537
+            }
+          }
+        },
+        {
+          "id": "28.6188_-17.8479",
+          "fields": {
+            "darkness": {
+              "published": 0.8313503080195442,
+              "A": 0.8313503080195384
+            }
+          }
+        },
+        {
+          "id": "28.6438_-13.8313",
+          "fields": {
+            "darkness": {
+              "published": 0.6586510039985121,
+              "A": 0.6586510039985031
+            }
+          }
+        },
+        {
+          "id": "28.7521_-17.9063",
+          "fields": {
+            "darkness": {
+              "published": 0.9862621603126309,
+              "A": 0.9862621603126405
+            }
+          }
+        },
+        {
+          "id": "28.8896_-13.8729",
+          "fields": {
+            "darkness": {
+              "published": 0.49457321524985876,
+              "A": 0.49457321524984954
+            }
+          }
+        },
+        {
+          "id": "28.9813_-13.7354",
+          "fields": {
+            "darkness": {
+              "published": 0.4718960077863176,
+              "A": 0.4718960077863068
+            }
+          }
+        },
+        {
+          "id": "28.9813_-13.8271",
+          "fields": {
+            "darkness": {
+              "published": 0.5923606772857263,
+              "A": 0.592360677285714
+            }
+          }
+        },
+        {
+          "id": "29.0271_-13.5979",
+          "fields": {
+            "darkness": {
+              "published": 0.3493225737447717,
+              "A": 0.34932257374477593
+            }
+          }
+        },
+        {
+          "id": "29.0729_-13.4646",
+          "fields": {
+            "darkness": {
+              "published": 0.5222414206629807,
+              "A": 0.5222414206629806
+            }
+          }
+        },
+        {
+          "id": "29.0729_-13.5104",
+          "fields": {
+            "darkness": {
+              "published": 0.47604510821917456,
+              "A": 0.4760451082191697
+            }
+          }
+        },
+        {
+          "id": "29.1188_-13.6104",
+          "fields": {
+            "darkness": {
+              "published": 0.5532321146005427,
+              "A": 0.5532321146005346
+            }
+          }
+        },
+        {
+          "id": "29.2104_-13.4646",
+          "fields": {
+            "darkness": {
+              "published": 0.7123717415718898,
+              "A": 0.7123717415718812
+            }
+          }
+        }
+      ],
+      "exact": false,
+      "compatible": true,
+      "darkness_absolute_tolerance": 1e-12,
+      "note": "All non-darkness fields must match exactly. Last-bit darkness differences are recorded, never attributed to WBM."
+    }
+  },
+  "historical_naming_differences": {
+    "france": [],
+    "uk_ireland": [],
+    "canaries": []
+  },
+  "historical_numerical_note": "France and UK/Ireland reproduce exactly. 48 Canaries darkness values differ by at most 2.7977620220553945e-14; positions, Bortle, countries and naming match. Differences exist in A without WBM. A 350-km ALR kernel was tested and does not reproduce the published values; directory names do not establish kernel parameters. Floating-point/FFT build differences are plausible, but the original build environment was not archived; exact last-bit cause remains unresolved. Absolute comparison tolerance is 1e-12, explicitly reported, not rounded away.",
+  "metrics": {
+    "france": {
+      "A": {
+        "countries": {
+          "FR": 2189
+        },
+        "counts": {
+          "selected": 25452,
+          "deduplicated": 2162,
+          "covered": 2189
+        },
+        "coverage_added": 27,
+        "darkness": {
+          "min": 0.0,
+          "median": 0.7392382520254386,
+          "mean": 0.7049662242336524,
+          "max": 1.0
+        },
+        "bortle": {
+          "1": 148,
+          "2": 410,
+          "3": 505,
+          "4": 664,
+          "5": 255,
+          "6": 133,
+          "7": 60,
+          "8": 14
+        },
+        "wbm_final": {
+          "1": 10,
+          "0": 2159,
+          "2": 18,
+          "3": 2
+        }
+      },
+      "B": {
+        "countries": {
+          "FR": 2179
+        },
+        "counts": {
+          "selected": 25226,
+          "deduplicated": 2152,
+          "covered": 2179
+        },
+        "coverage_added": 27,
+        "darkness": {
+          "min": 0.0,
+          "median": 0.7392497238856943,
+          "mean": 0.7053488561788404,
+          "max": 1.0
+        },
+        "bortle": {
+          "1": 147,
+          "2": 409,
+          "3": 503,
+          "4": 661,
+          "5": 254,
+          "6": 131,
+          "7": 60,
+          "8": 14
+        },
+        "wbm_final": {
+          "0": 2179
+        }
+      },
+      "C": {
+        "countries": {
+          "FR": 2210
+        },
+        "counts": {
+          "selected": 26035,
+          "deduplicated": 2183,
+          "covered": 2210
+        },
+        "coverage_added": 27,
+        "darkness": {
+          "min": 0.0,
+          "median": 0.7393162713490626,
+          "mean": 0.7053091672060467,
+          "max": 1.0
+        },
+        "bortle": {
+          "1": 151,
+          "2": 414,
+          "3": 511,
+          "4": 666,
+          "5": 258,
+          "6": 135,
+          "7": 61,
+          "8": 14
+        },
+        "wbm_final": {
+          "1": 41,
+          "0": 2153,
+          "2": 13,
+          "3": 3
+        }
+      },
+      "D": {
+        "countries": {
+          "FR": 2210
+        },
+        "counts": {
+          "selected": 25992,
+          "deduplicated": 2182,
+          "covered": 2210
+        },
+        "coverage_added": 28,
+        "darkness": {
+          "min": 0.0,
+          "median": 0.7393162713490626,
+          "mean": 0.7055395609184778,
+          "max": 1.0
+        },
+        "bortle": {
+          "1": 151,
+          "2": 415,
+          "3": 511,
+          "4": 666,
+          "5": 257,
+          "6": 135,
+          "7": 61,
+          "8": 14
+        },
+        "wbm_final": {
+          "0": 2210
+        }
+      }
+    },
+    "uk_ireland": {
+      "A": {
+        "countries": {
+          "IE": 358,
+          "GB": 821
+        },
+        "counts": {
+          "selected": 14261,
+          "deduplicated": 1159,
+          "covered": 1179
+        },
+        "coverage_added": 20,
+        "darkness": {
+          "min": 0.0,
+          "median": 0.5951208128519155,
+          "mean": 0.5831346542677571,
+          "max": 1.0
+        },
+        "bortle": {
+          "1": 63,
+          "2": 127,
+          "3": 173,
+          "4": 319,
+          "5": 205,
+          "6": 161,
+          "7": 111,
+          "8": 20
+        },
+        "wbm_final": {
+          "0": 1139,
+          "2": 14,
+          "1": 23,
+          "3": 3
+        }
+      },
+      "B": {
+        "countries": {
+          "IE": 355,
+          "GB": 814
+        },
+        "counts": {
+          "selected": 13982,
+          "deduplicated": 1149,
+          "covered": 1169
+        },
+        "coverage_added": 20,
+        "darkness": {
+          "min": 0.0,
+          "median": 0.5982397090284838,
+          "mean": 0.5835418106528154,
+          "max": 1.0
+        },
+        "bortle": {
+          "1": 62,
+          "2": 126,
+          "3": 173,
+          "4": 316,
+          "5": 204,
+          "6": 159,
+          "7": 109,
+          "8": 20
+        },
+        "wbm_final": {
+          "0": 1169
+        }
+      },
+      "C": {
+        "countries": {
+          "IE": 378,
+          "GB": 849
+        },
+        "counts": {
+          "selected": 15489,
+          "deduplicated": 1204,
+          "covered": 1227
+        },
+        "coverage_added": 23,
+        "darkness": {
+          "min": 0.0,
+          "median": 0.6105941375203502,
+          "mean": 0.5888618597174673,
+          "max": 1.0
+        },
+        "bortle": {
+          "1": 71,
+          "2": 136,
+          "3": 184,
+          "4": 327,
+          "5": 209,
+          "6": 166,
+          "7": 114,
+          "8": 20
+        },
+        "wbm_final": {
+          "0": 1119,
+          "1": 86,
+          "3": 8,
+          "2": 14
+        }
+      },
+      "D": {
+        "countries": {
+          "IE": 376,
+          "GB": 842
+        },
+        "counts": {
+          "selected": 15426,
+          "deduplicated": 1195,
+          "covered": 1218
+        },
+        "coverage_added": 23,
+        "darkness": {
+          "min": 0.0,
+          "median": 0.607140350604633,
+          "mean": 0.5875600833745951,
+          "max": 1.0
+        },
+        "bortle": {
+          "1": 69,
+          "2": 136,
+          "3": 182,
+          "4": 323,
+          "5": 208,
+          "6": 165,
+          "7": 114,
+          "8": 21
+        },
+        "wbm_final": {
+          "0": 1218
+        }
+      }
+    },
+    "canaries": {
+      "A": {
+        "countries": {
+          "ES": 54
+        },
+        "counts": {
+          "selected": 255,
+          "deduplicated": 54,
+          "covered": 54
+        },
+        "coverage_added": 0,
+        "darkness": {
+          "min": 0.08041461497463509,
+          "median": 0.5160509464332442,
+          "mean": 0.568217211798603,
+          "max": 1.0
+        },
+        "bortle": {
+          "1": 5,
+          "2": 4,
+          "3": 6,
+          "4": 13,
+          "5": 10,
+          "6": 11,
+          "7": 5
+        },
+        "wbm_final": {
+          "0": 51,
+          "1": 3
+        }
+      },
+      "B": {
+        "countries": {
+          "ES": 53
+        },
+        "counts": {
+          "selected": 249,
+          "deduplicated": 53,
+          "covered": 53
+        },
+        "coverage_added": 0,
+        "darkness": {
+          "min": 0.08041461497463509,
+          "median": 0.5222414206629806,
+          "mean": 0.568261719547827,
+          "max": 1.0
+        },
+        "bortle": {
+          "1": 5,
+          "2": 4,
+          "3": 6,
+          "4": 12,
+          "5": 10,
+          "6": 11,
+          "7": 5
+        },
+        "wbm_final": {
+          "0": 53
+        }
+      },
+      "C": {
+        "countries": {
+          "ES": 67
+        },
+        "counts": {
+          "selected": 460,
+          "deduplicated": 67,
+          "covered": 67
+        },
+        "coverage_added": 0,
+        "darkness": {
+          "min": 0.1010997063255179,
+          "median": 0.5569118444231744,
+          "mean": 0.5870457005184316,
+          "max": 1.0
+        },
+        "bortle": {
+          "1": 5,
+          "2": 8,
+          "3": 8,
+          "4": 16,
+          "5": 11,
+          "6": 12,
+          "7": 7
+        },
+        "wbm_final": {
+          "0": 51,
+          "1": 16
+        }
+      },
+      "D": {
+        "countries": {
+          "ES": 66
+        },
+        "counts": {
+          "selected": 450,
+          "deduplicated": 66,
+          "covered": 66
+        },
+        "coverage_added": 0,
+        "darkness": {
+          "min": 0.08731632884897078,
+          "median": 0.5423478940421866,
+          "mean": 0.5855140912035735,
+          "max": 1.0
+        },
+        "bortle": {
+          "1": 5,
+          "2": 8,
+          "3": 8,
+          "4": 15,
+          "5": 11,
+          "6": 12,
+          "7": 7
+        },
+        "wbm_final": {
+          "0": 66
+        }
+      }
+    }
+  },
+  "comparisons": {
+    "france": {
+      "AB": {
+        "stages": {
+          "selected": {
+            "retained": 25226,
+            "removed": 226
+          },
+          "deduplicated": {
+            "retained": 2093,
+            "removed": 69,
+            "new": 59
+          },
+          "covered": {
+            "retained": 2119,
+            "removed": 70,
+            "new": 60
+          }
+        },
+        "coverage_losses": [
+          {
+            "place": {
+              "name": "La Roquette-sur-Var",
+              "lat": 43.82812,
+              "lon": 7.19912,
+              "population": 853,
+              "country": "FR"
+            },
+            "before": 4,
+            "after": 3,
+            "available": 3
+          }
+        ]
+      },
+      "AC": {
+        "stages": {
+          "selected": {
+            "retained": 25452,
+            "new": 583
+          },
+          "deduplicated": {
+            "new": 135,
+            "removed": 114,
+            "retained": 2048
+          },
+          "covered": {
+            "new": 135,
+            "removed": 114,
+            "retained": 2075
+          }
+        },
+        "coverage_losses": []
+      },
+      "AD": {
+        "stages": {
+          "selected": {
+            "retained": 25226,
+            "new": 542,
+            "moved": 224,
+            "removed": 2
+          },
+          "deduplicated": {
+            "new": 132,
+            "removed": 112,
+            "retained": 2037,
+            "moved": 13
+          },
+          "covered": {
+            "new": 133,
+            "removed": 112,
+            "retained": 2063,
+            "moved": 14
+          }
+        },
+        "coverage_losses": [
+          {
+            "place": {
+              "name": "La Roquette-sur-Var",
+              "lat": 43.82812,
+              "lon": 7.19912,
+              "population": 853,
+              "country": "FR"
+            },
+            "before": 4,
+            "after": 3,
+            "available": 3
+          }
+        ]
+      },
+      "CD": {
+        "stages": {
+          "selected": {
+            "retained": 25570,
+            "moved": 422,
+            "removed": 43
+          },
+          "deduplicated": {
+            "retained": 2098,
+            "moved": 37,
+            "new": 47,
+            "removed": 48
+          },
+          "covered": {
+            "retained": 2124,
+            "moved": 38,
+            "new": 48,
+            "removed": 48
+          }
+        },
+        "coverage_losses": [
+          {
+            "place": {
+              "name": "La Roquette-sur-Var",
+              "lat": 43.82812,
+              "lon": 7.19912,
+              "population": 853,
+              "country": "FR"
+            },
+            "before": 4,
+            "after": 3,
+            "available": 3
+          }
+        ]
+      }
+    },
+    "uk_ireland": {
+      "AB": {
+        "stages": {
+          "selected": {
+            "retained": 13982,
+            "removed": 279
+          },
+          "deduplicated": {
+            "retained": 1097,
+            "removed": 62,
+            "new": 52
+          },
+          "covered": {
+            "retained": 1117,
+            "removed": 62,
+            "new": 52
+          }
+        },
+        "coverage_losses": []
+      },
+      "AC": {
+        "stages": {
+          "selected": {
+            "new": 1228,
+            "retained": 14261
+          },
+          "deduplicated": {
+            "new": 292,
+            "removed": 247,
+            "retained": 912
+          },
+          "covered": {
+            "new": 296,
+            "removed": 248,
+            "retained": 931
+          }
+        },
+        "coverage_losses": []
+      },
+      "AD": {
+        "stages": {
+          "selected": {
+            "new": 1180,
+            "retained": 13982,
+            "moved": 264,
+            "removed": 15
+          },
+          "deduplicated": {
+            "new": 282,
+            "removed": 246,
+            "retained": 896,
+            "moved": 17
+          },
+          "covered": {
+            "new": 288,
+            "removed": 249,
+            "retained": 913,
+            "moved": 17
+          }
+        },
+        "coverage_losses": []
+      },
+      "CD": {
+        "stages": {
+          "selected": {
+            "moved": 661,
+            "retained": 14765,
+            "removed": 63
+          },
+          "deduplicated": {
+            "moved": 68,
+            "retained": 1043,
+            "removed": 93,
+            "new": 84
+          },
+          "covered": {
+            "moved": 68,
+            "retained": 1065,
+            "removed": 94,
+            "new": 85
+          }
+        },
+        "coverage_losses": []
+      }
+    },
+    "canaries": {
+      "AB": {
+        "stages": {
+          "selected": {
+            "retained": 249,
+            "removed": 6
+          },
+          "deduplicated": {
+            "retained": 51,
+            "removed": 3,
+            "new": 2
+          },
+          "covered": {
+            "retained": 51,
+            "removed": 3,
+            "new": 2
+          }
+        },
+        "coverage_losses": []
+      },
+      "AC": {
+        "stages": {
+          "selected": {
+            "new": 205,
+            "retained": 255
+          },
+          "deduplicated": {
+            "new": 43,
+            "removed": 30,
+            "retained": 24
+          },
+          "covered": {
+            "new": 43,
+            "removed": 30,
+            "retained": 24
+          }
+        },
+        "coverage_losses": []
+      },
+      "AD": {
+        "stages": {
+          "selected": {
+            "new": 195,
+            "retained": 249,
+            "moved": 6
+          },
+          "deduplicated": {
+            "new": 41,
+            "removed": 29,
+            "retained": 24,
+            "moved": 1
+          },
+          "covered": {
+            "new": 41,
+            "removed": 29,
+            "retained": 24,
+            "moved": 1
+          }
+        },
+        "coverage_losses": []
+      },
+      "CD": {
+        "stages": {
+          "selected": {
+            "retained": 377,
+            "moved": 73,
+            "removed": 10
+          },
+          "deduplicated": {
+            "retained": 49,
+            "moved": 13,
+            "removed": 5,
+            "new": 4
+          },
+          "covered": {
+            "retained": 49,
+            "moved": 13,
+            "removed": 5,
+            "new": 4
+          }
+        },
+        "coverage_losses": []
+      }
+    }
+  },
+  "tests": {
+    "command": "darkspots/bin/pytest -q",
+    "passed": 403,
+    "warnings": 12,
+    "seconds": 127.36
+  },
+  "normal_generation_france": {
+    "command": "darkspots/bin/python run.py --year 2025 --region france --input-dir input --output-dir /tmp/darksky-wbm-normal-france --no-push",
+    "exit_code": 0,
+    "spots": 2210,
+    "spot_fields_equal_to_D_snapshot": true,
+    "local_cluster_manifest_exists": true,
+    "elevation_counts": {
+      "land": 2210,
+      "ocean": 0,
+      "lake": 0,
+      "river": 0
+    }
+  },
+  "original_diagnostic_source_files_reverified": 149,
+  "independent_checks": {
+    "status": "passed",
+    "D_scalar_wbm_checks": {
+      "france": {
+        "0": 25992
+      },
+      "uk_ireland": {
+        "0": 15426
+      },
+      "canaries": {
+        "0": 450
+      }
+    },
+    "A_land_mesh_maxima_preserved_exactly": 39457,
+    "A_published_land_controls": 3349,
+    "published_land_removed_after_redundancy": 349,
+    "source_data_repository_unchanged": true
+  },
+  "published_land_redundancy_removals": [
+    {
+      "region": "france",
+      "id": "48.8187_-3.5104",
+      "country": "FR",
+      "suppressor_id": "48.8396_-3.5146",
+      "distance_km": 2.3365531368859505,
+      "darkness": 1.0,
+      "suppressor_darkness": 1.0,
+      "bortle": 1,
+      "suppressor_osm_suspected": true
+    },
+    {
+      "region": "france",
+      "id": "48.6812_-3.7188",
+      "country": "FR",
+      "suppressor_id": "48.7146_-3.8313",
+      "distance_km": 9.050376387748052,
+      "darkness": 1.0,
+      "suppressor_darkness": 1.0,
+      "bortle": 1,
+      "suppressor_osm_suspected": true
+    },
+    {
+      "region": "france",
+      "id": "48.6354_-3.5104",
+      "country": "FR",
+      "suppressor_id": "48.6812_-3.5646",
+      "distance_km": 6.465465446021759,
+      "darkness": 1.0,
+      "suppressor_darkness": 1.0,
+      "bortle": 1,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "48.4979_-3.6396",
+      "country": "FR",
+      "suppressor_id": "48.5437_-3.6229",
+      "distance_km": 5.242173647922324,
+      "darkness": 1.0,
+      "suppressor_darkness": 1.0,
+      "bortle": 1,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "48.4979_-3.4188",
+      "country": "FR",
+      "suppressor_id": "48.5812_-3.3729",
+      "distance_km": 9.861520269347238,
+      "darkness": 1.0,
+      "suppressor_darkness": 1.0,
+      "bortle": 1,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "48.3562_-3.3313",
+      "country": "FR",
+      "suppressor_id": "48.4521_-3.4646",
+      "distance_km": 14.506204963056637,
+      "darkness": 1.0,
+      "suppressor_darkness": 1.0,
+      "bortle": 1,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "47.3604_-3.2354",
+      "country": "FR",
+      "suppressor_id": "47.3896_-3.2521",
+      "distance_km": 3.4775440986670327,
+      "darkness": 1.0,
+      "suppressor_darkness": 1.0,
+      "bortle": 1,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "46.7187_-2.3646",
+      "country": "FR",
+      "suppressor_id": "46.7271_-2.3771",
+      "distance_km": 1.3291108197987658,
+      "darkness": 1.0,
+      "suppressor_darkness": 1.0,
+      "bortle": 1,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "48.6812_-3.7688",
+      "country": "FR",
+      "suppressor_id": "48.7062_-3.8354",
+      "distance_km": 5.62770507826183,
+      "darkness": 0.9891041910095248,
+      "suppressor_darkness": 0.9920716555894807,
+      "bortle": 2,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "46.7146_-2.3188",
+      "country": "FR",
+      "suppressor_id": "46.7062_-2.3188",
+      "distance_km": 0.9266243887046036,
+      "darkness": 0.9762527484084201,
+      "suppressor_darkness": 0.9796368862392646,
+      "bortle": 2,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "48.6812_-2.3188",
+      "country": "FR",
+      "suppressor_id": "48.6646_-2.3479",
+      "distance_km": 2.832178495982412,
+      "darkness": 0.9493970027058072,
+      "suppressor_darkness": 0.9592766954051251,
+      "bortle": 2,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "46.2396_-1.5396",
+      "country": "FR",
+      "suppressor_id": "46.2396_-1.5438",
+      "distance_km": 0.32044727251263233,
+      "darkness": 0.9228814249627936,
+      "suppressor_darkness": 0.9262068238666075,
+      "bortle": 2,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "49.2646_-1.6313",
+      "country": "FR",
+      "suppressor_id": "49.2604_-1.6521",
+      "distance_km": 1.5811772195554463,
+      "darkness": 0.9098316699352966,
+      "suppressor_darkness": 0.9214618334604363,
+      "bortle": 2,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "49.3979_-1.1771",
+      "country": "FR",
+      "suppressor_id": "49.3937_-1.0229",
+      "distance_km": 11.16649074281005,
+      "darkness": 0.8976290330492914,
+      "suppressor_darkness": 0.8976472851258421,
+      "bortle": 2,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "45.8521_-1.2188",
+      "country": "FR",
+      "suppressor_id": "45.8604_-1.2438",
+      "distance_km": 2.1463950433124825,
+      "darkness": 0.8846981985249773,
+      "suppressor_darkness": 0.898397386387472,
+      "bortle": 2,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "48.5437_-2.3146",
+      "country": "FR",
+      "suppressor_id": "48.6646_-2.3479",
+      "distance_km": 13.65776978580268,
+      "darkness": 0.8819880961518464,
+      "suppressor_darkness": 0.9592766954051251,
+      "bortle": 2,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "49.3229_-0.9771",
+      "country": "FR",
+      "suppressor_id": "49.3937_-1.0229",
+      "distance_km": 8.547215831692395,
+      "darkness": 0.8800583477608449,
+      "suppressor_darkness": 0.8976472851258421,
+      "bortle": 2,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "47.8146_-3.7979",
+      "country": "FR",
+      "suppressor_id": "47.8021_-3.8396",
+      "distance_km": 3.407987265631323,
+      "darkness": 0.8785762027448176,
+      "suppressor_darkness": 0.8831656317337793,
+      "bortle": 2,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "45.9812_-1.3563",
+      "country": "FR",
+      "suppressor_id": "45.9771_-1.3771",
+      "distance_km": 1.6751693607047187,
+      "darkness": 0.8740605466087086,
+      "suppressor_darkness": 0.8940554621648056,
+      "bortle": 2,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "49.6896_-1.2688",
+      "country": "FR",
+      "suppressor_id": "49.6937_-1.2646",
+      "distance_km": 0.5518047286276919,
+      "darkness": 0.8717982248909532,
+      "suppressor_darkness": 0.8746522832004966,
+      "bortle": 2,
+      "suppressor_osm_suspected": true
+    },
+    {
+      "region": "france",
+      "id": "49.3729_-1.7688",
+      "country": "FR",
+      "suppressor_id": "49.3729_-1.7729",
+      "distance_km": 0.3016778808001159,
+      "darkness": 0.8693587127586875,
+      "suppressor_darkness": 0.8701010178944584,
+      "bortle": 2,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "46.3896_4.0062",
+      "country": "FR",
+      "suppressor_id": "46.4854_3.8687",
+      "distance_km": 14.985759512362161,
+      "darkness": 0.8681865521050394,
+      "suppressor_darkness": 0.9105480870012186,
+      "bortle": 2,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "49.3562_-1.4479",
+      "country": "FR",
+      "suppressor_id": "49.3562_-1.4854",
+      "distance_km": 2.7160213685106895,
+      "darkness": 0.8616350987200511,
+      "suppressor_darkness": 0.8747536721384743,
+      "bortle": 2,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "44.1312_-1.3104",
+      "country": "FR",
+      "suppressor_id": "44.1312_-1.3146",
+      "distance_km": 0.33254076582935665,
+      "darkness": 0.8594997162266514,
+      "suppressor_darkness": 0.8607247748543092,
+      "bortle": 2,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "45.1479_-1.1729",
+      "country": "FR",
+      "suppressor_id": "45.2229_-1.1688",
+      "distance_km": 8.346010289538553,
+      "darkness": 0.8585327609631094,
+      "suppressor_darkness": 0.866758773532187,
+      "bortle": 2,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "49.5896_-1.2688",
+      "country": "FR",
+      "suppressor_id": "49.5104_-1.2813",
+      "distance_km": 8.848999543104947,
+      "darkness": 0.8466038680329364,
+      "suppressor_darkness": 0.84684014839099,
+      "bortle": 3,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "44.3562_-1.2646",
+      "country": "FR",
+      "suppressor_id": "44.3562_-1.2688",
+      "distance_km": 0.3312713329903048,
+      "darkness": 0.8455001014603738,
+      "suppressor_darkness": 0.8480348662751658,
+      "bortle": 3,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "42.9562_-0.8563",
+      "country": "FR",
+      "suppressor_id": "42.9479_-0.8563",
+      "distance_km": 0.9266243887046036,
+      "darkness": 0.8449778223426434,
+      "suppressor_darkness": 0.845603664252998,
+      "bortle": 3,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "45.7729_-1.1729",
+      "country": "FR",
+      "suppressor_id": "45.8396_-1.1354",
+      "distance_km": 7.962506639049646,
+      "darkness": 0.8449189596327151,
+      "suppressor_darkness": 0.8459933935652868,
+      "bortle": 3,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "42.8146_-0.5771",
+      "country": "FR",
+      "suppressor_id": "42.8146_-0.6104",
+      "distance_km": 2.718926854978632,
+      "darkness": 0.8441987751638065,
+      "suppressor_darkness": 0.8474462806415414,
+      "bortle": 3,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "45.6604_1.3437",
+      "country": "FR",
+      "suppressor_id": "45.6604_1.3854",
+      "distance_km": 3.238133191002156,
+      "darkness": 0.8366705735893214,
+      "suppressor_darkness": 0.846772760136185,
+      "bortle": 3,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "45.1062_-1.1729",
+      "country": "FR",
+      "suppressor_id": "45.1021_-1.1896",
+      "distance_km": 1.3876885659154503,
+      "darkness": 0.8354211117443318,
+      "suppressor_darkness": 0.8428922743930238,
+      "bortle": 3,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "48.6021_-1.8188",
+      "country": "FR",
+      "suppressor_id": "48.7062_-1.8521",
+      "distance_km": 11.838775978734184,
+      "darkness": 0.8177307184146807,
+      "suppressor_darkness": 0.8201018091064005,
+      "bortle": 3,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "47.8146_-3.6479",
+      "country": "FR",
+      "suppressor_id": "47.8021_-3.6479",
+      "distance_km": 1.3899365830573003,
+      "darkness": 0.814840181115525,
+      "suppressor_darkness": 0.8163484413398583,
+      "bortle": 3,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "45.4312_-1.1271",
+      "country": "FR",
+      "suppressor_id": "45.4312_-1.1438",
+      "distance_km": 1.3005443820804863,
+      "darkness": 0.806872369593056,
+      "suppressor_darkness": 0.8168560677601786,
+      "bortle": 3,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "46.8604_-2.0896",
+      "country": "FR",
+      "suppressor_id": "46.8562_-2.1271",
+      "distance_km": 2.888731446800651,
+      "darkness": 0.802256843462565,
+      "suppressor_darkness": 0.8230161083409263,
+      "bortle": 3,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "45.4271_-0.9229",
+      "country": "FR",
+      "suppressor_id": "45.4396_-0.9354",
+      "distance_km": 1.6980208413706637,
+      "darkness": 0.8012850211925142,
+      "suppressor_darkness": 0.8047212913706119,
+      "bortle": 3,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "45.8896_-1.0354",
+      "country": "FR",
+      "suppressor_id": "45.8396_-1.1354",
+      "distance_km": 9.532410197684621,
+      "darkness": 0.7994839217720846,
+      "suppressor_darkness": 0.8459933935652868,
+      "bortle": 3,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "46.9896_-2.2271",
+      "country": "FR",
+      "suppressor_id": "46.9687_-2.2479",
+      "distance_km": 2.8043637569710613,
+      "darkness": 0.7839100930666711,
+      "suppressor_darkness": 0.809026723376971,
+      "bortle": 3,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "47.5854_-3.1354",
+      "country": "FR",
+      "suppressor_id": "47.5562_-3.1313",
+      "distance_km": 3.2582144930246484,
+      "darkness": 0.779987286305988,
+      "suppressor_darkness": 0.7928694733398729,
+      "bortle": 3,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "47.5521_-2.5479",
+      "country": "FR",
+      "suppressor_id": "47.5396_-2.5854",
+      "distance_km": 3.139111821110185,
+      "darkness": 0.7721079121793994,
+      "suppressor_darkness": 0.7770602436625633,
+      "bortle": 3,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "47.8604_-3.8813",
+      "country": "FR",
+      "suppressor_id": "47.8354_-3.8813",
+      "distance_km": 2.7798731661146006,
+      "darkness": 0.7600295030949351,
+      "suppressor_darkness": 0.7807312288602268,
+      "bortle": 3,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "46.0271_-1.0396",
+      "country": "FR",
+      "suppressor_id": "45.9812_-1.0813",
+      "distance_km": 6.0274716594590805,
+      "darkness": 0.7467836589242081,
+      "suppressor_darkness": 0.7947307177627387,
+      "bortle": 3,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "43.8812_-1.3563",
+      "country": "FR",
+      "suppressor_id": "43.8937_-1.3771",
+      "distance_km": 2.172400548310762,
+      "darkness": 0.745896919393306,
+      "suppressor_darkness": 0.7636115880289391,
+      "bortle": 3,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "46.6646_-1.7229",
+      "country": "FR",
+      "suppressor_id": "46.6437_-1.8646",
+      "distance_km": 11.057971178849128,
+      "darkness": 0.736524360834366,
+      "suppressor_darkness": 0.7399031727171397,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "49.2687_-0.7604",
+      "country": "FR",
+      "suppressor_id": "49.3396_-0.6229",
+      "distance_km": 12.70522739532882,
+      "darkness": 0.7288912316135496,
+      "suppressor_darkness": 0.733639776178175,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "44.7854_-1.2188",
+      "country": "FR",
+      "suppressor_id": "44.7854_-1.2354",
+      "distance_km": 1.3153434325708262,
+      "darkness": 0.7217046689806738,
+      "suppressor_darkness": 0.7378829469200333,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "45.5229_-1.0813",
+      "country": "FR",
+      "suppressor_id": "45.5729_-0.9479",
+      "distance_km": 11.777682946595867,
+      "darkness": 0.7154734078675008,
+      "suppressor_darkness": 0.7276034719928078,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "45.7021_-0.9479",
+      "country": "FR",
+      "suppressor_id": "45.5729_-0.9479",
+      "distance_km": 14.362678024921749,
+      "darkness": 0.7104466027251598,
+      "suppressor_darkness": 0.7276034719928078,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "49.6896_-1.9063",
+      "country": "FR",
+      "suppressor_id": "49.7229_-1.9354",
+      "distance_km": 4.258775102756464,
+      "darkness": 0.6971134971467521,
+      "suppressor_darkness": 0.7338736964780892,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "47.6771_-3.2396",
+      "country": "FR",
+      "suppressor_id": "47.6687_-3.2396",
+      "distance_km": 0.9266243887046036,
+      "darkness": 0.6899173814608456,
+      "suppressor_darkness": 0.69244023251279,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "47.3521_-2.5021",
+      "country": "FR",
+      "suppressor_id": "47.2979_-2.5354",
+      "distance_km": 6.526057584339498,
+      "darkness": 0.679582513012466,
+      "suppressor_darkness": 0.6890969680549945,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "49.1521_-0.6229",
+      "country": "FR",
+      "suppressor_id": "49.1521_-0.6688",
+      "distance_km": 3.3333402955387994,
+      "darkness": 0.6786117525810306,
+      "suppressor_darkness": 0.7199309001306609,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "49.7187_5.1021",
+      "country": "FR",
+      "suppressor_id": "49.7146_5.1229",
+      "distance_km": 1.5678344438469205,
+      "darkness": 0.6578613083993962,
+      "suppressor_darkness": 0.6599650627115364,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "46.7562_-1.5396",
+      "country": "FR",
+      "suppressor_id": "46.6812_-1.6313",
+      "distance_km": 10.88033801533739,
+      "darkness": 0.6562484597952284,
+      "suppressor_darkness": 0.691156856955341,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "49.3229_-0.5313",
+      "country": "FR",
+      "suppressor_id": "49.3396_-0.6229",
+      "distance_km": 6.896218334632956,
+      "darkness": 0.6528253956182659,
+      "suppressor_darkness": 0.733639776178175,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "49.8729_0.8271",
+      "country": "FR",
+      "suppressor_id": "49.8896_0.8521",
+      "distance_km": 2.5774419259275474,
+      "darkness": 0.6468638845521902,
+      "suppressor_darkness": 0.6626400036756681,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "50.4271_1.5771",
+      "country": "FR",
+      "suppressor_id": "50.4146_1.5646",
+      "distance_km": 1.648087485626876,
+      "darkness": 0.645305280088359,
+      "suppressor_darkness": 0.6516198412656287,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "50.1479_1.4854",
+      "country": "FR",
+      "suppressor_id": "50.1979_1.5062",
+      "distance_km": 5.754313791282926,
+      "darkness": 0.6304712297409649,
+      "suppressor_darkness": 0.6645227679785024,
+      "bortle": 4,
+      "suppressor_osm_suspected": true
+    },
+    {
+      "region": "france",
+      "id": "49.9229_4.7979",
+      "country": "FR",
+      "suppressor_id": "49.8979_4.8604",
+      "distance_km": 5.268556613462669,
+      "darkness": 0.6267458490940078,
+      "suppressor_darkness": 0.6286290460721033,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "47.0812_-1.9979",
+      "country": "FR",
+      "suppressor_id": "47.0812_-2.0104",
+      "distance_km": 0.946491988241365,
+      "darkness": 0.6253324213523215,
+      "suppressor_darkness": 0.6278361676531857,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "47.9521_-1.8146",
+      "country": "FR",
+      "suppressor_id": "47.9521_-2.0146",
+      "distance_km": 14.894597773953691,
+      "darkness": 0.5950326702805817,
+      "suppressor_darkness": 0.7378608496335723,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "44.6062_-0.9521",
+      "country": "FR",
+      "suppressor_id": "44.5604_-1.0396",
+      "distance_km": 8.601985278792974,
+      "darkness": 0.5886760492293875,
+      "suppressor_darkness": 0.6569459004690654,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "49.7812_4.8729",
+      "country": "FR",
+      "suppressor_id": "49.8979_4.8604",
+      "distance_km": 13.003675358551707,
+      "darkness": 0.5704529605502526,
+      "suppressor_darkness": 0.6286290460721033,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "44.6062_-0.7604",
+      "country": "FR",
+      "suppressor_id": "44.6062_-0.8521",
+      "distance_km": 7.256806568329473,
+      "darkness": 0.5599974153228265,
+      "suppressor_darkness": 0.5825196542673827,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "47.9521_-1.6063",
+      "country": "FR",
+      "suppressor_id": "47.9521_-1.7688",
+      "distance_km": 12.101861842741274,
+      "darkness": 0.559967348388521,
+      "suppressor_darkness": 0.5811732266222214,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "44.7437_-0.9438",
+      "country": "FR",
+      "suppressor_id": "44.6979_-1.0354",
+      "distance_km": 8.855908294533894,
+      "darkness": 0.5579336810765256,
+      "suppressor_darkness": 0.5832278203831014,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "50.0604_4.7812",
+      "country": "FR",
+      "suppressor_id": "49.9812_4.6896",
+      "distance_km": 10.971831901244059,
+      "darkness": 0.5569051661205128,
+      "suppressor_darkness": 0.5988816517352975,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "43.2771_-1.4521",
+      "country": "FR",
+      "suppressor_id": "43.2646_-1.4521",
+      "distance_km": 1.3899365830573003,
+      "darkness": 0.5467008778169469,
+      "suppressor_darkness": 0.5509434182700769,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "50.0604_4.1854",
+      "country": "FR",
+      "suppressor_id": "50.0437_4.1646",
+      "distance_km": 2.376345387086075,
+      "darkness": 0.5311122417193919,
+      "suppressor_darkness": 0.5358551376582283,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "44.6062_-0.5313",
+      "country": "FR",
+      "suppressor_id": "44.6062_-0.6104",
+      "distance_km": 6.267242120049485,
+      "darkness": 0.5255130896763132,
+      "suppressor_darkness": 0.5284880639754052,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "43.6854_-1.4021",
+      "country": "FR",
+      "suppressor_id": "43.7312_-1.4271",
+      "distance_km": 5.478288086758613,
+      "darkness": 0.5108778025207998,
+      "suppressor_darkness": 0.5852563726517893,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "49.7354_0.2937",
+      "country": "FR",
+      "suppressor_id": "49.7229_0.2521",
+      "distance_km": 3.301679930931716,
+      "darkness": 0.5044489502728186,
+      "suppressor_darkness": 0.5194475049573168,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "45.7771_5.5146",
+      "country": "FR",
+      "suppressor_id": "45.6562_5.5979",
+      "distance_km": 14.912586112800906,
+      "darkness": 0.4818682192723375,
+      "suppressor_darkness": 0.4983779661432711,
+      "bortle": 5,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "49.2771_-0.3479",
+      "country": "FR",
+      "suppressor_id": "49.2979_-0.3021",
+      "distance_km": 4.051775984264172,
+      "darkness": 0.47164109882140937,
+      "suppressor_darkness": 0.4891528108735047,
+      "bortle": 5,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "49.6896_0.2562",
+      "country": "FR",
+      "suppressor_id": "49.6896_0.1729",
+      "distance_km": 5.994596264015642,
+      "darkness": 0.4698893746596816,
+      "suppressor_darkness": 0.47350395929547806,
+      "bortle": 5,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "50.8104_1.6229",
+      "country": "FR",
+      "suppressor_id": "50.8687_1.5812",
+      "distance_km": 7.11570335682689,
+      "darkness": 0.4582614621968293,
+      "suppressor_darkness": 0.49599377677224665,
+      "bortle": 5,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "43.2604_3.1771",
+      "country": "FR",
+      "suppressor_id": "43.2396_3.2771",
+      "distance_km": 8.423901631446272,
+      "darkness": 0.404867994882797,
+      "suppressor_darkness": 0.42106998742903257,
+      "bortle": 5,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "45.6354_5.3771",
+      "country": "FR",
+      "suppressor_id": "45.7146_5.4229",
+      "distance_km": 9.49591763354555,
+      "darkness": 0.39113386777703296,
+      "suppressor_darkness": 0.41404479772769454,
+      "bortle": 5,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "43.4937_3.6854",
+      "country": "FR",
+      "suppressor_id": "43.4562_3.8062",
+      "distance_km": 10.604421420350068,
+      "darkness": 0.3570931322505654,
+      "suppressor_darkness": 0.35855128017414895,
+      "bortle": 5,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "50.2437_4.1854",
+      "country": "FR",
+      "suppressor_id": "50.2437_4.1979",
+      "distance_km": 0.8888962258485279,
+      "darkness": 0.3541607652934097,
+      "suppressor_darkness": 0.3590772135819028,
+      "bortle": 5,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "50.8396_1.8854",
+      "country": "FR",
+      "suppressor_id": "50.8396_1.8062",
+      "distance_km": 5.558996292072191,
+      "darkness": 0.35393358606549274,
+      "suppressor_darkness": 0.3595037613243697,
+      "bortle": 5,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "43.1396_3.0854",
+      "country": "FR",
+      "suppressor_id": "43.1271_3.1354",
+      "distance_km": 4.2887827244020285,
+      "darkness": 0.3511053124668133,
+      "suppressor_darkness": 0.38855136232285425,
+      "bortle": 5,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "43.3229_-1.6813",
+      "country": "FR",
+      "suppressor_id": "43.3062_-1.6813",
+      "distance_km": 1.853248777409997,
+      "darkness": 0.3283859366912818,
+      "suppressor_darkness": 0.34863708125217396,
+      "bortle": 6,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "50.8854_1.7604",
+      "country": "FR",
+      "suppressor_id": "50.9312_1.7187",
+      "distance_km": 5.874406695582456,
+      "darkness": 0.29103654951158964,
+      "suppressor_darkness": 0.31448756727728155,
+      "bortle": 6,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "49.3729_0.1104",
+      "country": "FR",
+      "suppressor_id": "49.3729_0.0854",
+      "distance_km": 1.8100672767594708,
+      "darkness": 0.27807744578285687,
+      "suppressor_darkness": 0.28943953611244,
+      "bortle": 6,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "50.4687_3.5687",
+      "country": "FR",
+      "suppressor_id": "50.5146_3.4937",
+      "distance_km": 7.356825094372734,
+      "darkness": 0.20226664390359428,
+      "suppressor_darkness": 0.20509865793031323,
+      "bortle": 6,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "50.4562_3.3104",
+      "country": "FR",
+      "suppressor_id": "50.5104_3.4521",
+      "distance_km": 11.693858234260404,
+      "darkness": 0.19456209650513345,
+      "suppressor_darkness": 0.19607243284264397,
+      "bortle": 7,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "50.6979_2.8146",
+      "country": "FR",
+      "suppressor_id": "50.7146_2.8146",
+      "distance_km": 1.8532487774092068,
+      "darkness": 0.18856558137397306,
+      "suppressor_darkness": 0.19603242721513214,
+      "bortle": 7,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "49.5521_0.1104",
+      "country": "FR",
+      "suppressor_id": "49.5521_0.0896",
+      "distance_km": 1.5028841027430402,
+      "darkness": 0.1626334460420844,
+      "suppressor_darkness": 0.18263964131210886,
+      "bortle": 7,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "43.3687_5.1187",
+      "country": "FR",
+      "suppressor_id": "43.3312_5.0854",
+      "distance_km": 4.965056417683912,
+      "darkness": 0.12813753112992776,
+      "suppressor_darkness": 0.18149532022464565,
+      "bortle": 7,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "50.4812_3.0854",
+      "country": "FR",
+      "suppressor_id": "50.4229_3.2687",
+      "distance_km": 14.51051870983256,
+      "darkness": 0.11195842314407167,
+      "suppressor_darkness": 0.1810978846930652,
+      "bortle": 7,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "50.5604_2.9062",
+      "country": "FR",
+      "suppressor_id": "50.5812_2.9062",
+      "distance_km": 2.316560971761904,
+      "darkness": 0.10888144034784053,
+      "suppressor_darkness": 0.11626964388229766,
+      "bortle": 7,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "43.2312_5.4687",
+      "country": "FR",
+      "suppressor_id": "43.2104_5.4687",
+      "distance_km": 2.316560971761904,
+      "darkness": 0.06723796860472353,
+      "suppressor_darkness": 0.12794272173555177,
+      "bortle": 7,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "50.7437_3.0437",
+      "country": "FR",
+      "suppressor_id": "50.7729_3.0479",
+      "distance_km": 3.2564016634661015,
+      "darkness": 0.06423901123764686,
+      "suppressor_darkness": 0.07896898890122372,
+      "bortle": 7,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "france",
+      "id": "50.6104_3.2229",
+      "country": "FR",
+      "suppressor_id": "50.5646_3.2229",
+      "distance_km": 5.096434137875714,
+      "darkness": 0.06034117762981983,
+      "suppressor_darkness": 0.10693901719658228,
+      "bortle": 7,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "54.9979_-8.5396",
+      "country": "IE",
+      "suppressor_id": "54.9979_-8.5563",
+      "distance_km": 1.0630350256028407,
+      "darkness": 1.0,
+      "suppressor_darkness": 1.0,
+      "bortle": 1,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "54.9979_-8.2646",
+      "country": "IE",
+      "suppressor_id": "54.9979_-8.3104",
+      "distance_km": 2.9233462750241634,
+      "darkness": 1.0,
+      "suppressor_darkness": 1.0,
+      "bortle": 1,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "54.8604_-8.3563",
+      "country": "IE",
+      "suppressor_id": "54.8271_-8.5521",
+      "distance_km": 13.074966748734282,
+      "darkness": 1.0,
+      "suppressor_darkness": 1.0,
+      "bortle": 1,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "54.7229_-8.7229",
+      "country": "IE",
+      "suppressor_id": "54.7313_-8.7313",
+      "distance_km": 1.070029979216187,
+      "darkness": 1.0,
+      "suppressor_darkness": 1.0,
+      "bortle": 1,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "54.7229_-8.4479",
+      "country": "IE",
+      "suppressor_id": "54.8271_-8.5521",
+      "distance_km": 13.371417012058851,
+      "darkness": 1.0,
+      "suppressor_darkness": 1.0,
+      "bortle": 1,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "54.3104_-9.8229",
+      "country": "IE",
+      "suppressor_id": "54.3312_-9.8271",
+      "distance_km": 2.332268476203563,
+      "darkness": 1.0,
+      "suppressor_darkness": 1.0,
+      "bortle": 1,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "54.3104_-9.5479",
+      "country": "IE",
+      "suppressor_id": "54.3146_-9.5021",
+      "distance_km": 3.008960090732931,
+      "darkness": 1.0,
+      "suppressor_darkness": 1.0,
+      "bortle": 1,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "54.2646_-10.0521",
+      "country": "IE",
+      "suppressor_id": "54.2771_-10.0563",
+      "distance_km": 1.416023575598065,
+      "darkness": 1.0,
+      "suppressor_darkness": 1.0,
+      "bortle": 1,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "54.2646_-9.3188",
+      "country": "IE",
+      "suppressor_id": "54.3146_-9.5021",
+      "distance_km": 13.133739057481588,
+      "darkness": 1.0,
+      "suppressor_darkness": 1.0,
+      "bortle": 1,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "54.2646_-9.0438",
+      "country": "IE",
+      "suppressor_id": "54.2812_-9.2188",
+      "distance_km": 11.512799554630083,
+      "darkness": 1.0,
+      "suppressor_darkness": 1.0,
+      "bortle": 1,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "54.1938_-8.8146",
+      "country": "IE",
+      "suppressor_id": "54.2896_-8.9396",
+      "distance_km": 13.398748988167211,
+      "darkness": 1.0,
+      "suppressor_darkness": 1.0,
+      "bortle": 1,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "54.1729_-9.8688",
+      "country": "IE",
+      "suppressor_id": "54.2188_-9.6854",
+      "distance_km": 12.969305168788946,
+      "darkness": 1.0,
+      "suppressor_darkness": 1.0,
+      "bortle": 1,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "54.1729_-9.5938",
+      "country": "IE",
+      "suppressor_id": "54.2188_-9.6854",
+      "distance_km": 7.844167565635451,
+      "darkness": 1.0,
+      "suppressor_darkness": 1.0,
+      "bortle": 1,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "54.1271_-10.0979",
+      "country": "IE",
+      "suppressor_id": "54.1271_-10.1229",
+      "distance_km": 1.6289761722729195,
+      "darkness": 1.0,
+      "suppressor_darkness": 1.0,
+      "bortle": 1,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "54.0812_-9.4104",
+      "country": "IE",
+      "suppressor_id": "54.1729_-9.4563",
+      "distance_km": 10.621368648998994,
+      "darkness": 1.0,
+      "suppressor_darkness": 1.0,
+      "bortle": 1,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "54.0354_-9.8688",
+      "country": "IE",
+      "suppressor_id": "54.1271_-9.8688",
+      "distance_km": 10.19286827575143,
+      "darkness": 1.0,
+      "suppressor_darkness": 1.0,
+      "bortle": 1,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "53.9896_-10.1896",
+      "country": "IE",
+      "suppressor_id": "53.9813_-10.2438",
+      "distance_km": 3.6607226667469708,
+      "darkness": 1.0,
+      "suppressor_darkness": 1.0,
+      "bortle": 1,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "53.9896_-9.6396",
+      "country": "IE",
+      "suppressor_id": "54.0812_-9.6396",
+      "distance_km": 10.192868275750639,
+      "darkness": 1.0,
+      "suppressor_darkness": 1.0,
+      "bortle": 1,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "53.8979_-9.9604",
+      "country": "IE",
+      "suppressor_id": "53.9896_-10.0063",
+      "distance_km": 10.625087391260104,
+      "darkness": 1.0,
+      "suppressor_darkness": 1.0,
+      "bortle": 1,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "53.7729_-9.6396",
+      "country": "IE",
+      "suppressor_id": "53.7854_-9.6646",
+      "distance_km": 2.1517756729931086,
+      "darkness": 1.0,
+      "suppressor_darkness": 1.0,
+      "bortle": 1,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "53.7604_-9.8688",
+      "country": "IE",
+      "suppressor_id": "53.7646_-9.8979",
+      "distance_km": 1.972345258512688,
+      "darkness": 1.0,
+      "suppressor_darkness": 1.0,
+      "bortle": 1,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "53.6646_-9.4563",
+      "country": "IE",
+      "suppressor_id": "53.6729_-9.5021",
+      "distance_km": 3.1583831621386596,
+      "darkness": 1.0,
+      "suppressor_darkness": 1.0,
+      "bortle": 1,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "53.6229_-9.8229",
+      "country": "IE",
+      "suppressor_id": "53.6021_-10.0229",
+      "distance_km": 13.394960440353017,
+      "darkness": 1.0,
+      "suppressor_darkness": 1.0,
+      "bortle": 1,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "53.5312_-10.0979",
+      "country": "IE",
+      "suppressor_id": "53.6021_-10.0229",
+      "distance_km": 9.304103574708288,
+      "darkness": 1.0,
+      "suppressor_darkness": 1.0,
+      "bortle": 1,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "53.5312_-9.6396",
+      "country": "IE",
+      "suppressor_id": "53.6229_-9.7771",
+      "distance_km": 13.649262604476862,
+      "darkness": 1.0,
+      "suppressor_darkness": 1.0,
+      "bortle": 1,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "53.5271_-9.4104",
+      "country": "IE",
+      "suppressor_id": "53.5312_-9.5938",
+      "distance_km": 12.126407800462859,
+      "darkness": 1.0,
+      "suppressor_darkness": 1.0,
+      "bortle": 1,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "53.2563_-9.6854",
+      "country": "IE",
+      "suppressor_id": "53.2563_-9.7146",
+      "distance_km": 1.9401940954980046,
+      "darkness": 1.0,
+      "suppressor_darkness": 1.0,
+      "bortle": 1,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "53.1187_-9.7313",
+      "country": "IE",
+      "suppressor_id": "53.1187_-9.7438",
+      "distance_km": 0.834182249537593,
+      "darkness": 1.0,
+      "suppressor_darkness": 1.0,
+      "bortle": 1,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "52.8896_-4.6438",
+      "country": "GB",
+      "suppressor_id": "52.9021_-4.6313",
+      "distance_km": 1.6232708937475482,
+      "darkness": 1.0,
+      "suppressor_darkness": 1.0,
+      "bortle": 1,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "52.6604_-9.6854",
+      "country": "IE",
+      "suppressor_id": "52.7354_-9.6063",
+      "distance_km": 9.899927277863128,
+      "darkness": 1.0,
+      "suppressor_darkness": 1.0,
+      "bortle": 1,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "52.5688_-9.9146",
+      "country": "IE",
+      "suppressor_id": "52.6187_-9.7813",
+      "distance_km": 10.584089814187447,
+      "darkness": 1.0,
+      "suppressor_darkness": 1.0,
+      "bortle": 1,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "52.2479_-10.2813",
+      "country": "IE",
+      "suppressor_id": "52.2563_-10.2938",
+      "distance_km": 1.258041755921641,
+      "darkness": 1.0,
+      "suppressor_darkness": 1.0,
+      "bortle": 1,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "52.2479_-10.0521",
+      "country": "IE",
+      "suppressor_id": "52.3062_-10.0521",
+      "distance_km": 6.486370720932224,
+      "darkness": 1.0,
+      "suppressor_darkness": 1.0,
+      "bortle": 1,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "52.2021_-4.3688",
+      "country": "GB",
+      "suppressor_id": "52.2062_-4.3771",
+      "distance_km": 0.7329034360608563,
+      "darkness": 1.0,
+      "suppressor_darkness": 1.0,
+      "bortle": 1,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "52.0312_-4.7354",
+      "country": "GB",
+      "suppressor_id": "52.0479_-4.8354",
+      "distance_km": 7.086411167603045,
+      "darkness": 1.0,
+      "suppressor_darkness": 1.0,
+      "bortle": 1,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "52.0187_-10.1438",
+      "country": "IE",
+      "suppressor_id": "51.9896_-10.2563",
+      "distance_km": 8.355921676896186,
+      "darkness": 1.0,
+      "suppressor_darkness": 1.0,
+      "bortle": 1,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "51.9729_-9.8229",
+      "country": "IE",
+      "suppressor_id": "52.0938_-9.9188",
+      "distance_km": 14.950077418123529,
+      "darkness": 1.0,
+      "suppressor_darkness": 1.0,
+      "bortle": 1,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "51.9271_-10.3271",
+      "country": "IE",
+      "suppressor_id": "51.9896_-10.2563",
+      "distance_km": 8.476792296019466,
+      "darkness": 1.0,
+      "suppressor_darkness": 1.0,
+      "bortle": 1,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "51.8813_-10.0979",
+      "country": "IE",
+      "suppressor_id": "51.9271_-10.0521",
+      "distance_km": 5.988391475791268,
+      "darkness": 1.0,
+      "suppressor_darkness": 1.0,
+      "bortle": 1,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "51.8813_-5.2854",
+      "country": "GB",
+      "suppressor_id": "51.9438_-5.1979",
+      "distance_km": 9.182583836824296,
+      "darkness": 1.0,
+      "suppressor_darkness": 1.0,
+      "bortle": 1,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "51.6979_-9.9604",
+      "country": "IE",
+      "suppressor_id": "51.6729_-10.0729",
+      "distance_km": 8.238732000390142,
+      "darkness": 1.0,
+      "suppressor_darkness": 1.0,
+      "bortle": 1,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "51.6063_-9.6854",
+      "country": "IE",
+      "suppressor_id": "51.5771_-9.7813",
+      "distance_km": 7.37199514808898,
+      "darkness": 1.0,
+      "suppressor_darkness": 1.0,
+      "bortle": 1,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "51.6063_-9.4563",
+      "country": "IE",
+      "suppressor_id": "51.6021_-9.5646",
+      "distance_km": 7.496063386557735,
+      "darkness": 1.0,
+      "suppressor_darkness": 1.0,
+      "bortle": 1,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "51.0104_-4.5063",
+      "country": "GB",
+      "suppressor_id": "51.0146_-4.5229",
+      "distance_km": 1.2546518355400158,
+      "darkness": 1.0,
+      "suppressor_darkness": 1.0,
+      "bortle": 1,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "49.9562_-6.3396",
+      "country": "GB",
+      "suppressor_id": "49.9604_-6.3438",
+      "distance_km": 0.5509115483886017,
+      "darkness": 1.0,
+      "suppressor_darkness": 1.0,
+      "bortle": 1,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "52.1104_-4.5313",
+      "country": "GB",
+      "suppressor_id": "52.2062_-4.3771",
+      "distance_km": 14.97176225106933,
+      "darkness": 0.998759959053324,
+      "suppressor_darkness": 1.0,
+      "bortle": 1,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "52.2354_-4.2771",
+      "country": "GB",
+      "suppressor_id": "52.2146_-4.3188",
+      "distance_km": 3.6634855606098338,
+      "darkness": 0.9933453441187124,
+      "suppressor_darkness": 0.9966940668157922,
+      "bortle": 2,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "52.1104_-4.5063",
+      "country": "GB",
+      "suppressor_id": "52.1104_-4.7229",
+      "distance_km": 14.796040852671641,
+      "darkness": 0.992427422616748,
+      "suppressor_darkness": 0.9937281508883298,
+      "bortle": 2,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "51.6313_-9.2729",
+      "country": "IE",
+      "suppressor_id": "51.5312_-9.3646",
+      "distance_km": 12.796922739354136,
+      "darkness": 0.9902434999437717,
+      "suppressor_darkness": 0.9918219393065312,
+      "bortle": 2,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "52.0187_-4.8771",
+      "country": "GB",
+      "suppressor_id": "52.0229_-5.0771",
+      "distance_km": 13.693149572401794,
+      "darkness": 0.9865040128026816,
+      "suppressor_darkness": 0.9975741746166866,
+      "bortle": 2,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "54.8188_-4.1854",
+      "country": "GB",
+      "suppressor_id": "54.7938_-4.1729",
+      "distance_km": 2.8929957928546237,
+      "darkness": 0.9847440721872354,
+      "suppressor_darkness": 0.9882689871271958,
+      "bortle": 2,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "52.9813_-9.4104",
+      "country": "IE",
+      "suppressor_id": "52.9896_-9.4146",
+      "distance_km": 0.9676933746601685,
+      "darkness": 0.9831924552527948,
+      "suppressor_darkness": 0.9935499863109472,
+      "bortle": 2,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "51.9271_-5.1938",
+      "country": "GB",
+      "suppressor_id": "52.0229_-5.0771",
+      "distance_km": 13.319706690024276,
+      "darkness": 0.9823063552282445,
+      "suppressor_darkness": 0.9975741746166866,
+      "bortle": 2,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "50.7604_-4.5979",
+      "country": "GB",
+      "suppressor_id": "50.7563_-4.6146",
+      "distance_km": 1.2605818210531468,
+      "darkness": 0.9748221002019881,
+      "suppressor_darkness": 0.9775536181217677,
+      "bortle": 2,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "54.8646_-4.7396",
+      "country": "GB",
+      "suppressor_id": "54.8312_-4.7396",
+      "distance_km": 3.706497554819204,
+      "darkness": 0.9730795610356311,
+      "suppressor_darkness": 0.980095229703186,
+      "bortle": 2,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "52.7938_-9.4563",
+      "country": "IE",
+      "suppressor_id": "52.7354_-9.5479",
+      "distance_km": 8.950557178303026,
+      "darkness": 0.9717220746965285,
+      "suppressor_darkness": 0.9971742727244206,
+      "bortle": 2,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "54.6854_-4.8771",
+      "country": "GB",
+      "suppressor_id": "54.6354_-4.8646",
+      "distance_km": 5.6175746612864454,
+      "darkness": 0.971253595243141,
+      "suppressor_darkness": 0.976865813483788,
+      "bortle": 2,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "52.4312_-9.8229",
+      "country": "IE",
+      "suppressor_id": "52.4271_-9.8688",
+      "distance_km": 3.1418574907869115,
+      "darkness": 0.9634305354611685,
+      "suppressor_darkness": 0.9921036835373107,
+      "bortle": 2,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "54.6771_-8.4938",
+      "country": "IE",
+      "suppressor_id": "54.6313_-8.5396",
+      "distance_km": 5.887813185642837,
+      "darkness": 0.9616973765386565,
+      "suppressor_darkness": 0.9681852816013675,
+      "bortle": 2,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "51.9729_-4.6438",
+      "country": "GB",
+      "suppressor_id": "51.9729_-4.8521",
+      "distance_km": 14.27079588228627,
+      "darkness": 0.9611982844770917,
+      "suppressor_darkness": 0.9821563413573281,
+      "bortle": 2,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "52.2563_-4.0479",
+      "country": "GB",
+      "suppressor_id": "52.2604_-4.0938",
+      "distance_km": 3.15375663203824,
+      "darkness": 0.9536705981065852,
+      "suppressor_darkness": 0.9622873495588751,
+      "bortle": 2,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "50.0063_-5.2313",
+      "country": "GB",
+      "suppressor_id": "49.9937_-5.2438",
+      "distance_km": 1.6523159575249278,
+      "darkness": 0.9530803916753927,
+      "suppressor_darkness": 0.9670439880333093,
+      "bortle": 2,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "54.4479_-8.4479",
+      "country": "IE",
+      "suppressor_id": "54.4688_-8.4646",
+      "distance_km": 2.5547984987521852,
+      "darkness": 0.9516442515059127,
+      "suppressor_darkness": 0.9632987036334277,
+      "bortle": 2,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "52.6562_-4.0938",
+      "country": "GB",
+      "suppressor_id": "52.6562_-4.1021",
+      "distance_km": 0.5620863067648305,
+      "darkness": 0.9504398016958095,
+      "suppressor_darkness": 0.9546559585921766,
+      "bortle": 2,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "54.5771_-8.1729",
+      "country": "IE",
+      "suppressor_id": "54.5771_-8.1979",
+      "distance_km": 1.6112343650030854,
+      "darkness": 0.9474677102021856,
+      "suppressor_darkness": 0.954897767020359,
+      "bortle": 2,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "51.5646_-9.0229",
+      "country": "IE",
+      "suppressor_id": "51.5646_-9.1438",
+      "distance_km": 8.352281178374803,
+      "darkness": 0.9434725205023389,
+      "suppressor_darkness": 0.9875882250824219,
+      "bortle": 2,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "50.6437_-4.7354",
+      "country": "GB",
+      "suppressor_id": "50.6437_-4.7479",
+      "distance_km": 0.8814147772529233,
+      "darkness": 0.9418249080135401,
+      "suppressor_darkness": 0.9443860417045069,
+      "bortle": 2,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "53.6646_-9.1063",
+      "country": "IE",
+      "suppressor_id": "53.6896_-9.3188",
+      "distance_km": 14.269635909239364,
+      "darkness": 0.9392881687010842,
+      "suppressor_darkness": 0.9665672875132986,
+      "bortle": 2,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "51.7812_-9.1813",
+      "country": "IE",
+      "suppressor_id": "51.7479_-9.2271",
+      "distance_km": 4.8669088393826145,
+      "darkness": 0.9333774285254792,
+      "suppressor_darkness": 0.9642138599390473,
+      "bortle": 2,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "52.5063_-4.0479",
+      "country": "GB",
+      "suppressor_id": "52.5063_-4.0521",
+      "distance_km": 0.28200649609669426,
+      "darkness": 0.928871996586095,
+      "suppressor_darkness": 0.9299033479636681,
+      "bortle": 2,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "52.3438_-3.8313",
+      "country": "GB",
+      "suppressor_id": "52.3021_-3.8646",
+      "distance_km": 5.1573328977252455,
+      "darkness": 0.9238630070380474,
+      "suppressor_darkness": 0.9295551121046621,
+      "bortle": 2,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "54.8188_-4.9688",
+      "country": "GB",
+      "suppressor_id": "54.8312_-4.7396",
+      "distance_km": 14.745308892354002,
+      "darkness": 0.9163352417410408,
+      "suppressor_darkness": 0.980095229703186,
+      "bortle": 2,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "52.4813_-3.8188",
+      "country": "GB",
+      "suppressor_id": "52.4396_-3.8188",
+      "distance_km": 4.633121943523808,
+      "darkness": 0.9139901410519211,
+      "suppressor_darkness": 0.9200353613417267,
+      "bortle": 2,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "54.8188_-3.9104",
+      "country": "GB",
+      "suppressor_id": "54.7979_-3.9104",
+      "distance_km": 2.316560971761904,
+      "darkness": 0.9114282993463274,
+      "suppressor_darkness": 0.922744923931383,
+      "bortle": 2,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "52.8021_-4.1396",
+      "country": "GB",
+      "suppressor_id": "52.8021_-4.1438",
+      "distance_km": 0.280104723639344,
+      "darkness": 0.9109007963655685,
+      "suppressor_darkness": 0.9118542289059679,
+      "bortle": 2,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "51.8813_-4.8313",
+      "country": "GB",
+      "suppressor_id": "51.9729_-4.8521",
+      "distance_km": 10.292486861691964,
+      "darkness": 0.9066930883961146,
+      "suppressor_darkness": 0.9821563413573281,
+      "bortle": 2,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "53.7646_-9.2604",
+      "country": "IE",
+      "suppressor_id": "53.6896_-9.3188",
+      "distance_km": 9.180195757215941,
+      "darkness": 0.9053199400681542,
+      "suppressor_darkness": 0.9665672875132986,
+      "bortle": 2,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "52.2021_-3.8188",
+      "country": "GB",
+      "suppressor_id": "52.3021_-3.8646",
+      "distance_km": 11.548911979756056,
+      "darkness": 0.9041697507919148,
+      "suppressor_darkness": 0.9295551121046621,
+      "bortle": 2,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "52.1104_-4.0479",
+      "country": "GB",
+      "suppressor_id": "52.1562_-3.9104",
+      "distance_km": 10.679479437348519,
+      "darkness": 0.8984396700841439,
+      "suppressor_darkness": 0.905091358986444,
+      "bortle": 2,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "52.6646_-3.8646",
+      "country": "GB",
+      "suppressor_id": "52.5896_-3.8563",
+      "distance_km": 8.358565412112311,
+      "darkness": 0.8982475366610346,
+      "suppressor_darkness": 0.9036794867361506,
+      "bortle": 2,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "52.5229_-9.5021",
+      "country": "IE",
+      "suppressor_id": "52.4771_-9.6313",
+      "distance_km": 10.120346617137594,
+      "darkness": 0.8897741711047382,
+      "suppressor_darkness": 0.9000237937193689,
+      "bortle": 2,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "51.8354_-4.6229",
+      "country": "GB",
+      "suppressor_id": "51.9271_-4.6438",
+      "distance_km": 10.292689375945084,
+      "darkness": 0.8844909949813489,
+      "suppressor_darkness": 0.9451390975206073,
+      "bortle": 2,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "54.9521_-5.1521",
+      "country": "GB",
+      "suppressor_id": "54.9979_-5.1646",
+      "distance_km": 5.1584897372911085,
+      "darkness": 0.879998418504525,
+      "suppressor_darkness": 0.8859304300341495,
+      "bortle": 2,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "50.5521_-4.9604",
+      "country": "GB",
+      "suppressor_id": "50.5604_-4.9521",
+      "distance_km": 1.097818013718566,
+      "darkness": 0.8770824261785024,
+      "suppressor_darkness": 0.8815018997645501,
+      "bortle": 2,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "54.3563_-8.6313",
+      "country": "IE",
+      "suppressor_id": "54.3604_-8.6604",
+      "distance_km": 1.9458136554144878,
+      "darkness": 0.8763823498456942,
+      "suppressor_darkness": 0.9190049305296778,
+      "bortle": 2,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "52.3563_-3.5896",
+      "country": "GB",
+      "suppressor_id": "52.3146_-3.6354",
+      "distance_km": 5.582429817365186,
+      "darkness": 0.8749082950047748,
+      "suppressor_darkness": 0.8846278514613388,
+      "bortle": 2,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "52.8146_-3.9104",
+      "country": "GB",
+      "suppressor_id": "52.7563_-3.9104",
+      "distance_km": 6.486370720932224,
+      "darkness": 0.8626818057532354,
+      "suppressor_darkness": 0.8762770795758097,
+      "bortle": 2,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "52.5021_-6.2521",
+      "country": "IE",
+      "suppressor_id": "52.5271_-6.2271",
+      "distance_km": 3.254167308073832,
+      "darkness": 0.8618316445783669,
+      "suppressor_darkness": 0.8632309801036235,
+      "bortle": 2,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "52.5729_-3.6354",
+      "country": "GB",
+      "suppressor_id": "52.5271_-3.6354",
+      "distance_km": 5.096434137875714,
+      "darkness": 0.8556440580148388,
+      "suppressor_darkness": 0.865513278050205,
+      "bortle": 2,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "52.2021_-3.5896",
+      "country": "GB",
+      "suppressor_id": "52.3146_-3.6354",
+      "distance_km": 12.892529776884258,
+      "darkness": 0.8518142156831228,
+      "suppressor_darkness": 0.8846278514613388,
+      "bortle": 2,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "50.2354_-3.6854",
+      "country": "GB",
+      "suppressor_id": "50.2146_-3.6979",
+      "distance_km": 2.481373185654348,
+      "darkness": 0.8509831726591195,
+      "suppressor_darkness": 0.8802682544402475,
+      "bortle": 2,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "52.8937_-3.9729",
+      "country": "GB",
+      "suppressor_id": "52.8937_-4.1188",
+      "distance_km": 9.782985670867225,
+      "darkness": 0.8438717266985012,
+      "suppressor_darkness": 0.8443166517013317,
+      "bortle": 3,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "53.3937_-4.5521",
+      "country": "GB",
+      "suppressor_id": "53.4146_-4.4646",
+      "distance_km": 6.245918497682971,
+      "darkness": 0.8416502012874616,
+      "suppressor_darkness": 0.8471622276095097,
+      "bortle": 3,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "51.7437_-4.5063",
+      "country": "GB",
+      "suppressor_id": "51.6979_-4.6813",
+      "distance_km": 13.087843113168654,
+      "darkness": 0.8395775163890296,
+      "suppressor_darkness": 0.8479319902834712,
+      "bortle": 3,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "50.2354_-3.7313",
+      "country": "GB",
+      "suppressor_id": "50.2146_-3.7896",
+      "distance_km": 4.752621295366449,
+      "darkness": 0.8365438028455401,
+      "suppressor_darkness": 0.8464383554397497,
+      "bortle": 3,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "51.7437_-4.7396",
+      "country": "GB",
+      "suppressor_id": "51.6979_-4.6813",
+      "distance_km": 6.489999371765521,
+      "darkness": 0.8345860631840905,
+      "suppressor_darkness": 0.8479319902834712,
+      "bortle": 3,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "54.1729_-7.3938",
+      "country": "GB",
+      "suppressor_id": "54.1729_-7.4313",
+      "distance_km": 2.4407605550934166,
+      "darkness": 0.833476810780619,
+      "suppressor_darkness": 0.836443742452282,
+      "bortle": 3,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "52.8021_-3.7729",
+      "country": "GB",
+      "suppressor_id": "52.8062_-3.8188",
+      "distance_km": 3.1156453000173983,
+      "darkness": 0.8306016128742781,
+      "suppressor_darkness": 0.8431736988271463,
+      "bortle": 3,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "54.9104_-3.5896",
+      "country": "GB",
+      "suppressor_id": "54.8854_-3.5854",
+      "distance_km": 2.792610752671493,
+      "darkness": 0.8241519522040794,
+      "suppressor_darkness": 0.8260531865134365,
+      "bortle": 3,
+      "suppressor_osm_suspected": true
+    },
+    {
+      "region": "uk_ireland",
+      "id": "50.5063_-5.0104",
+      "country": "GB",
+      "suppressor_id": "50.5063_-5.0271",
+      "distance_km": 1.1786551844332782,
+      "darkness": 0.8230227975621061,
+      "suppressor_darkness": 0.8302728820334908,
+      "bortle": 3,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "51.6104_-8.9313",
+      "country": "IE",
+      "suppressor_id": "51.5938_-8.7729",
+      "distance_km": 11.091265386913168,
+      "darkness": 0.8194914216358021,
+      "suppressor_darkness": 0.8413219176641145,
+      "bortle": 3,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "51.9771_-7.7188",
+      "country": "IE",
+      "suppressor_id": "51.9813_-7.6271",
+      "distance_km": 6.29534813370825,
+      "darkness": 0.8172440181056526,
+      "suppressor_darkness": 0.8401884789014482,
+      "bortle": 3,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "50.0521_-5.1979",
+      "country": "GB",
+      "suppressor_id": "50.0521_-5.2729",
+      "distance_km": 5.354794316530934,
+      "darkness": 0.8150645368058178,
+      "suppressor_darkness": 0.8222461145323399,
+      "bortle": 3,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "53.3937_-4.3229",
+      "country": "GB",
+      "suppressor_id": "53.4146_-4.4646",
+      "distance_km": 9.672677994013373,
+      "darkness": 0.8139890263193547,
+      "suppressor_darkness": 0.8471622276095097,
+      "bortle": 3,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "51.6104_-4.9646",
+      "country": "GB",
+      "suppressor_id": "51.5979_-4.9396",
+      "distance_km": 2.216508737376617,
+      "darkness": 0.8033033558144065,
+      "suppressor_darkness": 0.819095764289573,
+      "bortle": 3,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "54.1146_-7.1646",
+      "country": "IE",
+      "suppressor_id": "54.1104_-7.1979",
+      "distance_km": 2.2215816808396784,
+      "darkness": 0.7957490379417328,
+      "suppressor_darkness": 0.8068813855973593,
+      "bortle": 3,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "50.2354_-4.8313",
+      "country": "GB",
+      "suppressor_id": "50.2313_-4.7979",
+      "distance_km": 2.4157530010778103,
+      "darkness": 0.7946691493355107,
+      "suppressor_darkness": 0.8075040834306909,
+      "bortle": 3,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "52.9354_0.9687",
+      "country": "GB",
+      "suppressor_id": "52.9729_0.9687",
+      "distance_km": 4.169809749170321,
+      "darkness": 0.7945013141331068,
+      "suppressor_darkness": 0.8235584607247805,
+      "bortle": 3,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "52.1896_-7.6229",
+      "country": "IE",
+      "suppressor_id": "52.1229_-7.4479",
+      "distance_km": 14.052646442689662,
+      "darkness": 0.7855615322407152,
+      "suppressor_darkness": 0.7938833878460982,
+      "bortle": 3,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "51.8354_-4.9229",
+      "country": "GB",
+      "suppressor_id": "51.8354_-4.8771",
+      "distance_km": 3.1492013209515535,
+      "darkness": 0.7851946779546082,
+      "suppressor_darkness": 0.8127814197929575,
+      "bortle": 3,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "51.1604_-4.0104",
+      "country": "GB",
+      "suppressor_id": "51.2188_-4.0021",
+      "distance_km": 6.512317899101773,
+      "darkness": 0.7807225667958277,
+      "suppressor_darkness": 0.7838241560561998,
+      "bortle": 3,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "54.9062_-3.2688",
+      "country": "GB",
+      "suppressor_id": "54.9813_-3.3896",
+      "distance_km": 11.362549154902684,
+      "darkness": 0.761393241642073,
+      "suppressor_darkness": 0.772516330553106,
+      "bortle": 3,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "52.1604_-7.3938",
+      "country": "IE",
+      "suppressor_id": "52.1229_-7.4479",
+      "distance_km": 5.57232620468707,
+      "darkness": 0.7563682809110781,
+      "suppressor_darkness": 0.7938833878460982,
+      "bortle": 3,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "52.9396_-3.7271",
+      "country": "GB",
+      "suppressor_id": "52.9396_-3.8646",
+      "distance_km": 9.214201047246629,
+      "darkness": 0.7553948296904034,
+      "suppressor_darkness": 0.7971918933492763,
+      "bortle": 3,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "52.8021_-3.5438",
+      "country": "GB",
+      "suppressor_id": "52.8021_-3.5896",
+      "distance_km": 3.081151908338499,
+      "darkness": 0.7500200220184466,
+      "suppressor_darkness": 0.7674585654174154,
+      "bortle": 3,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "52.1604_-6.8938",
+      "country": "IE",
+      "suppressor_id": "52.1313_-6.9229",
+      "distance_km": 3.805143721477473,
+      "darkness": 0.74781197322631,
+      "suppressor_darkness": 0.7637289497713686,
+      "bortle": 3,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "50.3479_-5.1479",
+      "country": "GB",
+      "suppressor_id": "50.3479_-5.1521",
+      "distance_km": 0.29565069673609684,
+      "darkness": 0.740301394665955,
+      "suppressor_darkness": 0.7417663350253955,
+      "bortle": 3,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "51.6562_-8.7229",
+      "country": "IE",
+      "suppressor_id": "51.5938_-8.7729",
+      "distance_km": 7.759580763018626,
+      "darkness": 0.7401436316248223,
+      "suppressor_darkness": 0.8413219176641145,
+      "bortle": 3,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "52.6187_-6.2521",
+      "country": "IE",
+      "suppressor_id": "52.7062_-6.1813",
+      "distance_km": 10.839024134113396,
+      "darkness": 0.7363135132927184,
+      "suppressor_darkness": 0.7385820494302258,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "51.7938_-4.3688",
+      "country": "GB",
+      "suppressor_id": "51.7229_-4.3729",
+      "distance_km": 7.881526498329668,
+      "darkness": 0.7357700328616832,
+      "suppressor_darkness": 0.7400164088916268,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "52.0688_-7.7146",
+      "country": "IE",
+      "suppressor_id": "52.0354_-7.5771",
+      "distance_km": 10.106293268262332,
+      "darkness": 0.7326640499620114,
+      "suppressor_darkness": 0.7372144003893257,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "52.7479_-6.3396",
+      "country": "IE",
+      "suppressor_id": "52.7062_-6.1813",
+      "distance_km": 11.625445141540757,
+      "darkness": 0.7323867004439477,
+      "suppressor_darkness": 0.7385820494302258,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "53.2604_-9.2729",
+      "country": "IE",
+      "suppressor_id": "53.2563_-9.2729",
+      "distance_km": 0.4633121943519067,
+      "darkness": 0.7323051988250896,
+      "suppressor_darkness": 0.7340871978212133,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "50.7396_-2.8938",
+      "country": "GB",
+      "suppressor_id": "50.7271_-2.9396",
+      "distance_km": 3.5124054753066067,
+      "darkness": 0.7306927270003594,
+      "suppressor_darkness": 0.738948166244645,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "50.3271_-4.6479",
+      "country": "GB",
+      "suppressor_id": "50.3438_-4.4604",
+      "distance_km": 13.436201932257182,
+      "darkness": 0.7306136237827912,
+      "suppressor_darkness": 0.7317081581137299,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "50.6938_-3.1354",
+      "country": "GB",
+      "suppressor_id": "50.7271_-2.9396",
+      "distance_km": 14.278686097595642,
+      "darkness": 0.727136558685594,
+      "suppressor_darkness": 0.738948166244645,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "50.3229_-5.1938",
+      "country": "GB",
+      "suppressor_id": "50.3188_-5.2146",
+      "distance_km": 1.5499626997121259,
+      "darkness": 0.7264282041235859,
+      "suppressor_darkness": 0.7317515594078762,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "51.6562_-4.8771",
+      "country": "GB",
+      "suppressor_id": "51.6187_-5.0271",
+      "distance_km": 11.159984487594516,
+      "darkness": 0.7259228089667769,
+      "suppressor_darkness": 0.7324326446745391,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "51.8813_-4.1938",
+      "country": "GB",
+      "suppressor_id": "51.8813_-4.3229",
+      "distance_km": 8.865984700438256,
+      "darkness": 0.7248316492635606,
+      "suppressor_darkness": 0.7260170996684678,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "53.1229_-4.1271",
+      "country": "GB",
+      "suppressor_id": "53.1229_-4.3021",
+      "distance_km": 11.677416656003956,
+      "darkness": 0.7227102382657353,
+      "suppressor_darkness": 0.7345576016482047,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "50.6938_-2.6646",
+      "country": "GB",
+      "suppressor_id": "50.6812_-2.6688",
+      "distance_km": 1.4205929478864128,
+      "darkness": 0.7218040380195565,
+      "suppressor_darkness": 0.7346996361151292,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "51.6562_-8.6771",
+      "country": "IE",
+      "suppressor_id": "51.6396_-8.6604",
+      "distance_km": 2.181023049123097,
+      "darkness": 0.7209862046567956,
+      "suppressor_darkness": 0.7367148861702643,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "53.3021_-4.6313",
+      "country": "GB",
+      "suppressor_id": "53.3062_-4.6938",
+      "distance_km": 4.1786643630937235,
+      "darkness": 0.7185380817577479,
+      "suppressor_darkness": 0.7286440244966718,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "54.9979_-6.0229",
+      "country": "GB",
+      "suppressor_id": "54.9979_-5.9896",
+      "distance_km": 2.126070036117045,
+      "darkness": 0.717102168440666,
+      "suppressor_darkness": 0.7245416961874755,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "52.7979_1.5854",
+      "country": "GB",
+      "suppressor_id": "52.8021_1.5854",
+      "distance_km": 0.4633121943519067,
+      "darkness": 0.7164623672737581,
+      "suppressor_darkness": 0.7213996556430102,
+      "bortle": 4,
+      "suppressor_osm_suspected": true
+    },
+    {
+      "region": "uk_ireland",
+      "id": "54.2687_-5.6104",
+      "country": "GB",
+      "suppressor_id": "54.2604_-5.6063",
+      "distance_km": 0.9653258628655567,
+      "darkness": 0.7136189869209948,
+      "suppressor_darkness": 0.7226537409093956,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "52.2896_1.6312",
+      "country": "GB",
+      "suppressor_id": "52.2896_1.6396",
+      "distance_km": 0.56678915363666,
+      "darkness": 0.7102395891656671,
+      "suppressor_darkness": 0.7115466300886613,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "53.3021_-4.0938",
+      "country": "GB",
+      "suppressor_id": "53.3062_-4.0938",
+      "distance_km": 0.4633121943526967,
+      "darkness": 0.7052329230120776,
+      "suppressor_darkness": 0.7070938060555301,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "51.5646_-4.2771",
+      "country": "GB",
+      "suppressor_id": "51.5646_-4.2938",
+      "distance_km": 1.1520389117258423,
+      "darkness": 0.7036858165321704,
+      "suppressor_darkness": 0.7190421376352725,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "52.8896_1.3604",
+      "country": "GB",
+      "suppressor_id": "52.9021_1.3604",
+      "distance_km": 1.3899365830565102,
+      "darkness": 0.6984950813003935,
+      "suppressor_darkness": 0.7360080345472413,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "50.3729_-4.4146",
+      "country": "GB",
+      "suppressor_id": "50.3438_-4.4604",
+      "distance_km": 4.592400162901993,
+      "darkness": 0.6907610718441582,
+      "suppressor_darkness": 0.7317081581137299,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "54.4062_-5.4729",
+      "country": "GB",
+      "suppressor_id": "54.3896_-5.4646",
+      "distance_km": 1.930161394705904,
+      "darkness": 0.6823130966289218,
+      "suppressor_darkness": 0.7027637157091049,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "52.9354_0.5312",
+      "country": "GB",
+      "suppressor_id": "52.9688_0.5771",
+      "distance_km": 4.813125297094273,
+      "darkness": 0.681757645971353,
+      "suppressor_darkness": 0.7255845835865745,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "52.1354_1.5854",
+      "country": "GB",
+      "suppressor_id": "52.1396_1.5979",
+      "distance_km": 0.9707918716728666,
+      "darkness": 0.6810257053422454,
+      "suppressor_darkness": 0.6867292305553552,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "54.9979_-7.5771",
+      "country": "IE",
+      "suppressor_id": "54.9937_-7.5896",
+      "distance_km": 0.9221570642482441,
+      "darkness": 0.679679657515339,
+      "suppressor_darkness": 0.6849428297787256,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "54.4104_-0.5229",
+      "country": "GB",
+      "suppressor_id": "54.3896_-0.4646",
+      "distance_km": 4.42985465739779,
+      "darkness": 0.6647583865317288,
+      "suppressor_darkness": 0.6708771376761705,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "53.3354_0.2562",
+      "country": "GB",
+      "suppressor_id": "53.2854_0.3062",
+      "distance_km": 6.476523274077509,
+      "darkness": 0.6587137838318818,
+      "suppressor_darkness": 0.6675201351477319,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "54.2229_-8.4063",
+      "country": "IE",
+      "suppressor_id": "54.3104_-8.5688",
+      "distance_km": 14.35347876609026,
+      "darkness": 0.6582635430609425,
+      "suppressor_darkness": 0.714070235711443,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "52.8937_-6.5313",
+      "country": "IE",
+      "suppressor_id": "52.8479_-6.3854",
+      "distance_km": 11.035471744124864,
+      "darkness": 0.6545860974644593,
+      "suppressor_darkness": 0.6847450855976489,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "52.8687_-6.1146",
+      "country": "IE",
+      "suppressor_id": "52.8604_-6.0729",
+      "distance_km": 2.9465153004103746,
+      "darkness": 0.6509031324049702,
+      "suppressor_darkness": 0.6712633202292116,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "50.6479_-2.3396",
+      "country": "GB",
+      "suppressor_id": "50.6313_-2.3063",
+      "distance_km": 2.993338586561987,
+      "darkness": 0.6503152445375122,
+      "suppressor_darkness": 0.6521734320544802,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "53.0771_0.2771",
+      "country": "GB",
+      "suppressor_id": "53.0729_0.2771",
+      "distance_km": 0.4633121943526967,
+      "darkness": 0.6497272781193413,
+      "suppressor_darkness": 0.65244041131082,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "54.4979_-3.5896",
+      "country": "GB",
+      "suppressor_id": "54.4813_-3.5896",
+      "distance_km": 1.8532487774092068,
+      "darkness": 0.6430288925841253,
+      "suppressor_darkness": 0.6567355398421496,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "54.1271_-0.1104",
+      "country": "GB",
+      "suppressor_id": "54.1146_-0.0813",
+      "distance_km": 2.3547415663847864,
+      "darkness": 0.6384458469968439,
+      "suppressor_darkness": 0.6653871767065024,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "52.8729_-6.7563",
+      "country": "IE",
+      "suppressor_id": "52.8937_-6.6188",
+      "distance_km": 9.512557489361251,
+      "darkness": 0.6371729745185841,
+      "suppressor_darkness": 0.6500115443876876,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "52.1604_-7.0313",
+      "country": "IE",
+      "suppressor_id": "52.1437_-7.0063",
+      "distance_km": 2.5186781286675393,
+      "darkness": 0.628539514144629,
+      "suppressor_darkness": 0.656744015286266,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "54.2229_-6.0688",
+      "country": "GB",
+      "suppressor_id": "54.2021_-6.0688",
+      "distance_km": 2.3165609717611138,
+      "darkness": 0.6198575799762728,
+      "suppressor_darkness": 0.6252463063566293,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "54.2646_-0.6563",
+      "country": "GB",
+      "suppressor_id": "54.3104_-0.6521",
+      "distance_km": 5.103604683386714,
+      "darkness": 0.6179040422033011,
+      "suppressor_darkness": 0.6249579356648567,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "50.6021_-2.0771",
+      "country": "GB",
+      "suppressor_id": "50.5979_-2.0813",
+      "distance_km": 0.5487625049543872,
+      "darkness": 0.6066658747976517,
+      "suppressor_darkness": 0.6162502740207819,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "54.1604_-0.4354",
+      "country": "GB",
+      "suppressor_id": "54.2188_-0.2813",
+      "distance_km": 11.944777431340933,
+      "darkness": 0.6033472069584271,
+      "suppressor_darkness": 0.6207425358028253,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "54.0354_-6.1604",
+      "country": "IE",
+      "suppressor_id": "54.0063_-6.1104",
+      "distance_km": 4.602930889093854,
+      "darkness": 0.5920202083014603,
+      "suppressor_darkness": 0.625135237091596,
+      "bortle": 4,
+      "suppressor_osm_suspected": true
+    },
+    {
+      "region": "uk_ireland",
+      "id": "54.3146_-5.8479",
+      "country": "GB",
+      "suppressor_id": "54.2854_-5.8396",
+      "distance_km": 3.2879527311387,
+      "darkness": 0.5919354469438521,
+      "suppressor_darkness": 0.6150838054788537,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "50.6313_-3.5896",
+      "country": "GB",
+      "suppressor_id": "50.5646_-3.4854",
+      "distance_km": 10.440716009541381,
+      "darkness": 0.5879052262155983,
+      "suppressor_darkness": 0.5966781802238736,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "51.7021_-8.4688",
+      "country": "IE",
+      "suppressor_id": "51.6396_-8.6604",
+      "distance_km": 14.933161837183368,
+      "darkness": 0.5748898782441023,
+      "suppressor_darkness": 0.7367148861702643,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "54.1271_-0.6604",
+      "country": "GB",
+      "suppressor_id": "54.1604_-0.5479",
+      "distance_km": 8.21154896324263,
+      "darkness": 0.573055698318365,
+      "suppressor_darkness": 0.5990055237646882,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "50.3271_-3.9604",
+      "country": "GB",
+      "suppressor_id": "50.3229_-3.9604",
+      "distance_km": 0.4633121943526967,
+      "darkness": 0.5710903437947235,
+      "suppressor_darkness": 0.5811066305535713,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "54.4521_-0.7521",
+      "country": "GB",
+      "suppressor_id": "54.4979_-0.6563",
+      "distance_km": 8.019523317752698,
+      "darkness": 0.5687930072144034,
+      "suppressor_darkness": 0.5904981596393758,
+      "bortle": 4,
+      "suppressor_osm_suspected": true
+    },
+    {
+      "region": "uk_ireland",
+      "id": "50.9229_0.9354",
+      "country": "GB",
+      "suppressor_id": "50.9146_0.9604",
+      "distance_km": 1.9823882810972644,
+      "darkness": 0.568251521529463,
+      "suppressor_darkness": 0.5812374001523305,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "50.6479_-3.3646",
+      "country": "GB",
+      "suppressor_id": "50.6938_-3.1813",
+      "distance_km": 13.888807998779994,
+      "darkness": 0.5659681607317018,
+      "suppressor_darkness": 0.709752040805698,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "53.4438_0.1187",
+      "country": "GB",
+      "suppressor_id": "53.4104_0.2104",
+      "distance_km": 7.115052386604567,
+      "darkness": 0.5603604766668153,
+      "suppressor_darkness": 0.6328812778456008,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "52.9854_-6.3396",
+      "country": "IE",
+      "suppressor_id": "52.9854_-6.4313",
+      "distance_km": 6.136292591032985,
+      "darkness": 0.5477241382888329,
+      "suppressor_darkness": 0.554445667350594,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "50.4729_-3.5021",
+      "country": "GB",
+      "suppressor_id": "50.3729_-3.5229",
+      "distance_km": 11.217015938679381,
+      "darkness": 0.5434583763011459,
+      "suppressor_darkness": 0.6460155824128697,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "52.8438_0.1646",
+      "country": "GB",
+      "suppressor_id": "52.8563_0.1771",
+      "distance_km": 1.6237289891281788,
+      "darkness": 0.5406784954448997,
+      "suppressor_darkness": 0.5578973530865692,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "50.9229_0.7146",
+      "country": "GB",
+      "suppressor_id": "50.9021_0.7104",
+      "distance_km": 2.33490676684455,
+      "darkness": 0.5400604974500343,
+      "suppressor_darkness": 0.5487609644449108,
+      "bortle": 4,
+      "suppressor_osm_suspected": true
+    },
+    {
+      "region": "uk_ireland",
+      "id": "54.5438_-5.5188",
+      "country": "GB",
+      "suppressor_id": "54.5438_-5.4813",
+      "distance_km": 2.4188279762975062,
+      "darkness": 0.5388056551658494,
+      "suppressor_darkness": 0.5747134217571397,
+      "bortle": 4,
+      "suppressor_osm_suspected": true
+    },
+    {
+      "region": "uk_ireland",
+      "id": "51.7896_-3.9521",
+      "country": "GB",
+      "suppressor_id": "51.7896_-4.1396",
+      "distance_km": 12.896201776041835,
+      "darkness": 0.5374839823402312,
+      "suppressor_darkness": 0.583958001953309,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "54.8146_-5.7021",
+      "country": "GB",
+      "suppressor_id": "54.8229_-5.7021",
+      "distance_km": 0.9266243887046036,
+      "darkness": 0.5295559066371405,
+      "suppressor_darkness": 0.5349288036866444,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "51.8396_-8.1313",
+      "country": "IE",
+      "suppressor_id": "51.8062_-8.1313",
+      "distance_km": 3.7064975548184136,
+      "darkness": 0.5273694263347168,
+      "suppressor_darkness": 0.5523163656449761,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "51.6979_-4.1854",
+      "country": "GB",
+      "suppressor_id": "51.7229_-4.3729",
+      "distance_km": 13.214526628081783,
+      "darkness": 0.526420103007838,
+      "suppressor_darkness": 0.7400164088916268,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "54.9521_-2.9938",
+      "country": "GB",
+      "suppressor_id": "54.9479_-3.0354",
+      "distance_km": 2.7007970178244456,
+      "darkness": 0.5239187955791305,
+      "suppressor_darkness": 0.5483910147233715,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "54.1271_-0.9229",
+      "country": "GB",
+      "suppressor_id": "54.1271_-0.7979",
+      "distance_km": 8.144879843168695,
+      "darkness": 0.5110134896211314,
+      "suppressor_darkness": 0.5326201953947735,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "51.7479_-8.3604",
+      "country": "IE",
+      "suppressor_id": "51.7563_-8.3063",
+      "distance_km": 3.8420815082991373,
+      "darkness": 0.4960456854959191,
+      "suppressor_darkness": 0.4969411471860019,
+      "bortle": 5,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "50.8563_0.3937",
+      "country": "GB",
+      "suppressor_id": "50.8354_0.4312",
+      "distance_km": 3.506905459545769,
+      "darkness": 0.4789971921182804,
+      "suppressor_darkness": 0.48981612489788584,
+      "bortle": 5,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "50.6479_-1.9854",
+      "country": "GB",
+      "suppressor_id": "50.6396_-1.9396",
+      "distance_km": 3.36206987001105,
+      "darkness": 0.4745726145250534,
+      "suppressor_darkness": 0.4884447828625911,
+      "bortle": 5,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "52.6146_1.7229",
+      "country": "GB",
+      "suppressor_id": "52.6146_1.7396",
+      "distance_km": 1.1252437663171349,
+      "darkness": 0.4735585420124153,
+      "suppressor_darkness": 0.47609520604721045,
+      "bortle": 5,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "53.0312_-6.0688",
+      "country": "IE",
+      "suppressor_id": "53.0312_-6.0521",
+      "distance_km": 1.1145055344120078,
+      "darkness": 0.468573884106812,
+      "suppressor_darkness": 0.47341789129403555,
+      "bortle": 5,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "54.1271_-3.2229",
+      "country": "GB",
+      "suppressor_id": "54.1271_-3.2354",
+      "distance_km": 0.8144880893183791,
+      "darkness": 0.4679710617576799,
+      "suppressor_darkness": 0.4715496087540879,
+      "bortle": 5,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "50.7854_0.1687",
+      "country": "GB",
+      "suppressor_id": "50.7604_0.1646",
+      "distance_km": 2.795271328568111,
+      "darkness": 0.46723400604245713,
+      "suppressor_darkness": 0.4954029306940486,
+      "bortle": 5,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "53.7146_0.0271",
+      "country": "GB",
+      "suppressor_id": "53.6146_0.1437",
+      "distance_km": 13.517589020316619,
+      "darkness": 0.4563149474336303,
+      "suppressor_darkness": 0.4991470846571867,
+      "bortle": 5,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "50.7396_-0.7979",
+      "country": "GB",
+      "suppressor_id": "50.7313_-0.7896",
+      "distance_km": 1.0966181570389713,
+      "darkness": 0.4560856920589591,
+      "suppressor_darkness": 0.46558669318758594,
+      "bortle": 5,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "51.8479_1.2646",
+      "country": "GB",
+      "suppressor_id": "51.8604_1.2854",
+      "distance_km": 1.9948135918810341,
+      "darkness": 0.4530154857907265,
+      "suppressor_darkness": 0.47039268346934093,
+      "bortle": 5,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "53.7604_-6.2521",
+      "country": "IE",
+      "suppressor_id": "53.7604_-6.2479",
+      "distance_km": 0.27389303728601994,
+      "darkness": 0.44574999775896373,
+      "suppressor_darkness": 0.4506203796908069,
+      "bortle": 5,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "53.3021_-8.9563",
+      "country": "IE",
+      "suppressor_id": "53.2646_-9.1354",
+      "distance_km": 12.619590763003938,
+      "darkness": 0.4350796615275986,
+      "suppressor_darkness": 0.4859026860450738,
+      "bortle": 5,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "50.9688_0.2562",
+      "country": "GB",
+      "suppressor_id": "50.9688_0.3937",
+      "distance_km": 9.628347584546354,
+      "darkness": 0.42805711172024796,
+      "suppressor_darkness": 0.4525269074290511,
+      "bortle": 5,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "51.7938_1.0354",
+      "country": "GB",
+      "suppressor_id": "51.7771_1.0479",
+      "distance_km": 2.0429959640162587,
+      "darkness": 0.42766917210062394,
+      "suppressor_darkness": 0.43626214944910013,
+      "bortle": 5,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "51.4271_-3.5438",
+      "country": "GB",
+      "suppressor_id": "51.4021_-3.5479",
+      "distance_km": 2.7948509855821135,
+      "darkness": 0.4271777295418616,
+      "suppressor_darkness": 0.4604232297989507,
+      "bortle": 5,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "51.6063_-3.6479",
+      "country": "GB",
+      "suppressor_id": "51.4979_-3.7313",
+      "distance_km": 13.353162948765066,
+      "darkness": 0.39851271795442567,
+      "suppressor_darkness": 0.4180574586143889,
+      "bortle": 5,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "51.0604_0.4396",
+      "country": "GB",
+      "suppressor_id": "50.9688_0.3937",
+      "distance_km": 10.685260577055978,
+      "darkness": 0.39587781761194696,
+      "suppressor_darkness": 0.4525269074290511,
+      "bortle": 5,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "51.3771_1.4021",
+      "country": "GB",
+      "suppressor_id": "51.3813_1.4437",
+      "distance_km": 2.928706079949604,
+      "darkness": 0.3916623659692404,
+      "suppressor_darkness": 0.4127133872836367,
+      "bortle": 5,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "54.4979_-6.2021",
+      "country": "GB",
+      "suppressor_id": "54.5604_-6.3271",
+      "distance_km": 10.646717960090287,
+      "darkness": 0.3853976543760558,
+      "suppressor_darkness": 0.45984511996189914,
+      "bortle": 5,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "51.6521_0.8979",
+      "country": "GB",
+      "suppressor_id": "51.6521_0.9354",
+      "distance_km": 2.5870964099082094,
+      "darkness": 0.38017322369461914,
+      "suppressor_darkness": 0.4057046800545745,
+      "bortle": 5,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "50.9396_0.0271",
+      "country": "GB",
+      "suppressor_id": "50.9229_0.1646",
+      "distance_km": 9.812711851675562,
+      "darkness": 0.3716816761070427,
+      "suppressor_darkness": 0.4252954585432912,
+      "bortle": 5,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "51.2938_-2.9521",
+      "country": "GB",
+      "suppressor_id": "51.2479_-3.0021",
+      "distance_km": 6.170323792299921,
+      "darkness": 0.3587303299181971,
+      "suppressor_darkness": 0.37225692607919214,
+      "bortle": 5,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "53.8062_-0.1563",
+      "country": "GB",
+      "suppressor_id": "53.7354_0.0271",
+      "distance_km": 14.394361667720716,
+      "darkness": 0.35870396586099373,
+      "suppressor_darkness": 0.4611916496595999,
+      "bortle": 5,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "53.3479_-3.3604",
+      "country": "GB",
+      "suppressor_id": "53.3104_-3.4979",
+      "distance_km": 10.038076496377489,
+      "darkness": 0.3498695769817587,
+      "suppressor_darkness": 0.3937810027524816,
+      "bortle": 5,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "51.3771_1.3146",
+      "country": "GB",
+      "suppressor_id": "51.3813_1.3187",
+      "distance_km": 0.5461545594390745,
+      "darkness": 0.3462316258865443,
+      "suppressor_darkness": 0.34666168833144195,
+      "bortle": 6,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "53.8979_-2.7729",
+      "country": "GB",
+      "suppressor_id": "53.9396_-2.9521",
+      "distance_km": 12.61458898927065,
+      "darkness": 0.3276150133296276,
+      "suppressor_darkness": 0.34747897953145934,
+      "bortle": 6,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "53.5771_-6.1146",
+      "country": "IE",
+      "suppressor_id": "53.5812_-6.1063",
+      "distance_km": 0.719249982015719,
+      "darkness": 0.3250045691993254,
+      "suppressor_darkness": 0.3358693653570428,
+      "bortle": 6,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "50.4146_-4.0979",
+      "country": "GB",
+      "suppressor_id": "50.3521_-4.1854",
+      "distance_km": 9.316012666760837,
+      "darkness": 0.30632456786350193,
+      "suppressor_darkness": 0.34764033139229744,
+      "bortle": 6,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "50.8312_-0.0646",
+      "country": "GB",
+      "suppressor_id": "50.8062_-0.0646",
+      "distance_km": 2.77987316611381,
+      "darkness": 0.3045124416380185,
+      "suppressor_darkness": 0.3260197137145753,
+      "bortle": 6,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "53.5354_-0.0188",
+      "country": "GB",
+      "suppressor_id": "53.5354_-0.0021",
+      "distance_km": 1.1014335210238424,
+      "darkness": 0.30344325829880947,
+      "suppressor_darkness": 0.3244860801467063,
+      "bortle": 6,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "53.8979_-3.0396",
+      "country": "GB",
+      "suppressor_id": "53.9396_-2.9521",
+      "distance_km": 7.368801330081728,
+      "darkness": 0.2961215017233477,
+      "suppressor_darkness": 0.34747897953145934,
+      "bortle": 6,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "51.4729_-2.8104",
+      "country": "GB",
+      "suppressor_id": "51.4729_-2.8146",
+      "distance_km": 0.2885899848268189,
+      "darkness": 0.23696328380567078,
+      "suppressor_darkness": 0.24181083950831161,
+      "bortle": 6,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "53.6229_-3.0396",
+      "country": "GB",
+      "suppressor_id": "53.6354_-3.0354",
+      "distance_km": 1.4168310947250988,
+      "darkness": 0.22012836162183436,
+      "suppressor_darkness": 0.2260827226999712,
+      "bortle": 6,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "51.3354_0.7604",
+      "country": "GB",
+      "suppressor_id": "51.4271_0.8187",
+      "distance_km": 10.967400198826002,
+      "darkness": 0.2149935667962115,
+      "suppressor_darkness": 0.2288647204988915,
+      "bortle": 6,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "53.7604_-2.8854",
+      "country": "GB",
+      "suppressor_id": "53.8521_-2.7646",
+      "distance_km": 12.91690413985732,
+      "darkness": 0.21439017540324357,
+      "suppressor_darkness": 0.278842279871224,
+      "bortle": 6,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "51.4271_-3.2229",
+      "country": "GB",
+      "suppressor_id": "51.5146_-3.0604",
+      "distance_km": 14.877865280560602,
+      "darkness": 0.19839313956764726,
+      "suppressor_darkness": 0.19862531288003726,
+      "bortle": 7,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "53.2146_-6.1146",
+      "country": "IE",
+      "suppressor_id": "53.2146_-6.1063",
+      "distance_km": 0.5548810041320101,
+      "darkness": 0.17760706708543927,
+      "suppressor_darkness": 0.18310562947235764,
+      "bortle": 7,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "51.5604_0.7146",
+      "country": "GB",
+      "suppressor_id": "51.5604_0.7604",
+      "distance_km": 3.168397266473317,
+      "darkness": 0.16767908722903524,
+      "suppressor_darkness": 0.19724957956889866,
+      "bortle": 7,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "53.4854_-6.1604",
+      "country": "IE",
+      "suppressor_id": "53.3854_-6.0521",
+      "distance_km": 13.234088171061082,
+      "darkness": 0.1587477636633532,
+      "suppressor_darkness": 0.16869916505557414,
+      "bortle": 7,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "53.3521_-3.1313",
+      "country": "GB",
+      "suppressor_id": "53.3813_-3.1854",
+      "distance_km": 4.840912807669487,
+      "darkness": 0.13417847227865676,
+      "suppressor_darkness": 0.18154220579763902,
+      "bortle": 7,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "51.4479_0.5771",
+      "country": "GB",
+      "suppressor_id": "51.4479_0.6229",
+      "distance_km": 3.1762291411347707,
+      "darkness": 0.10373260290843656,
+      "suppressor_darkness": 0.127821808215011,
+      "bortle": 7,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "53.4396_-2.9938",
+      "country": "GB",
+      "suppressor_id": "53.4396_-2.9979",
+      "distance_km": 0.2759812204757194,
+      "darkness": 0.0,
+      "suppressor_darkness": 0.0,
+      "bortle": 8,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "54.9771_-4.9688",
+      "country": "GB",
+      "suppressor_id": "54.9979_-4.8313",
+      "distance_km": 9.073034091470412,
+      "darkness": 0.8681951896531678,
+      "suppressor_darkness": 0.9211350959168962,
+      "bortle": 2,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "54.9562_-4.7438",
+      "country": "GB",
+      "suppressor_id": "54.8312_-4.7396",
+      "distance_km": 13.901919471260324,
+      "darkness": 0.9516735919956045,
+      "suppressor_darkness": 0.980095229703186,
+      "bortle": 2,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "uk_ireland",
+      "id": "54.9562_-3.5896",
+      "country": "GB",
+      "suppressor_id": "54.8854_-3.5854",
+      "distance_km": 7.880806806118193,
+      "darkness": 0.7762077864344397,
+      "suppressor_darkness": 0.8260531865134365,
+      "bortle": 3,
+      "suppressor_osm_suspected": true
+    },
+    {
+      "region": "canaries",
+      "id": "28.8438_-17.9063",
+      "country": "ES",
+      "suppressor_id": "28.8521_-17.9146",
+      "distance_km": 1.2318204978501,
+      "darkness": 1.0,
+      "suppressor_darkness": 1.0,
+      "bortle": 1,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "canaries",
+      "id": "28.5396_-17.8229",
+      "country": "ES",
+      "suppressor_id": "28.5312_-17.8771",
+      "distance_km": 5.371911568554818,
+      "darkness": 1.0,
+      "suppressor_darkness": 1.0,
+      "bortle": 1,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "canaries",
+      "id": "27.8354_-17.9521",
+      "country": "ES",
+      "suppressor_id": "27.8479_-17.9354",
+      "distance_km": 2.148796330379619,
+      "darkness": 1.0,
+      "suppressor_darkness": 1.0,
+      "bortle": 1,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "canaries",
+      "id": "27.7438_-18.1354",
+      "country": "ES",
+      "suppressor_id": "27.7646_-18.1396",
+      "distance_km": 2.352565159625172,
+      "darkness": 1.0,
+      "suppressor_darkness": 1.0,
+      "bortle": 1,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "canaries",
+      "id": "27.6521_-17.9979",
+      "country": "ES",
+      "suppressor_id": "27.7146_-17.9979",
+      "distance_km": 6.949682915284921,
+      "darkness": 1.0,
+      "suppressor_darkness": 1.0,
+      "bortle": 1,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "canaries",
+      "id": "28.5729_-17.8604",
+      "country": "ES",
+      "suppressor_id": "28.5729_-17.8979",
+      "distance_km": 3.661965067970842,
+      "darkness": 0.9483272777085355,
+      "suppressor_darkness": 0.9711141150898619,
+      "bortle": 2,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "canaries",
+      "id": "28.2021_-17.3104",
+      "country": "ES",
+      "suppressor_id": "28.1854_-17.3271",
+      "distance_km": 2.4703094466025837,
+      "darkness": 0.8979295629789722,
+      "suppressor_darkness": 0.9047160048098095,
+      "bortle": 2,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "canaries",
+      "id": "28.2938_-14.1938",
+      "country": "ES",
+      "suppressor_id": "28.3104_-14.1979",
+      "distance_km": 1.8976132921817,
+      "darkness": 0.7636371795722792,
+      "suppressor_darkness": 0.8023802748151663,
+      "bortle": 3,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "canaries",
+      "id": "28.5938_-14.0104",
+      "country": "ES",
+      "suppressor_id": "28.5604_-14.0563",
+      "distance_km": 5.8110877375008325,
+      "darkness": 0.7431871081403838,
+      "suppressor_darkness": 0.7852707846876318,
+      "bortle": 3,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "canaries",
+      "id": "28.2979_-13.9229",
+      "country": "ES",
+      "suppressor_id": "28.2479_-13.9313",
+      "distance_km": 5.619320662712596,
+      "darkness": 0.7110687681662176,
+      "suppressor_darkness": 0.733788663931229,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "canaries",
+      "id": "28.1104_-14.3771",
+      "country": "ES",
+      "suppressor_id": "28.1313_-14.3354",
+      "distance_km": 4.697184966737804,
+      "darkness": 0.6886281065723734,
+      "suppressor_darkness": 0.7356553542045801,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "canaries",
+      "id": "28.9813_-13.8271",
+      "country": "ES",
+      "suppressor_id": "29.0188_-13.8188",
+      "distance_km": 4.2478385912641965,
+      "darkness": 0.592360677285714,
+      "suppressor_darkness": 0.639769202563373,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "canaries",
+      "id": "29.1188_-13.6104",
+      "country": "ES",
+      "suppressor_id": "29.1313_-13.6021",
+      "distance_km": 1.6084627240666562,
+      "darkness": 0.5532321146005346,
+      "suppressor_darkness": 0.5775237656624446,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "canaries",
+      "id": "28.3396_-16.8521",
+      "country": "ES",
+      "suppressor_id": "28.3521_-16.9146",
+      "distance_km": 6.272342613133611,
+      "darkness": 0.5381719634447792,
+      "suppressor_darkness": 0.6334031286366386,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "canaries",
+      "id": "29.0729_-13.4646",
+      "country": "ES",
+      "suppressor_id": "29.1313_-13.6021",
+      "distance_km": 14.850536620147956,
+      "darkness": 0.5222414206629806,
+      "suppressor_darkness": 0.5775237656624446,
+      "bortle": 4,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "canaries",
+      "id": "28.5688_-16.1688",
+      "country": "ES",
+      "suppressor_id": "28.5729_-16.1688",
+      "distance_km": 0.4633121943523017,
+      "darkness": 0.43679850356486993,
+      "suppressor_darkness": 0.44674475893056376,
+      "bortle": 5,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "canaries",
+      "id": "28.3854_-16.6688",
+      "country": "ES",
+      "suppressor_id": "28.3979_-16.6688",
+      "distance_km": 1.389936583056905,
+      "darkness": 0.41319361102732566,
+      "suppressor_darkness": 0.4189297212374309,
+      "bortle": 5,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "canaries",
+      "id": "28.2479_-16.4854",
+      "country": "ES",
+      "suppressor_id": "28.1938_-16.4229",
+      "distance_km": 8.589267804028971,
+      "darkness": 0.4126792461840527,
+      "suppressor_darkness": 0.4259044313073288,
+      "bortle": 5,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "canaries",
+      "id": "27.8354_-15.7521",
+      "country": "ES",
+      "suppressor_id": "27.8354_-15.7771",
+      "distance_km": 2.45822102972473,
+      "darkness": 0.36384545673028235,
+      "suppressor_darkness": 0.41594973789927525,
+      "bortle": 5,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "canaries",
+      "id": "28.1562_-15.6604",
+      "country": "ES",
+      "suppressor_id": "28.1604_-15.6604",
+      "distance_km": 0.4633121943526967,
+      "darkness": 0.31539409675019014,
+      "suppressor_darkness": 0.3201217029676956,
+      "bortle": 6,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "canaries",
+      "id": "28.1562_-16.7604",
+      "country": "ES",
+      "suppressor_id": "28.1562_-16.7896",
+      "distance_km": 2.859399855583014,
+      "darkness": 0.31061769393951466,
+      "suppressor_darkness": 0.3373797502467837,
+      "bortle": 6,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "canaries",
+      "id": "28.5229_-16.2146",
+      "country": "ES",
+      "suppressor_id": "28.5646_-16.2604",
+      "distance_km": 6.442757582560578,
+      "darkness": 0.27274845904670375,
+      "suppressor_darkness": 0.34266230672871234,
+      "bortle": 6,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "canaries",
+      "id": "28.5229_-16.3938",
+      "country": "ES",
+      "suppressor_id": "28.5646_-16.2604",
+      "distance_km": 13.823476229489511,
+      "darkness": 0.26013567871911336,
+      "suppressor_darkness": 0.34266230672871234,
+      "bortle": 6,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "canaries",
+      "id": "28.0229_-16.6271",
+      "country": "ES",
+      "suppressor_id": "28.0021_-16.6938",
+      "distance_km": 6.942426338979256,
+      "darkness": 0.24972935129905793,
+      "suppressor_darkness": 0.2984491615200978,
+      "bortle": 6,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "canaries",
+      "id": "27.8938_-15.5229",
+      "country": "ES",
+      "suppressor_id": "27.7854_-15.5021",
+      "distance_km": 12.219043969118669,
+      "darkness": 0.21994189043704493,
+      "suppressor_darkness": 0.2263066577887738,
+      "bortle": 6,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "canaries",
+      "id": "28.0729_-15.5688",
+      "country": "ES",
+      "suppressor_id": "28.1438_-15.5688",
+      "distance_km": 7.876307303989524,
+      "darkness": 0.17062934620263392,
+      "suppressor_darkness": 0.1919756475955312,
+      "bortle": 7,
+      "suppressor_osm_suspected": false
+    },
+    {
+      "region": "canaries",
+      "id": "28.0104_-15.3896",
+      "country": "ES",
+      "suppressor_id": "28.0021_-15.3771",
+      "distance_km": 1.537718729973879,
+      "darkness": 0.08041461497463509,
+      "suppressor_darkness": 0.08731632884897078,
+      "bortle": 7,
+      "suppressor_osm_suspected": false
+    }
+  ],
+  "land_removals_with_osm_suspect_suppressor": 11,
+  "osm_summary": {
+    "france": {
+      "selected": 25992,
+      "final": 2210,
+      "selected_water_suspected": 127,
+      "final_water_suspected": 11,
+      "new_final_water_suspected": 6,
+      "final_outside_inland_extract_coverage": 678
+    },
+    "uk_ireland": {
+      "selected": 15426,
+      "final": 1218,
+      "selected_water_suspected": 133,
+      "final_water_suspected": 13,
+      "new_final_water_suspected": 11,
+      "final_outside_inland_extract_coverage": 33
+    },
+    "canaries": {
+      "selected": 450,
+      "final": 66,
+      "selected_water_suspected": 9,
+      "final_water_suspected": 0,
+      "new_final_water_suspected": 0,
+      "final_outside_inland_extract_coverage": 0
+    }
+  },
+  "osm_suspected_final": [
+    {
+      "id": "50.1979_1.5062",
+      "lat": 50.197916666666664,
+      "lon": 1.5062499999999925,
+      "country": "FR",
+      "region": "france",
+      "name": "Brighton",
+      "near": "Cayeux-sur-Mer",
+      "new_vs_A": true,
+      "osm_land_covers": false,
+      "osm_water": [],
+      "osm_wetlands": [
+        {
+          "osm_id": "7726849",
+          "fclass": "wetland_tidalflat",
+          "name": "",
+          "source": "/tmp/darksky-water-diagnostic/sources/geofabrik/haute-normandie/source.json"
+        },
+        {
+          "osm_id": "7726849",
+          "fclass": "wetland_tidalflat",
+          "name": "",
+          "source": "/tmp/darksky-water-diagnostic/sources/geofabrik/picardie/source.json"
+        }
+      ],
+      "interpretation": "Independent cartographic disagreement requiring review, not established field error."
+    },
+    {
+      "id": "49.6937_-1.2646",
+      "lat": 49.693749999999994,
+      "lon": -1.2645833333333414,
+      "country": "FR",
+      "region": "france",
+      "name": "Gatteville-le-Phare",
+      "near": "Gatteville-le-Phare",
+      "new_vs_A": true,
+      "osm_land_covers": false,
+      "osm_water": [],
+      "osm_wetlands": [],
+      "interpretation": "Independent cartographic disagreement requiring review, not established field error."
+    },
+    {
+      "id": "48.8687_-3.2271",
+      "lat": 48.86874999999999,
+      "lon": -3.227083333333341,
+      "country": "FR",
+      "region": "france",
+      "name": "Porz Bugalé",
+      "near": "Plougrescant",
+      "new_vs_A": true,
+      "osm_land_covers": false,
+      "osm_water": [],
+      "osm_wetlands": [],
+      "interpretation": "Independent cartographic disagreement requiring review, not established field error."
+    },
+    {
+      "id": "48.8396_-3.5146",
+      "lat": 48.83958333333333,
+      "lon": -3.514583333333341,
+      "country": "FR",
+      "region": "france",
+      "name": "Île Dhu",
+      "near": "Trégastel",
+      "new_vs_A": true,
+      "osm_land_covers": false,
+      "osm_water": [],
+      "osm_wetlands": [],
+      "interpretation": "Independent cartographic disagreement requiring review, not established field error."
+    },
+    {
+      "id": "48.7146_-3.8313",
+      "lat": 48.71458333333333,
+      "lon": -3.831250000000008,
+      "country": "FR",
+      "region": "france",
+      "name": "Trégastel",
+      "near": "Plougasnou",
+      "new_vs_A": true,
+      "osm_land_covers": false,
+      "osm_water": [
+        {
+          "osm_id": "3620222",
+          "fclass": "water",
+          "name": "",
+          "source": "/tmp/darksky-water-diagnostic/sources/geofabrik/bretagne/source.json"
+        }
+      ],
+      "osm_wetlands": [],
+      "interpretation": "Independent cartographic disagreement requiring review, not established field error."
+    },
+    {
+      "id": "47.4896_-2.4563",
+      "lat": 47.48958333333333,
+      "lon": -2.456250000000008,
+      "country": "FR",
+      "region": "france",
+      "name": "Tréhiguier",
+      "near": "Pénestin",
+      "new_vs_A": false,
+      "osm_land_covers": false,
+      "osm_water": [],
+      "osm_wetlands": [
+        {
+          "osm_id": "1031679320",
+          "fclass": "wetland_tidalflat",
+          "name": "",
+          "source": "/tmp/darksky-water-diagnostic/sources/geofabrik/bretagne/source.json"
+        }
+      ],
+      "interpretation": "Independent cartographic disagreement requiring review, not established field error."
+    },
+    {
+      "id": "47.3562_0.5229",
+      "lat": 47.356249999999996,
+      "lon": 0.5229166666666591,
+      "country": "FR",
+      "region": "france",
+      "name": "Berthenay",
+      "near": "Berthenay",
+      "new_vs_A": false,
+      "osm_land_covers": true,
+      "osm_water": [
+        {
+          "osm_id": "1418279319",
+          "fclass": "water",
+          "name": "",
+          "source": "/tmp/darksky-water-diagnostic/sources/geofabrik/centre/source.json"
+        }
+      ],
+      "osm_wetlands": [],
+      "interpretation": "Independent cartographic disagreement requiring review, not established field error."
+    },
+    {
+      "id": "46.2062_-1.3563",
+      "lat": 46.20625,
+      "lon": -1.3562500000000073,
+      "country": "FR",
+      "region": "france",
+      "name": "Saint-Martin-de-Ré",
+      "near": "Saint-Martin-de-Ré",
+      "new_vs_A": false,
+      "osm_land_covers": false,
+      "osm_water": [],
+      "osm_wetlands": [
+        {
+          "osm_id": "499611914",
+          "fclass": "wetland_tidalflat",
+          "name": "",
+          "source": "/tmp/darksky-water-diagnostic/sources/geofabrik/poitou-charentes/source.json"
+        }
+      ],
+      "interpretation": "Independent cartographic disagreement requiring review, not established field error."
+    },
+    {
+      "id": "44.9687_-0.2146",
+      "lat": 44.96874999999999,
+      "lon": -0.21458333333334068,
+      "country": "FR",
+      "region": "france",
+      "name": "Les Eymerits",
+      "near": "Savignac-de-l'Isle",
+      "new_vs_A": false,
+      "osm_land_covers": true,
+      "osm_water": [
+        {
+          "osm_id": "135856018",
+          "fclass": "water",
+          "name": "",
+          "source": "/tmp/darksky-water-diagnostic/sources/geofabrik/aquitaine/source.json"
+        }
+      ],
+      "osm_wetlands": [],
+      "interpretation": "Independent cartographic disagreement requiring review, not established field error."
+    },
+    {
+      "id": "44.8354_-0.0771",
+      "lat": 44.83541666666666,
+      "lon": -0.07708333333334139,
+      "country": "FR",
+      "region": "france",
+      "name": "Civrac-sur-Dordogne",
+      "near": "Saint-Pey-de-Castets",
+      "new_vs_A": false,
+      "osm_land_covers": true,
+      "osm_water": [
+        {
+          "osm_id": "12323635",
+          "fclass": "riverbank",
+          "name": "",
+          "source": "/tmp/darksky-water-diagnostic/sources/geofabrik/aquitaine/source.json"
+        }
+      ],
+      "osm_wetlands": [],
+      "interpretation": "Independent cartographic disagreement requiring review, not established field error."
+    },
+    {
+      "id": "43.3729_4.5687",
+      "lat": 43.37291666666666,
+      "lon": 4.5687499999999925,
+      "country": "FR",
+      "region": "france",
+      "name": "Pointe du Sablon",
+      "near": "Saintes-Maries-de-la-Mer",
+      "new_vs_A": true,
+      "osm_land_covers": true,
+      "osm_water": [
+        {
+          "osm_id": "15098009",
+          "fclass": "water",
+          "name": "",
+          "source": "/tmp/darksky-water-diagnostic/sources/geofabrik/provence-alpes-cote-d-azur/source.json"
+        }
+      ],
+      "osm_wetlands": [],
+      "interpretation": "Independent cartographic disagreement requiring review, not established field error."
+    },
+    {
+      "id": "54.8854_-3.5854",
+      "lat": 54.885416666666664,
+      "lon": -3.5854166666666707,
+      "country": "GB",
+      "region": "uk_ireland",
+      "name": "Southerness",
+      "near": "Silloth",
+      "new_vs_A": true,
+      "osm_land_covers": false,
+      "osm_water": [],
+      "osm_wetlands": [],
+      "interpretation": "Independent cartographic disagreement requiring review, not established field error."
+    },
+    {
+      "id": "54.5896_-0.9854",
+      "lat": 54.58958333333333,
+      "lon": -0.985416666666671,
+      "country": "GB",
+      "region": "uk_ireland",
+      "name": "Saltburn-by-the-Sea",
+      "near": "Saltburn-by-the-Sea",
+      "new_vs_A": true,
+      "osm_land_covers": false,
+      "osm_water": [],
+      "osm_wetlands": [],
+      "interpretation": "Independent cartographic disagreement requiring review, not established field error."
+    },
+    {
+      "id": "54.5438_-5.4813",
+      "lat": 54.54375,
+      "lon": -5.481250000000005,
+      "country": "GB",
+      "region": "uk_ireland",
+      "name": "Ballywalter",
+      "near": "Ballywalter",
+      "new_vs_A": true,
+      "osm_land_covers": false,
+      "osm_water": [],
+      "osm_wetlands": [],
+      "interpretation": "Independent cartographic disagreement requiring review, not established field error."
+    },
+    {
+      "id": "54.4979_-0.6563",
+      "lat": 54.49791666666667,
+      "lon": -0.6562500000000036,
+      "country": "GB",
+      "region": "uk_ireland",
+      "name": "Raithwaite",
+      "near": "Whitby",
+      "new_vs_A": true,
+      "osm_land_covers": false,
+      "osm_water": [],
+      "osm_wetlands": [],
+      "interpretation": "Independent cartographic disagreement requiring review, not established field error."
+    },
+    {
+      "id": "54.0063_-6.1104",
+      "lat": 54.00625,
+      "lon": -6.110416666666671,
+      "country": "IE",
+      "region": "uk_ireland",
+      "name": "Ballagan",
+      "near": "Carlingford",
+      "new_vs_A": true,
+      "osm_land_covers": false,
+      "osm_water": [],
+      "osm_wetlands": [],
+      "interpretation": "Independent cartographic disagreement requiring review, not established field error."
+    },
+    {
+      "id": "53.8646_-6.2438",
+      "lat": 53.864583333333336,
+      "lon": -6.243750000000004,
+      "country": "IE",
+      "region": "uk_ireland",
+      "name": "Roadstown",
+      "near": "Clogherhead",
+      "new_vs_A": true,
+      "osm_land_covers": false,
+      "osm_water": [],
+      "osm_wetlands": [],
+      "interpretation": "Independent cartographic disagreement requiring review, not established field error."
+    },
+    {
+      "id": "52.8021_1.5854",
+      "lat": 52.80208333333333,
+      "lon": 1.5854166666666636,
+      "country": "GB",
+      "region": "uk_ireland",
+      "name": "Eccles on Sea",
+      "near": "Stalham",
+      "new_vs_A": true,
+      "osm_land_covers": false,
+      "osm_water": [],
+      "osm_wetlands": [],
+      "interpretation": "Independent cartographic disagreement requiring review, not established field error."
+    },
+    {
+      "id": "52.6604_1.6021",
+      "lat": 52.66041666666666,
+      "lon": 1.6020833333333293,
+      "country": "GB",
+      "region": "uk_ireland",
+      "name": "Billockby",
+      "near": "Filby",
+      "new_vs_A": false,
+      "osm_land_covers": true,
+      "osm_water": [
+        {
+          "osm_id": "4500715",
+          "fclass": "water",
+          "name": "",
+          "source": "/tmp/darksky-water-diagnostic/sources/geofabrik/england/source.json"
+        }
+      ],
+      "osm_wetlands": [],
+      "interpretation": "Independent cartographic disagreement requiring review, not established field error."
+    },
+    {
+      "id": "52.2062_-6.6396",
+      "lat": 52.20625,
+      "lon": -6.639583333333338,
+      "country": "IE",
+      "region": "uk_ireland",
+      "name": "Cull Island",
+      "near": "Taghmon",
+      "new_vs_A": true,
+      "osm_land_covers": false,
+      "osm_water": [],
+      "osm_wetlands": [
+        {
+          "osm_id": "3499017",
+          "fclass": "wetland_tidalflat",
+          "name": "Ballyteigue Lough",
+          "source": "/tmp/darksky-water-diagnostic/sources/geofabrik/ireland-and-northern-ireland/source.json"
+        }
+      ],
+      "interpretation": "Independent cartographic disagreement requiring review, not established field error."
+    },
+    {
+      "id": "51.6979_-2.9063",
+      "lat": 51.697916666666664,
+      "lon": -2.9062500000000036,
+      "country": "GB",
+      "region": "uk_ireland",
+      "name": "Llanbadoc",
+      "near": "Llanbadoc",
+      "new_vs_A": false,
+      "osm_land_covers": true,
+      "osm_water": [
+        {
+          "osm_id": "401442647",
+          "fclass": "riverbank",
+          "name": "",
+          "source": "/tmp/darksky-water-diagnostic/sources/geofabrik/wales/source.json"
+        }
+      ],
+      "osm_wetlands": [],
+      "interpretation": "Independent cartographic disagreement requiring review, not established field error."
+    },
+    {
+      "id": "51.5604_-2.9979",
+      "lat": 51.56041666666667,
+      "lon": -2.9979166666666703,
+      "country": "GB",
+      "region": "uk_ireland",
+      "name": "Duffryn",
+      "near": "Newport",
+      "new_vs_A": true,
+      "osm_land_covers": true,
+      "osm_water": [
+        {
+          "osm_id": "43457375",
+          "fclass": "water",
+          "name": "",
+          "source": "/tmp/darksky-water-diagnostic/sources/geofabrik/wales/source.json"
+        }
+      ],
+      "osm_wetlands": [],
+      "interpretation": "Independent cartographic disagreement requiring review, not established field error."
+    },
+    {
+      "id": "51.1896_-4.2229",
+      "lat": 51.18958333333333,
+      "lon": -4.22291666666667,
+      "country": "GB",
+      "region": "uk_ireland",
+      "name": "Mortehoe",
+      "near": "Woolacombe",
+      "new_vs_A": true,
+      "osm_land_covers": false,
+      "osm_water": [],
+      "osm_wetlands": [],
+      "interpretation": "Independent cartographic disagreement requiring review, not established field error."
+    },
+    {
+      "id": "50.9021_0.7104",
+      "lat": 50.90208333333333,
+      "lon": 0.7104166666666636,
+      "country": "GB",
+      "region": "uk_ireland",
+      "name": "Winchelsea Beach",
+      "near": "Winchelsea Beach",
+      "new_vs_A": true,
+      "osm_land_covers": false,
+      "osm_water": [],
+      "osm_wetlands": [],
+      "interpretation": "Independent cartographic disagreement requiring review, not established field error."
+    }
+  ],
+  "benchmark": {
+    "region": "france",
+    "repetitions": 3,
+    "integrity_seconds": 14.35543146100099,
+    "observations": [
+      {
+        "scenario": "A",
+        "cache": "empty",
+        "trial": 0,
+        "seconds": 6.652229298000748,
+        "production_guard_seconds": 0.0,
+        "stats": {
+          "qualification": {
+            "wbm_land": 0,
+            "wbm_nodata": 0,
+            "wbm_ocean": 0,
+            "wbm_lake": 0,
+            "wbm_river": 0,
+            "geographically_empty_cells": 0,
+            "mesh_candidates": 39787,
+            "sea_rejected": 9699,
+            "invalid_candidates": 0,
+            "ambiguous_country_candidates": 0,
+            "lexical_area_ties": 0,
+            "other_country_rejected": 4632,
+            "country_candidates": 25456,
+            "outside_bbox": 4
+          }
+        },
+        "io_delta": {}
+      },
+      {
+        "scenario": "D",
+        "cache": "empty",
+        "trial": 0,
+        "seconds": 7.807800901999144,
+        "production_guard_seconds": 1.7342426470022474,
+        "stats": {
+          "cells": 97056,
+          "empty_cells": 71064,
+          "selected_cells": 25992,
+          "candidates_examined": 59270,
+          "ranked_cells": 850,
+          "qualification": {
+            "wbm_land": 25992,
+            "wbm_nodata": 0,
+            "wbm_ocean": 1240,
+            "wbm_lake": 558,
+            "wbm_river": 221,
+            "geographically_empty_cells": 13711,
+            "mesh_candidates": 59270,
+            "sea_rejected": 27697,
+            "invalid_candidates": 0,
+            "ambiguous_country_candidates": 0,
+            "lexical_area_ties": 0,
+            "other_country_rejected": 3520,
+            "country_candidates": 28053,
+            "outside_bbox": 42
+          }
+        },
+        "io_delta": {
+          "block_reads": 6010,
+          "peak_cache_bytes": 42746420,
+          "points": 54003,
+          "cache_hits": 7566
+        }
+      },
+      {
+        "scenario": "D",
+        "cache": "warm",
+        "trial": 1,
+        "seconds": 6.350370439999097,
+        "production_guard_seconds": 1.584884443996998,
+        "stats": {
+          "cells": 97056,
+          "empty_cells": 71064,
+          "selected_cells": 25992,
+          "candidates_examined": 59270,
+          "ranked_cells": 850,
+          "qualification": {
+            "wbm_land": 25992,
+            "wbm_nodata": 0,
+            "wbm_ocean": 1240,
+            "wbm_lake": 558,
+            "wbm_river": 221,
+            "geographically_empty_cells": 13711,
+            "mesh_candidates": 59270,
+            "sea_rejected": 27697,
+            "invalid_candidates": 0,
+            "ambiguous_country_candidates": 0,
+            "lexical_area_ties": 0,
+            "other_country_rejected": 3520,
+            "country_candidates": 28053,
+            "outside_bbox": 42
+          }
+        },
+        "io_delta": {
+          "points": 54003,
+          "cache_hits": 13576
+        }
+      },
+      {
+        "scenario": "A",
+        "cache": "warm",
+        "trial": 1,
+        "seconds": 7.511545340999874,
+        "production_guard_seconds": 0.0,
+        "stats": {
+          "qualification": {
+            "wbm_land": 0,
+            "wbm_nodata": 0,
+            "wbm_ocean": 0,
+            "wbm_lake": 0,
+            "wbm_river": 0,
+            "geographically_empty_cells": 0,
+            "mesh_candidates": 39787,
+            "sea_rejected": 9699,
+            "invalid_candidates": 0,
+            "ambiguous_country_candidates": 0,
+            "lexical_area_ties": 0,
+            "other_country_rejected": 4632,
+            "country_candidates": 25456,
+            "outside_bbox": 4
+          }
+        },
+        "io_delta": {}
+      },
+      {
+        "scenario": "A",
+        "cache": "warm",
+        "trial": 2,
+        "seconds": 7.1132782620006765,
+        "production_guard_seconds": 0.0,
+        "stats": {
+          "qualification": {
+            "wbm_land": 0,
+            "wbm_nodata": 0,
+            "wbm_ocean": 0,
+            "wbm_lake": 0,
+            "wbm_river": 0,
+            "geographically_empty_cells": 0,
+            "mesh_candidates": 39787,
+            "sea_rejected": 9699,
+            "invalid_candidates": 0,
+            "ambiguous_country_candidates": 0,
+            "lexical_area_ties": 0,
+            "other_country_rejected": 4632,
+            "country_candidates": 25456,
+            "outside_bbox": 4
+          }
+        },
+        "io_delta": {}
+      },
+      {
+        "scenario": "D",
+        "cache": "warm",
+        "trial": 2,
+        "seconds": 5.476136447003228,
+        "production_guard_seconds": 1.5262043370021274,
+        "stats": {
+          "cells": 97056,
+          "empty_cells": 71064,
+          "selected_cells": 25992,
+          "candidates_examined": 59270,
+          "ranked_cells": 850,
+          "qualification": {
+            "wbm_land": 25992,
+            "wbm_nodata": 0,
+            "wbm_ocean": 1240,
+            "wbm_lake": 558,
+            "wbm_river": 221,
+            "geographically_empty_cells": 13711,
+            "mesh_candidates": 59270,
+            "sea_rejected": 27697,
+            "invalid_candidates": 0,
+            "ambiguous_country_candidates": 0,
+            "lexical_area_ties": 0,
+            "other_country_rejected": 3520,
+            "country_candidates": 28053,
+            "outside_bbox": 42
+          }
+        },
+        "io_delta": {
+          "points": 54003,
+          "cache_hits": 13576
+        }
+      },
+      {
+        "scenario": "D",
+        "cache": "warm",
+        "trial": 3,
+        "seconds": 5.551478474997566,
+        "production_guard_seconds": 1.4765709179991973,
+        "stats": {
+          "cells": 97056,
+          "empty_cells": 71064,
+          "selected_cells": 25992,
+          "candidates_examined": 59270,
+          "ranked_cells": 850,
+          "qualification": {
+            "wbm_land": 25992,
+            "wbm_nodata": 0,
+            "wbm_ocean": 1240,
+            "wbm_lake": 558,
+            "wbm_river": 221,
+            "geographically_empty_cells": 13711,
+            "mesh_candidates": 59270,
+            "sea_rejected": 27697,
+            "invalid_candidates": 0,
+            "ambiguous_country_candidates": 0,
+            "lexical_area_ties": 0,
+            "other_country_rejected": 3520,
+            "country_candidates": 28053,
+            "outside_bbox": 42
+          }
+        },
+        "io_delta": {
+          "points": 54003,
+          "cache_hits": 13576
+        }
+      },
+      {
+        "scenario": "A",
+        "cache": "warm",
+        "trial": 3,
+        "seconds": 6.404230462998385,
+        "production_guard_seconds": 0.0,
+        "stats": {
+          "qualification": {
+            "wbm_land": 0,
+            "wbm_nodata": 0,
+            "wbm_ocean": 0,
+            "wbm_lake": 0,
+            "wbm_river": 0,
+            "geographically_empty_cells": 0,
+            "mesh_candidates": 39787,
+            "sea_rejected": 9699,
+            "invalid_candidates": 0,
+            "ambiguous_country_candidates": 0,
+            "lexical_area_ties": 0,
+            "other_country_rejected": 4632,
+            "country_candidates": 25456,
+            "outside_bbox": 4
+          }
+        },
+        "io_delta": {}
+      }
+    ],
+    "warm_median_seconds": {
+      "A": 7.1132782620006765,
+      "D": 5.551478474997566
+    },
+    "ratio_D_over_A": 0.7804388174512605,
+    "generation_selection_median_seconds": {
+      "A": 7.1132782620006765,
+      "D": 7.028049392996763
+    },
+    "generation_selection_ratio_D_over_A": 0.9880183417736927,
+    "cache_bytes": 42746420,
+    "peak_cache_bytes": 42746420,
+    "max_rss_kib": 538844,
+    "note": "Empty means application WBM cache, not the operating-system filesystem cache. ALR is not rerun here."
+  },
+  "clusters": {
+    "A": {
+      "L1": {
+        "clusters": 1110,
+        "sha256": "1daa1d77476ba8f6a60d9850e6fe904261c74a1f3b5cd13a8f10a084cf9fbe28"
+      },
+      "L2": {
+        "clusters": 323,
+        "sha256": "ece378a26e2f7e42023a11eb3799c3631229f0be5867610e5d66cc2c4dc639da"
+      },
+      "L3": {
+        "clusters": 102,
+        "sha256": "c06f6e9e51edafed73ca2a15b31bee4822a420ae62df1307e2a823e8fc82cfec"
+      },
+      "L4": {
+        "clusters": 37,
+        "sha256": "900452c65c7b9f25a52893a411cbb8a9e33f987829843923db859d16fb30ddf1"
+      },
+      "L5": {
+        "clusters": 19,
+        "sha256": "8e8425b342dfc3a9f019453d0e0145f42825cc4ac37c28d9ae765a91f821fb23"
+      },
+      "L6": {
+        "clusters": 7,
+        "sha256": "565e8eecf4184497ef3a00d99871c69b7a9f339ce91b9b51751f0c1d24dc2da8"
+      }
+    },
+    "B": {
+      "L1": {
+        "clusters": 1107,
+        "sha256": "a384231731ce443aec4d5f4ef2710b4a8b1b78f299eed4cc3ee62416ac0fb9a5"
+      },
+      "L2": {
+        "clusters": 321,
+        "sha256": "fa9d7d453aeaf56dacfe79ea548cc3d55cf5ecee6f16011979278d4afe7107d9"
+      },
+      "L3": {
+        "clusters": 102,
+        "sha256": "42a45ac2c63e570818df6ff3dd0882a99f1af9499ef541a0eb4d03a6cf3cf0a6"
+      },
+      "L4": {
+        "clusters": 37,
+        "sha256": "dc03b122bed1b64f16a581430aa2d558a698b4e848a378f368a29d1334a6d9d7"
+      },
+      "L5": {
+        "clusters": 19,
+        "sha256": "439d2056cb8f86765b39b874421264100cb4c1000f43883c4174b6a6a90e1ac8"
+      },
+      "L6": {
+        "clusters": 7,
+        "sha256": "c491961a6b452d1815007dbf55efb7fad7ec6c5b6b263b4b061c30886446738f"
+      }
+    },
+    "C": {
+      "L1": {
+        "clusters": 1127,
+        "sha256": "1f0761bea5291976eaec9a9b9409a4e454b31eed05d760f5fb1593e750e0b941"
+      },
+      "L2": {
+        "clusters": 331,
+        "sha256": "3543c9174323e41eb7944f9827c5c7f6cb21a5cfc4edafb7276488f45064b86b"
+      },
+      "L3": {
+        "clusters": 103,
+        "sha256": "f8c514858dcb2288f257e6b3e77bafb5fb0a11283fe62998ceba78123a5b52d6"
+      },
+      "L4": {
+        "clusters": 37,
+        "sha256": "c1e5a28b6755f6e223232d2c00948de0dd291c489422d56f7251dd9598c57eeb"
+      },
+      "L5": {
+        "clusters": 19,
+        "sha256": "26bbbc28f914c8525943ccda2f633911d1215a0cf9764b00cb9504ac5d881bbe"
+      },
+      "L6": {
+        "clusters": 7,
+        "sha256": "0b5bdbfd7f74583801b544b5e9c207723d65531ee680d2030cd38b1eb005b437"
+      }
+    },
+    "D": {
+      "L1": {
+        "clusters": 1125,
+        "sha256": "1347ba68667fca0c2b746317128e174c009594bf9d681d91e24aeef307c97e21"
+      },
+      "L2": {
+        "clusters": 331,
+        "sha256": "7bceb079fd20578e8acde6b2260c2e3a7834035ee0633c690e49bb6cac1b848b"
+      },
+      "L3": {
+        "clusters": 103,
+        "sha256": "8b1f13783d69cc8a8c70005553a02095c9fbd7926af7baf1d00c780c5fb6f141"
+      },
+      "L4": {
+        "clusters": 37,
+        "sha256": "ab745ec3e22c1cda43639a92974fde728725446bdc63615e38726028a21f5861"
+      },
+      "L5": {
+        "clusters": 19,
+        "sha256": "e8cde64ff599fd79ce77cddf3b7c657b5af31bbacedc1c269a8326754b1ed8b4"
+      },
+      "L6": {
+        "clusters": 7,
+        "sha256": "378e7049f5ce17252660aa67e316d81d2aec5a3fa5ce049c51e711b388e28811"
+      }
+    }
+  },
+  "limitations": [
+    "OSM disagreements require review; no orthophoto or field confirmation.",
+    "711 final D points are outside the downloaded inland-extract footprints (678 FR, 33 UK/Ireland). The marine OSM land mask covers all points but is not an inland-water validation.",
+    "One new four-to-three coverage deficit at La Roquette-sur-Var: Esparron lake point at 99.695 km is replaced by WBM land at 100.027943 km. The 100-km radius is unchanged; the eligible pool contains three points.",
+    "A last-bit numerical mismatch remains for 48 Canaries darkness values; it predates WBM and does not change selection or Bortle.",
+    "The final implementation rejects unsupported projected/rotated VIIRS mesh grids explicitly. Projected WBM data are sampled with grouped transformations and unit-tested.",
+    "Initial full-simulation timings include concurrent validation work and the earlier scalar cell-envelope calculation. The isolated final benchmark includes production guards and verifies exact selection output equality."
+  ],
+  "publication": "No published data, masks, regional configuration or source data repository modified. All spot/cluster generation was confined to temporary snapshots. Publication decision remains with the user."
+}
