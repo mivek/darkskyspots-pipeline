@@ -47,6 +47,7 @@ from src.publish import (
 from src.clusters import write_cluster_files
 from src.regions import build_region_ownerships, get_region, load_regions
 from src.geography import classify_candidates, validate_country_codes
+from src.selection import CandidateQualifier
 from src.tile_export import (
     classify_spots_into_tiles,
     enumerate_tiles_in_bbox,
@@ -158,6 +159,7 @@ def _filter_candidates_to_bbox(candidates: list[dict], bbox) -> tuple[list[dict]
 
 def run(args) -> int:
     """Execute the 7-step pipeline. Returns 0 on success, 1 on error."""
+    sampler = None
     try:
         region = get_region(args.region)
         logger.info("Region: %s (%s)", region["name"], args.region)
@@ -168,8 +170,7 @@ def run(args) -> int:
         # incomplete filtered extract must never yield a partial run.
         _validate_geonames_inputs(country_codes)
 
-        with ElevationSampler(Path(args.dem_manifest_dir) / f"{args.region}.json", args.dem_cache_dir):
-            pass
+        sampler = ElevationSampler(Path(args.dem_manifest_dir) / f"{args.region}.json", args.dem_cache_dir)
 
         input_path = Path(args.input_dir) / args.region / f"{args.year}.tif"
         if not input_path.exists():
@@ -218,7 +219,14 @@ def run(args) -> int:
 
         # Step 2: Mesh scan (darkest pixel per cell)
         logger.info("Step 2: Mesh scan (darkest pixel per cell)")
-        candidates = mesh_darkest(darkness, transform, MESH_KM)
+        qualifier = CandidateQualifier(region, transform, crs, sampler,
+                                       classify=classify_candidates)
+        selection_stats = {}
+        candidates = mesh_darkest(darkness, transform, MESH_KM, qualify=qualifier,
+                                  crs=crs, stats=selection_stats)
+        logger.info("  Mesh selection stats: %s; qualification: %s", selection_stats, dict(qualifier.counts))
+        if qualifier.counts['wbm_nodata']:
+            logger.warning("WBM NoData candidates rejected: %d", qualifier.counts['wbm_nodata'])
         logger.info("  Found %d candidate spots", len(candidates))
 
         # Step 2b: Attach bortle (and re-attach definitive darkness) to each candidate.
@@ -253,6 +261,9 @@ def run(args) -> int:
             bbox_rejected,
             region["bbox"],
         )
+        classes = sampler.wbm_classes([p['lat'] for p in candidates], [p['lon'] for p in candidates])
+        if len(classes) != len(candidates) or any(value != 0 for value in classes):
+            raise ValueError('WBM qualification failed: a non-land candidate reached redundancy')
 
         # Step 3: Redundancy filter
         logger.info("Step 3: Redundancy filter")
@@ -281,9 +292,9 @@ def run(args) -> int:
         named = naming_index.enrich_spots(covered)
         if any(not isinstance(spot.get("name"), str) or not spot["name"].strip() for spot in named):
             raise ValueError("GeoNames naming cascade produced an empty name")
-        with ElevationSampler(Path(args.dem_manifest_dir) / f"{args.region}.json", args.dem_cache_dir) as sampler:
-            enriched = enrich_all(named, elevation_sampler=sampler)
-            logger.info("  Elevation sample counts: %s", dict(sampler.counts))
+        enriched = enrich_all(named, elevation_sampler=sampler)
+        logger.info("  Elevation sample counts: %s", dict(sampler.counts))
+        logger.info("  WBM IO stats: %s", dict(sampler.wbm_io))
         logger.info("  Enriched %d spots", len(enriched))
 
         # Step 6: Tile export + version
@@ -397,6 +408,9 @@ def run(args) -> int:
     except Exception:
         logger.exception("Pipeline failed")
         return 1
+    finally:
+        if sampler is not None:
+            sampler.close()
 
 
 def main() -> int:

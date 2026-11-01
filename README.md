@@ -124,11 +124,16 @@ ISO alpha-2 codes; the Natural Earth 1:10m polygons decide which countries can
 publish.
 
 The 300 km ALR margin avoids raster edge effects and remains in the luminosity
-calculation. Mesh minima can consequently be found in that halo, but the
-orchestrator removes candidates outside the inclusive nominal bbox immediately
-after land/country clipping and before redundancy. The same filtered list is
-used for coverage, naming, and tile export. There is no coastal buffer; islands
-inside the configured countries are retained.
+calculation. Within each mesh cell, generation selects the darkest VIIRS pixel
+whose centre passes Natural Earth land/country qualification, the inclusive
+nominal bbox, and the Copernicus WBM land class. Rejected maxima are replaced
+by the next darkest eligible pixel of the same cell. Equal values retain the
+row-major tie-break. The qualified candidate pool is used for redundancy,
+coverage, naming, and tile export. No coastal buffer is applied: WBM land
+centres remain eligible next to water. An island without an eligible VIIRS
+pixel centre produces no candidate; coordinates are never moved between pixel
+centres. The angular mesh requires an unrotated EPSG:4326 VIIRS grid; other
+CRSs fail explicitly instead of being interpreted as degrees.
 
 Changing a published region bbox or country configuration is a spot-level
 migration. Run the
@@ -259,6 +264,69 @@ The dated investigation and decision are recorded in
 - **Populated places (GeoNames):** [GeoNames](https://www.geonames.org) data used under the [Creative Commons Attribution 4.0 License](https://creativecommons.org/licenses/by/4.0/). Data is sourced from the [cities500](https://download.geonames.org/export/dump/cities500.zip) export.
 
 ## Spot elevation
+
+Normal spot generation requires the prepared WBM as well as the DEM. Water
+classes (ocean, lake, river) and valid WBM NoData pixels are not eligible for
+selection. NoData is counted separately and reported as a warning; the selector
+tries the next pixel. Missing, corrupt, unreadable rasters and unexpected WBM
+classes stop the run, with no Natural Earth-only fallback. A DEM NoData value
+does not invalidate a WBM land candidate: its altitude can still be `null`.
+
+Selection reads WBM points in groups by native raster block. A 64 MiB LRU
+accounts for both values and validity masks; GDAL's cache is limited to 32 MiB
+while the terrain reader is open. Verified datasets are reused for enrichment.
+Rejected cells are ranked once, not rescanned for every alternative. These
+changes do not mask or modify the ALR input, halo, darkness or Bortle arrays.
+
+### Offline selection comparison
+
+The comparison tool runs A (historical selection), B (A with water removed),
+C (geographically eligible maxima) and D (geographically eligible WBM land
+maxima) on the same full-precision arrays. It compares A to committed data
+before proceeding, records last-bit darkness differences separately (absolute
+tolerance `1e-12`; coordinates, Bortle and country must match exactly), and
+reports selection, redundancy and locality coverage independently. Larger
+historical differences stop the comparison unless explicitly marked exploratory
+with `--allow-historical-drift`.
+
+```bash
+darkspots/bin/python tools/compare_wbm.py \
+    --data-repo /path/to/darkskyspots-data --reference 1502e35 \
+    --output-dir /tmp/darksky-wbm-simulation --snapshots
+
+darkspots/bin/python tools/compare_wbm.py \
+    --data-repo /path/to/darkskyspots-data \
+    --output-dir /tmp/darksky-wbm-simulation --benchmark-region france
+
+darkspots/bin/python tools/audit_wbm_osm.py \
+    --simulation /tmp/darksky-wbm-simulation \
+    --diagnostic /tmp/darksky-water-diagnostic \
+    --output /tmp/darksky-wbm-simulation/osm-audit.json
+
+darkspots/bin/python tools/check_wbm_results.py \
+    --simulation /tmp/darksky-wbm-simulation \
+    --data-repo /path/to/darkskyspots-data
+```
+
+The output must be separate from the source data repository. Optional snapshots
+use the existing regional ownership merger and regenerate global clusters only
+inside that output directory. No tool above publishes or pushes. The OSM audit
+uses only the previously downloaded Geofabrik and OSMCoastline snapshots and
+checks the entire D candidate pool, including new points. Missing inland
+extract coverage is reported explicitly and never treated as evidence of dry
+land. OSM is not a generation dependency.
+
+The independent checker rereads WBM points using scalar raster windows,
+verifies unchanged historical land maxima, explains later redundancy removals,
+and audits the temporary global snapshots, cluster hashes and representative
+fields. Generate snapshots before running this checker.
+
+Comparison array caches include input, parameter and implementation provenance
+and file hashes. Use a new output directory when those inputs change. Optional
+`--context-km region=km` overrides concern the ALR kernel; an input folder named
+after a larger context does not establish which kernel parameters produced it.
+
+### Terrain preparation and altitude enrichment
 
 Preparation uses Copernicus DEM GLO-30 DGED and its water body mask (WBM),
 with GLO-90 as a fallback. The DEM is a surface model: trees, buildings,

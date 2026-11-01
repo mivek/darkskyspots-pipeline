@@ -2,7 +2,7 @@
 import hashlib
 import json
 import math
-from collections import Counter
+from collections import Counter, OrderedDict
 from contextlib import ExitStack
 from pathlib import Path
 
@@ -11,6 +11,7 @@ import rasterio
 from rasterio.warp import transform
 
 WATER_CLASSES = {1: 'ocean', 2: 'lake', 3: 'river'}
+WBM_NODATA = -1
 
 
 def sha256(path):
@@ -24,13 +25,20 @@ def sha256(path):
 class ElevationSampler:
     """Sample paired, manifest-verified elevation and water rasters locally."""
 
-    def __init__(self, manifest, cache_dir):
+    def __init__(self, manifest, cache_dir, *, wbm_cache_bytes=64 * 1024 * 1024):
         self.manifest_path = Path(manifest)
         self.cache_dir = Path(cache_dir).resolve()
         self.stack = ExitStack()
         self.tiles = {}
         self.counts = Counter({name: 0 for name in WATER_CLASSES.values()})
+        self.wbm_cache_limit = int(wbm_cache_bytes)
+        if self.wbm_cache_limit < 0:
+            raise ValueError('WBM cache size must be nonnegative')
+        self.wbm_cache = OrderedDict()
+        self.wbm_cache_size = 0
+        self.wbm_io = Counter()
         try:
+            self.stack.enter_context(rasterio.Env(GDAL_CACHEMAX=32 * 1024 * 1024))
             data = json.loads(self.manifest_path.read_text(encoding='utf-8'))
             if data.get('schema') != 1 or not data.get('tiles'):
                 raise ValueError(f'Invalid elevation manifest: {manifest}')
@@ -60,6 +68,8 @@ class ElevationSampler:
             raise
 
     def close(self):
+        self.wbm_cache.clear()
+        self.wbm_cache_size = 0
         self.stack.close()
 
     def __enter__(self):
@@ -67,6 +77,72 @@ class ElevationSampler:
 
     def __exit__(self, *args):
         self.close()
+
+    def wbm_classes(self, lats, lons):
+        """Read WGS84 points by native raster block, with a bounded LRU.
+
+        Returns 0/1/2/3, or WBM_NODATA for valid masked pixels. Technical
+        failures and unknown classes raise; altitude counters are untouched.
+        Cache accounting includes both the values and their validity masks.
+        """
+        lats, lons = np.asarray(lats, dtype=float), np.asarray(lons, dtype=float)
+        if (lats.ndim != 1 or lats.shape != lons.shape
+                or not np.all(np.isfinite(lats)) or not np.all(np.isfinite(lons))
+                or np.any((lats < -90) | (lats >= 90) | (lons < -180) | (lons >= 180))):
+            raise ValueError('Invalid WGS84 coordinates for WBM')
+        result = np.full(lats.size, WBM_NODATA, dtype=np.int16)
+        groups = {}
+        for i, key in enumerate(zip(np.floor(lats).astype(int), np.floor(lons).astype(int))):
+            groups.setdefault(key, []).append(i)
+        for key, positions in groups.items():
+            if key not in self.tiles:
+                raise ValueError(f'No prepared DEM tile for WBM: {key}')
+            ds = self.tiles[key][1]
+            xs, ys = lons[positions], lats[positions]
+            if ds.crs != rasterio.crs.CRS.from_epsg(4326):
+                xs, ys = transform('EPSG:4326', ds.crs, xs, ys)
+                self.wbm_io['transformed_points'] += len(positions)
+            rows, cols = rasterio.transform.rowcol(ds.transform, xs, ys)
+            rows, cols = np.asarray(rows), np.asarray(cols)
+            if np.any((rows < 0) | (cols < 0) | (rows >= ds.height) | (cols >= ds.width)):
+                raise ValueError(f'Coordinate outside WBM raster {ds.name}')
+            bh, bw = ds.block_shapes[0]
+            blocks = {}
+            for j, (row, col) in enumerate(zip(rows, cols)):
+                blocks.setdefault((int(row) // bh, int(col) // bw), []).append(j)
+            for (br, bc), indexes in blocks.items():
+                cache_key = (key, br, bc)
+                if cache_key in self.wbm_cache:
+                    data, invalid = self.wbm_cache.pop(cache_key)
+                    self.wbm_cache[cache_key] = (data, invalid)
+                    self.wbm_io['cache_hits'] += 1
+                else:
+                    window = rasterio.windows.Window(bc * bw, br * bh,
+                                                     min(bw, ds.width - bc * bw),
+                                                     min(bh, ds.height - br * bh))
+                    array = ds.read(1, window=window, masked=True)
+                    data = np.array(array.data, copy=True)
+                    # Only the dataset's valid NoData mask is a recoverable
+                    # missing pixel. Unmasked NaN/Inf are invalid classes.
+                    invalid = np.ma.getmaskarray(array).copy()
+                    self.wbm_io['block_reads'] += 1
+                    cost = data.nbytes + invalid.nbytes
+                    if cost <= self.wbm_cache_limit:
+                        while self.wbm_cache and self.wbm_cache_size + cost > self.wbm_cache_limit:
+                            old_data, old_mask = self.wbm_cache.popitem(last=False)[1]
+                            self.wbm_cache_size -= old_data.nbytes + old_mask.nbytes
+                        self.wbm_cache[cache_key] = (data, invalid)
+                        self.wbm_cache_size += cost
+                        self.wbm_io['peak_cache_bytes'] = max(self.wbm_io['peak_cache_bytes'], self.wbm_cache_size)
+                rr, cc = rows[indexes] - br * bh, cols[indexes] - bc * bw
+                values, missing = data[rr, cc], invalid[rr, cc]
+                if np.any(~missing & ~np.isin(values, (0, 1, 2, 3))):
+                    bad = np.unique(values[~missing & ~np.isin(values, (0, 1, 2, 3))])
+                    raise ValueError(f'Invalid WBM value in {ds.name}: {bad.tolist()}')
+                dest = np.asarray(positions)[indexes]
+                result[dest[~missing]] = values[~missing].astype(np.int16)
+        self.wbm_io['points'] += lats.size
+        return result
 
     @staticmethod
     def _read(ds, lon, lat):
