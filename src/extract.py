@@ -10,6 +10,12 @@ def mesh_darkest(
     darkness: np.ndarray,
     transform,
     mesh_km: int = MESH_KM,
+    *,
+    qualify=None,
+    crs='EPSG:4326',
+    batch_size: int = 4096,
+    stats: dict | None = None,
+    priority_key=None,
 ) -> list[dict]:
     """
     Scan the darkness array in mesh_km cells, find the darkest pixel per cell.
@@ -18,7 +24,15 @@ def mesh_darkest(
     Skips cells where all values are NaN (NaN halo).
     Tie-breaker: ``np.nanargmax`` returns the first maximum in row-major
     order (D6), so equal darkness values are deterministic.
+
+    With ``qualify``, examine alternatives in darkness order. With
+    ``priority_key``, select the darkest candidate in the best available tier.
+    An accepted top-tier maximum needs no further examination; a lower-tier
+    fallback is retained while the remaining cell is ranked once. Normal
+    generation supplies E3 qualification; omission is a historical comparator.
     """
+    if qualify is not None:
+        return _qualified_mesh(darkness, transform, mesh_km, qualify, crs, batch_size, stats, priority_key)
     res_deg_x = abs(transform.a)  # degrees per pixel in x
     res_deg_y = abs(transform.e)  # degrees per pixel in y
 
@@ -53,9 +67,104 @@ def mesh_darkest(
     return points
 
 
+def _qualified_mesh(darkness, transform, mesh_km, qualify, crs, batch_size, stats, priority_key=None):
+    """Rank a rejected cell once; qualify batches without rescanning maxima.
+
+    The existing mesh is angular. Reject unsupported grids explicitly instead
+    of interpreting projected coordinates as longitude/latitude. Qualification
+    returns a subset of the original candidate objects, in any order.
+    """
+    from rasterio.crs import CRS
+    if CRS.from_user_input(crs) != CRS.from_epsg(4326) or transform.b or transform.d:
+        raise ValueError('Mesh selection requires an unrotated EPSG:4326 VIIRS grid')
+    if batch_size < 1:
+        raise ValueError('Mesh batch size must be positive')
+    stats = stats if stats is not None else {}
+    stats.update(cells=0, empty_cells=0, selected_cells=0, candidates_examined=0, ranked_cells=0)
+    cy = max(1, int(round(mesh_km / 111.32 / abs(transform.e))))
+    cx = max(1, int(round(mesh_km / 111.32 / abs(transform.a))))
+    points = []
+
+    def consume(states):
+        chosen = {}
+        fallbacks = {}
+        active = states
+        if hasattr(qualify, 'possible_cells'):
+            # Whole-pixel envelopes are a conservative superset of centres.
+            # Compute these affine bounds in one batch, not two xy() calls
+            # per cell. Actual candidate centres still use rasterio.xy.
+            rr = np.array([s['r'] for s in states])
+            cc = np.array([s['c'] for s in states])
+            hh = np.array([s['cell'].shape[0] for s in states])
+            ww = np.array([s['width'] for s in states])
+            x0, x1 = transform.c + transform.a * cc, transform.c + transform.a * (cc + ww)
+            y0, y1 = transform.f + transform.e * rr, transform.f + transform.e * (rr + hh)
+            bounds = np.column_stack((np.minimum(x0, x1), np.minimum(y0, y1),
+                                      np.maximum(x0, x1), np.maximum(y0, y1)))
+            active = [s for s, possible in zip(states, qualify.possible_cells(bounds)) if possible]
+        while active:
+            rows = [s['r'] + s['index'] // s['width'] for s in active]
+            cols = [s['c'] + s['index'] % s['width'] for s in active]
+            lons, lats = xy(transform, rows, cols, offset='center')
+            candidates = [dict(lat=float(lat), lon=float(lon), row=int(row), col=int(col),
+                               darkness=float(darkness[row, col]))
+                          for lat, lon, row, col in zip(lats, lons, rows, cols)]
+            from .geographic_geometry import longitude
+            for p in candidates:p['lon']=longitude(p['lon'])
+            accepted = {id(p) for p in qualify(candidates)}
+            if not accepted.issubset({id(p) for p in candidates}):
+                raise ValueError('Mesh qualifier must return original candidate objects')
+            stats['candidates_examined'] += len(candidates)
+            following = []
+            for state, candidate in zip(active, candidates):
+                if id(candidate) in accepted:
+                    rank=priority_key(candidate) if priority_key is not None else 0
+                    if rank not in {0,1,2}:raise ValueError('Invalid admissible confidence rank')
+                    if rank==0:
+                        chosen[state['ordinal']] = candidate
+                        continue
+                    previous=fallbacks.get(state['ordinal'])
+                    if previous is None or rank<previous[0]:fallbacks[state['ordinal']]=(rank,candidate)
+                if state['order'] is None:
+                    flat = state['cell'].ravel()
+                    valid = np.flatnonzero(~np.isnan(flat))
+                    state['order'] = valid[np.argsort(-flat[valid], kind='stable')]
+                    state['position'] = 0
+                    stats['ranked_cells'] += 1
+                state['position'] += 1
+                if state['position'] < len(state['order']):
+                    state['index'] = int(state['order'][state['position']])
+                    following.append(state)
+            active = following
+        for ordinal,(_,candidate) in fallbacks.items():
+            if ordinal not in chosen:chosen[ordinal]=candidate
+        points.extend(chosen[i] for i in sorted(chosen))
+        stats['selected_cells'] += len(chosen)
+        stats['empty_cells'] += len(states) - len(chosen)
+
+    states = []
+    for r in range(0, darkness.shape[0], cy):
+        for c in range(0, darkness.shape[1], cx):
+            cell = darkness[r:r + cy, c:c + cx]
+            stats['cells'] += 1
+            if np.all(np.isnan(cell)):
+                stats['empty_cells'] += 1
+                continue
+            states.append(dict(r=r, c=c, width=cell.shape[1], cell=cell,
+                               index=int(np.nanargmax(cell)), order=None,
+                               ordinal=stats['cells']))
+            if len(states) == batch_size:
+                consume(states)
+                states = []
+    if states:
+        consume(states)
+    return points
+
+
 def redundancy_filter(
     candidates: list[dict],
     min_distance_km: float = REDUNDANCY_KM,
+    *, priority_key=None,
 ) -> list[dict]:
     """
     Filter candidates: keep a candidate if no already-kept candidate is within
@@ -64,7 +173,8 @@ def redundancy_filter(
     Candidates with different Bortle classes are always kept regardless of distance.
     Sorted by darkness (darkest first) before filtering.
     """
-    sorted_cands = sorted(candidates, key=lambda c: c["darkness"], reverse=True)
+    sorted_cands = sorted(candidates, key=(lambda c:(priority_key(c),-c['darkness'])) if priority_key else
+                         (lambda c:-c['darkness']))
     kept: list[dict] = []
     for cand in sorted_cands:
         redundant = False

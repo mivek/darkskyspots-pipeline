@@ -105,11 +105,16 @@ def load_places(
     if isinstance(configured_countries, str):
         configured_countries = [configured_countries]
     configured_countries = {str(code).upper() for code in configured_countries}
+    span = (lon_max - lon_min) % 360 if lon_max < lon_min else lon_max - lon_min
+    def longitude_in_margin(lon):
+        if span + 2 * margin_lon >= 360:
+            return True
+        return (lon - (lon_min - margin_lon)) % 360 <= span + 2 * margin_lon
     filtered = [
         p
         for p in all_places
         if (lat_min - margin_lat) <= p["lat"] <= (lat_max + margin_lat)
-        and (lon_min - margin_lon) <= p["lon"] <= (lon_max + margin_lon)
+        and longitude_in_margin(p["lon"])
         and (not configured_countries or p.get("country") in configured_countries)
     ]
 
@@ -123,6 +128,7 @@ def ensure_coverage(
     communes: list[dict],
     min_spots: int = MIN_SPOTS_PER_AREA,
     radius_km: float = COVERAGE_RADIUS_KM,
+    *, priority_key=None, additions=None,
 ) -> list[dict]:
     """
     For each commune, verify >= min_spots candidates within radius_km.
@@ -153,12 +159,12 @@ def ensure_coverage(
                 and haversine_km(commune["lat"], commune["lon"], p["lat"], p["lon"])
                 <= radius_km
             ],
-            key=lambda p: p["darkness"],
-            reverse=True,
+            key=(lambda p:(priority_key(p),-p['darkness'])) if priority_key else (lambda p:-p['darkness']),
         )
         for p in pool[:needed]:
             result.append(p)
             kept_ids.add(id(p))
+            if additions is not None:additions.append(dict(point=dict(p),place=dict(commune)))
     return result
 
 

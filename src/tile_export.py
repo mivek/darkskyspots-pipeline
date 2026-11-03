@@ -92,6 +92,8 @@ def classify_spots_into_tiles(
     """
     tiles: dict[str, list[dict]] = {}
     for spot in spots:
+        if any(k.startswith('_geographic_') for k in spot):
+            raise ValueError('Internal geographic confidence cannot enter public spot JSON')
         tid = tile_id(spot["lat"], spot["lon"])
         tiles.setdefault(tid, []).append(spot)
     return tiles
@@ -120,9 +122,11 @@ def enumerate_tiles_in_bbox(
     lat_end = int(math.floor(lat_max))
     lon_start = int(math.floor(lon_min))
     lon_end = int(math.floor(lon_max))
+    longitude_ranges = [(lon_start, lon_end)] if lon_min <= lon_max else [(lon_start, 180), (-180, lon_end)]
     for lat in range(lat_start, lat_end):
-        for lon in range(lon_start, lon_end):
-            yield tile_id(float(lat) + 0.5, float(lon) + 0.5)
+        for west, east in longitude_ranges:
+            for lon in range(west, east):
+                yield tile_id(float(lat) + 0.5, float(lon) + 0.5)
 
 
 def write_empty_tiles(
