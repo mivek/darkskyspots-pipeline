@@ -1,0 +1,281 @@
+{
+  "schema_version": 1,
+  "report": "E3 final implementation validation",
+  "validated_against": "75ea305bbf454ee85f42346a1b21e4aa07593306",
+  "grouped_implementation_commit": "862bcdb744306b85c4fe4cb9df2e3282f1b42db6",
+  "pull_request": {
+    "number": 13,
+    "base": "main",
+    "draft": true,
+    "merged": false,
+    "rewritten_head": "Recorded in PR description after final commit; omitted here to avoid self-reference"
+  },
+  "source_revisions": {
+    "pipeline_source_commit": "75ea305bbf454ee85f42346a1b21e4aa07593306",
+    "frozen_generation_commit": "3e68f332627fb4ed0912c12f29a3988ddd31ad76",
+    "published_data_commit": "1502e353ef7f88aa63a95deb5678e7af33b9b028",
+    "geographic_package_manifest_sha256": "6ac72c9735f6f9d2d93c6e47e1a1a60ee011820f628f977225cfc52684fc39ff",
+    "review_document_sha256": "7583f4c6a9ab74172c427d0207c40260042f8725d9411a5dce1aa8ddb2f19e88",
+    "reviewed_context_sha256": "640f693bc700bf71246cf566021f7232ee5acd3542194fffe0ca677f18a8620c",
+    "source_validation_manifest_sha256": "b291678148093f3125a8bc1631e854d5bae9cd47543408e03cd749d5b771323b",
+    "worldcover_2021_v200_manifest_sha256": "117d72ce8adcbf7949764f8b7f63f781dcb32b547371fc35aef97ddc8b83f36a",
+    "frozen_inventory_sha256": "fe8cc14f1c6f341d28f2afc0d0fcf61112d50d14705d7c267338a17cc2ff6035",
+    "frozen_study_inventory_sha256": "2b2bc682fbe76756b79ec4629e65f51e7dbe54087bed4091039abb70ece155a1",
+    "full_regression_output_sha256": "b45188673278df5e2b3b5c15c1eb35567c7ad9b1def6f83e267a0c640f38210f"
+  },
+  "geographic_sources": {
+    "wbm": "Copernicus GLO-30 WBM, exact regional assets bound by geographic package manifest",
+    "osm_coastline_and_hydrography": "Prepared regional evidence, exact files and indexes bound by geographic package manifest; OSM mapping completeness is not guaranteed",
+    "worldcover": {
+      "product": "ESA WorldCover 2021 v200",
+      "license": "CC-BY-4.0",
+      "manifest_sha256": "117d72ce8adcbf7949764f8b7f63f781dcb32b547371fc35aef97ddc8b83f36a"
+    }
+  },
+  "alr_replay": {
+    "crs": "EPSG:4326",
+    "grid_resolution_degrees": 0.004166666666666667,
+    "parameters": {
+      "ALR_ALPHA_BASE": 2.3,
+      "ALR_ALPHA_EXP": 0.28,
+      "ALR_CALIB_C": 0.0008885413704862098,
+      "ALR_RINGS": 38,
+      "ALR_MAX_KM": 300,
+      "ALR_NOISE_FLOOR": 0.5,
+      "ALR_WORK_RESOLUTION_M": 450,
+      "ALR_DARK": 0.1,
+      "ALR_BRIGHT": 10,
+      "ALR_EPS": 0.001
+    },
+    "regions": {
+      "france": {
+        "input_sha256": "a71d0015f63fdf5d24435736ac9209b513db4e2f210b124cf2a962524258c761",
+        "darkness_sha256": "e1325d61b5a29cbdf48ffe0a0d5a7274d6bc30a7c94233f494fef4dfd936ce13",
+        "bortle_sha256": "bc11bcedf8feaa0dd87c466fb415e4e7c0fd55b70ac0f5628206327d6fdfc7ea",
+        "transform": [
+          0.004166666666666667,
+          0,
+          -5.804166666666674,
+          0,
+          -0.004166666666666667,
+          53.77083333333333
+        ]
+      },
+      "uk_ireland": {
+        "input_sha256": "cc76900015f10727e1cdaf3c01b46f523328dbf73c43281460e48388c260bbca",
+        "darkness_sha256": "0a0f0604c50125f7c6b6522bcc4adb4a2753bfc65d17ba737344ed043775207c",
+        "bortle_sha256": "6e34c2e25b8acc5918744e62c4e17b49b1ef37adeeddb79fb10aee543092ce91",
+        "transform": [
+          0.004166666666666667,
+          0,
+          -16.058333333333337,
+          0,
+          -0.004166666666666667,
+          57.704166666666666
+        ]
+      },
+      "canaries": {
+        "input_sha256": "f1656c88ae5a1e29365df41bfb90429f54dea6cf53118568911c99110ec9b04d",
+        "darkness_sha256": "3c003aee565c68bb6cb9f37d63f767eab5dfe89fb0af923ef2d2515fae3ac45d",
+        "bortle_sha256": "ab79a868bc3ff23816dda04e2b645571aa3a1938dd08bc1b11e504cbb66ea46d",
+        "transform": [
+          0.004166666666666667,
+          0,
+          -22.76666666666668,
+          0,
+          -0.004166666666666667,
+          33.15416666666667
+        ]
+      }
+    }
+  },
+  "frozen_results": {
+    "stages_exact": [
+      "selected",
+      "deduplicated",
+      "covered"
+    ],
+    "equality_fields": [
+      "order",
+      "coordinates",
+      "darkness",
+      "Bortle",
+      "country",
+      "E3 tier"
+    ],
+    "regions": {
+      "france": {
+        "D": 2210,
+        "E2": 2207,
+        "E3": 2207
+      },
+      "uk_ireland": {
+        "D": 1218,
+        "E2": 1217,
+        "E3": 1217
+      },
+      "canaries": {
+        "D": 66,
+        "E2": 66,
+        "E3": 66
+      }
+    },
+    "totals": {
+      "D": 3494,
+      "E2": 3490,
+      "E3": 3490
+    },
+    "e3_confidence": {
+      "A": 3490,
+      "B1": 0,
+      "B2": 0,
+      "C": 0
+    },
+    "e3_final_coordinates_changed_vs_e2": 25,
+    "coverage_deficits_new_or_worsened": 0,
+    "historical_wbm_land_controls": {
+      "total": 3349,
+      "A": 3265,
+      "B1": 18,
+      "B2": 65,
+      "C": 1
+    },
+    "full_regression_coordinates": 4181,
+    "controls": [
+      "8 probable-water controls",
+      "Civrac-sur-Dordogne",
+      "16 uncertain cases",
+      "3 harmful replacement chains",
+      "Galway",
+      "2 WorldCover conflicts"
+    ]
+  },
+  "tests": {
+    "complete": {
+      "passed": 539,
+      "warnings": 792,
+      "seconds": 141.51
+    },
+    "focused": {
+      "passed": 144,
+      "warnings": 766,
+      "seconds": 96.01,
+      "note": "Previously recorded at approved source 75ea305; included in the complete 539-test rerun after this cleanup."
+    },
+    "environment": {
+      "shapely": "2.2.0",
+      "geos": "3.14.1",
+      "numpy": "2.5.4",
+      "rasterio": "1.5.2",
+      "pytest": "9.2.0"
+    },
+    "frozen_replay": "exact for D/E2/E3 selected, deduplicated and coverage sequences"
+  },
+  "performance": {
+    "regional_index_rebuild": {
+      "seconds": 477.26,
+      "peak_rss_mib": 236.52,
+      "index_bytes_total": 950300672,
+      "indexed_features": 1079640,
+      "subdivided_current_features": 0
+    },
+    "synthetic_large_geometry": {
+      "authoritative_wkb_bytes": 8480113,
+      "seconds": 67.61,
+      "peak_rss_mib": 498.48,
+      "pages": 39,
+      "index_bytes": 65908736,
+      "exact_predicate_comparisons": 20
+    },
+    "fresh_reader": {
+      "five_probes_seconds": 0.57,
+      "peak_rss_mib": 247.79,
+      "authoritative_context_seconds": 0.12
+    },
+    "final_audit": {
+      "seconds": 24.63,
+      "peak_rss_mib": 330.34,
+      "integrity_reverification_seconds": 8.53,
+      "geographic_evaluation_seconds": 16.1
+    },
+    "prior_reader_comparison": {
+      "prior_seconds": 24.31,
+      "current_seconds": 24.68,
+      "note": "single same-session pair, not a statistical benchmark"
+    }
+  },
+  "publication": {
+    "complete_temporary_e3_geographic_audit": "passed",
+    "shared_gate": "blocked_pending_generated_spot_licensing",
+    "original_3422_spot_bootstrap": {
+      "blocked": true,
+      "class_c_rejections": 74,
+      "unresolved_holds": 83
+    },
+    "publication_authorized": false,
+    "published_data_changed": false
+  },
+  "limitations": [
+    "Preparation memory scales with the largest source feature and GEOS triangulation.",
+    "Synthetic stress index is 7.77 times source WKB size; future oversized regional inputs need resource measurement.",
+    "The 64-MiB cache/query accounting is not a whole-process RSS cap; over-budget exact reconstruction fails closed.",
+    "Generated-data licensing and durable authenticated artifact retention/restore remain pending."
+  ],
+  "reproduction": {
+    "regression_command": [
+      "darkspots/bin/python tools/validate_e3.py",
+      "--manifest input/geography/e3-p2-final/manifest.json",
+      "--frozen input/geography/e3-regression-reference/frozen",
+      "--e2 input/geography/e3-regression-reference/e2",
+      "--e3 input/geography/e3-regression-reference/study/results",
+      "--output /tmp/e3-final-replay"
+    ],
+    "test_command": "darkspots/bin/pytest",
+    "private_inputs": [
+      "input/geography/e3-regression-reference/",
+      "input/geography/e3-p2-final-acceptance/",
+      "input/geography/e3-p2-final/"
+    ],
+    "preparation_command": [
+      "darkspots/bin/python tools/prepare_e3.py",
+      "--base-manifest input/geography/e3-validation/manifest.json",
+      "--worldcover-manifest input/geography/e3-validation/worldcover/manifest.json",
+      "--output /tmp/e3-final-package"
+    ],
+    "source_manifests": [
+      "input/geography/e3-validation/manifest.json (SHA-256 b291678148093f3125a8bc1631e854d5bae9cd47543408e03cd749d5b771323b)",
+      "input/geography/e3-validation/worldcover/manifest.json (SHA-256 117d72ce8adcbf7949764f8b7f63f781dcb32b547371fc35aef97ddc8b83f36a)"
+    ]
+  },
+  "historical_reports": {
+    "local_archive": "/tmp/darkskyspots-pr13-history/75ea305/",
+    "inventory": "inventory.json contains each report path, byte size, SHA-256 and Git blob ID",
+    "durability": "local temporary archive only; durable backup and restore are not claimed"
+  },
+  "github_actions": {
+    "status_location": "GitHub check runs for rewritten PR head; verify after push"
+  },
+  "cleanup_reverification": {
+    "complete_suite_seconds": 141.51,
+    "all_D_E2_E3_stage_sequences_exact": true,
+    "covered_counts": {
+      "france": {
+        "D": 2210,
+        "E2": 2207,
+        "E3": 2207
+      },
+      "uk_ireland": {
+        "D": 1218,
+        "E2": 1217,
+        "E3": 1217
+      },
+      "canaries": {
+        "D": 66,
+        "E2": 66,
+        "E3": 66
+      }
+    },
+    "final_geographic_audit": "passed",
+    "full_replay_process_peak_rss_mib": 947.5
+  }
+}

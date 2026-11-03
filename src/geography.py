@@ -16,6 +16,8 @@ from pathlib import Path
 from shapely.geometry import Point, Polygon, shape
 from shapely.ops import unary_union
 from shapely.strtree import STRtree
+from shapely import prepare
+from .geographic_geometry import canonical
 
 logger = logging.getLogger(__name__)
 
@@ -89,6 +91,10 @@ def load_geography(data_dir: str | Path = DEFAULT_DATA_DIR) -> Geography:
             continue
         countries[code] = unary_union([countries[code], geometry]) if code in countries else geometry
     land = unary_union([geometry for _record, geometry in _read_shapes(land_path)])
+    # Prepared indexes change predicate cost, not geometry or attribution rules.
+    prepare(land)
+    for geometry in countries.values():
+        prepare(geometry)
     codes = tuple(sorted(countries))
     tree = STRtree([countries[code] for code in codes])
     logger.info("Loaded Natural Earth 1:10m: %d country geometries", len(codes))
@@ -218,7 +224,7 @@ def _candidate_pixel_polygon(candidate: dict, transform, crs):
         ]
         xs, ys = zip(*corners)
         lon, lat = reproject_coords(crs, "EPSG:4326", list(xs), list(ys))
-        return Polygon(zip(lon, lat))
+        return canonical(Polygon(zip(lon, lat)))
     except Exception:
         logger.debug("Unable to derive source raster pixel for candidate", exc_info=True)
         return None

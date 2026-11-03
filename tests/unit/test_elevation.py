@@ -10,12 +10,12 @@ from src.elevation import ElevationSampler, sha256
 from tools.check_elevation import compare
 
 
-def make_sampler(tmp_path, elevations, water):
+def make_sampler(tmp_path, elevations, water, **options):
     entries = {}
     for layer, array, nodata in [('dem', elevations, -9999), ('wbm', water, 255)]:
         path = tmp_path / f'{layer}.tif'
         with rasterio.open(path, 'w', driver='GTiff', width=2, height=2, count=1,
-                           dtype='int16', crs='EPSG:4326', transform=from_origin(0, 1, .5, .5), nodata=nodata) as out:
+                           dtype='int16', crs='EPSG:4326', transform=from_origin(0, 1, .5, .5), nodata=nodata, **options) as out:
             out.write(np.array(array, dtype='int16'), 1)
         entries[layer] = {'path': path.name, 'size': path.stat().st_size, 'sha256': sha256(path)}
     manifest = tmp_path / 'manifest.json'
@@ -43,6 +43,101 @@ def test_water_classes_are_counted_separately(tmp_path):
         assert sampler.counts == {'ocean': 1, 'lake': 1, 'river': 1, 'land': 1}
 
 
+def test_grouped_wbm_reads_are_cached_and_do_not_touch_altitude_counts(tmp_path):
+    with make_sampler(tmp_path, [[-12, 0], [4, 5]], [[0, 1], [255, 3]]) as sampler:
+        expected = [0, 1, -1, 3, 0]
+        lats, lons = [.75, .75, .25, .25, .75], [.25, .75, .25, .75, .25]
+        assert sampler.wbm_classes(lats, lons).tolist() == expected
+        reads = sampler.wbm_io['block_reads']
+        assert reads < len(lats)
+        assert sampler.wbm_classes(lats, lons).tolist() == expected
+        assert sampler.wbm_io['block_reads'] == reads
+        assert sampler.wbm_io['transformed_points'] == 0
+        assert sampler.wbm_cache_size <= sampler.wbm_cache_limit
+        assert sampler.counts == {'ocean': 0, 'lake': 0, 'river': 0}
+        assert sampler.sample(.75, .25) == -12
+
+
+def test_grouped_wbm_rejects_unknown_classes_and_missing_tiles(tmp_path):
+    with make_sampler(tmp_path, [[1, 1], [1, 1]], [[7, 0], [0, 0]]) as sampler:
+        with pytest.raises(ValueError, match='Invalid WBM'):
+            sampler.wbm_classes([.75], [.25])
+        with pytest.raises(ValueError, match='No prepared DEM'):
+            sampler.wbm_classes([.75], [1.25])
+
+
+def test_zero_wbm_cache_budget_does_not_retain_arrays(tmp_path):
+    with make_sampler(tmp_path, [[1, 1], [1, 1]], [[0, 0], [0, 0]]) as sampler:
+        sampler.wbm_cache_limit = 0
+        assert sampler.wbm_classes([.75], [.25]).tolist() == [0]
+        assert not sampler.wbm_cache and sampler.wbm_cache_size == 0
+        reads = sampler.wbm_io['block_reads']
+        sampler.wbm_classes([.75], [.25])
+        assert sampler.wbm_io['block_reads'] > reads
+
+
+def test_wbm_cache_evicts_old_blocks_and_accounts_for_masks(tmp_path):
+    with make_sampler(tmp_path, [[1, 1], [1, 1]], [[0, 1], [2, 3]], blockysize=1) as sampler:
+        sampler.wbm_cache_limit = 6  # two int16 values plus two mask bytes
+        assert sampler.wbm_classes([.75], [.25]).tolist() == [0]
+        assert sampler.wbm_classes([.25], [.25]).tolist() == [2]
+        assert sampler.wbm_classes([.75], [.25]).tolist() == [0]
+        assert sampler.wbm_io['block_reads'] == 3
+        assert sampler.wbm_cache_size == sampler.wbm_io['peak_cache_bytes'] == 6
+
+
+def test_projected_wbm_transforms_a_group_not_each_point(tmp_path, monkeypatch):
+    from rasterio.transform import from_bounds
+    from unittest.mock import Mock
+    from src import elevation
+    with make_sampler(tmp_path, [[1, 1], [1, 1]], [[0, 1], [2, 3]]):
+        pass
+    m = json.loads((tmp_path / 'manifest.json').read_text())
+    for layer in ['dem', 'wbm']:
+        p = tmp_path / f'{layer}.tif'
+        with rasterio.open(p, 'r+') as ds:
+            ds.crs = 'EPSG:3857'
+            ds.transform = from_bounds(0, 0, 111319.49079327357, 111325.1428663851, 2, 2)
+        m['tiles'][0][layer].update(size=p.stat().st_size, sha256=sha256(p))
+    (tmp_path / 'manifest.json').write_text(json.dumps(m))
+    spy = Mock(wraps=elevation.transform)
+    monkeypatch.setattr(elevation, 'transform', spy)
+    with ElevationSampler(tmp_path / 'manifest.json', tmp_path) as sampler:
+        assert sampler.wbm_classes([.75, .25], [.25, .75]).tolist() == [0, 3]
+        assert spy.call_count == 1
+        assert sampler.wbm_io['transformed_points'] == 2
+
+
+def test_unreadable_and_missing_wbm_are_technical_errors(tmp_path):
+    with make_sampler(tmp_path, [[1, 1], [1, 1]], [[0, 0], [0, 0]]):
+        pass
+    p = tmp_path / 'wbm.tif'
+    p.write_bytes(b'not a raster')
+    m = json.loads((tmp_path / 'manifest.json').read_text())
+    m['tiles'][0]['wbm'].update(size=p.stat().st_size, sha256=sha256(p))
+    (tmp_path / 'manifest.json').write_text(json.dumps(m))
+    with pytest.raises(rasterio.errors.RasterioIOError):
+        ElevationSampler(tmp_path / 'manifest.json', tmp_path)
+    p.unlink()
+    with pytest.raises(ValueError, match='Missing elevation wbm'):
+        ElevationSampler(tmp_path / 'manifest.json', tmp_path)
+
+
+def test_unmasked_nan_is_invalid_wbm_not_declared_nodata(tmp_path):
+    with make_sampler(tmp_path, [[1, 1], [1, 1]], [[0, 0], [0, 0]]):
+        pass
+    p = tmp_path / 'wbm.tif'
+    with rasterio.open(p, 'w', driver='GTiff', width=2, height=2, count=1,
+                       dtype='float32', crs='EPSG:4326', transform=from_origin(0, 1, .5, .5)) as ds:
+        ds.write(np.array([[np.nan, 0], [0, 0]], dtype='float32'), 1)
+    m = json.loads((tmp_path / 'manifest.json').read_text())
+    m['tiles'][0]['wbm'].update(size=p.stat().st_size, sha256=sha256(p))
+    (tmp_path / 'manifest.json').write_text(json.dumps(m))
+    with ElevationSampler(tmp_path / 'manifest.json', tmp_path) as sampler:
+        with pytest.raises(ValueError, match='Invalid WBM'):
+            sampler.wbm_classes([.75], [.25])
+
+
 def test_invalid_water_mask_and_corrupt_file(tmp_path):
     with make_sampler(tmp_path, [[1, 1], [1, 1]], [[4, 0], [0, 0]]) as sampler:
         with pytest.raises(ValueError, match='Invalid WBM'):
@@ -60,7 +155,19 @@ def test_witness_is_sampled_at_its_own_coordinates(tmp_path):
     assert result['absolute_error_median'] == 2
 
 
-def test_migration_preserves_other_spot_fields_and_regenerates_clusters(tmp_path, monkeypatch):
+def test_water_only_audit_reader_preserves_classification_without_altitude_sampling(tmp_path):
+    from src.elevation import ElevationSampler
+    with make_sampler(tmp_path,[[-12,1],[1,1]],[[0,1],[2,3]]) as normal:
+        expected=normal.wbm_classes([.75,.75,.25,.25],[.25,.75,.25,.75])
+        assert normal.sample(.75,.25)==-12
+        with ElevationSampler.water_masks(normal.manifest_path,tmp_path) as audit:
+            assert np.array_equal(audit.wbm_classes([.75,.75,.25,.25],[.25,.75,.25,.75]),expected)
+            assert all(pair[0] is None for pair in audit.tiles.values())
+            with pytest.raises(ValueError,match='cannot sample altitude'):
+                audit.sample(.75,.25)
+
+
+def test_staged_migration_preserves_other_spot_fields_and_regenerates_clusters(tmp_path, monkeypatch):
     from tools import migrate_elevation
     from types import SimpleNamespace
 
@@ -82,13 +189,19 @@ def test_migration_preserves_other_spot_fields_and_regenerates_clusters(tmp_path
     monkeypatch.setattr(migrate_elevation, '_migration_data_year', lambda *_: 2025)
     cluster_calls = []
     monkeypatch.setattr(migrate_elevation, 'write_cluster_files', lambda *args, **kwargs: cluster_calls.append((args, kwargs)))
-    report = migrate_elevation.migrate(repo, tmp_path, tmp_path)
+    # This tests enrichment on the disposable stage, including water -> null.
+    # Final publication must reject WBM water; its transactional guard has
+    # separate tests and must not be bypassed to exercise altitude arithmetic.
+    report = migrate_elevation._migrate_staged(repo, tmp_path, tmp_path)
     result = json.loads(path.read_text())
     assert result['spots'][0] == {**original, 'altitude': -12}
     assert result['version'] == envelope['version']
     assert report['changed_tiles'] == 1
     assert report['samples']['test'] == {'land': 1, 'ocean': 1, 'lake': 1, 'river': 1}
-    assert cluster_calls[0][0] == (repo / 'spots', repo / 'clusters')
+    staged_spots, staged_clusters = cluster_calls[0][0]
+    assert staged_spots == repo / 'spots'
+    assert staged_spots.name == 'spots' and staged_clusters.name == 'clusters'
+    assert staged_spots.parent == staged_clusters.parent
     assert cluster_calls[0][1]['generated']
 
 

@@ -593,12 +593,24 @@ def _validate_spot_publication(data_repo_dir: str | Path) -> None:
             )
 
 
-def commit_and_push(data_repo_dir: str, message: str) -> None:
-    """Git add . -> validate -> commit -> push inside data_repo_dir."""
+def commit_and_push(data_repo_dir: str, message: str, *, geographic_dataset=None,
+                    geographic_report_dir=None) -> None:
+    """Publish only the exact immutable Git tree approved geographically.
+
+    All automated entry points, including cluster refreshes and migrations,
+    share this enforcement. There is no unqualified publication mode.
+    """
+    from .geographic_data import GeographicDataset
+    from .geographic_publication import approve_tree, verify_approval, DEFAULT_REPORT_DIR
     subprocess.run(
         ["git", "add", "."], cwd=data_repo_dir, check=True, capture_output=True, text=True
     )
     _validate_spot_publication(data_repo_dir)
+    dataset = geographic_dataset if geographic_dataset is not None else GeographicDataset()
+    if geographic_report_dir is None:
+        geographic_report_dir = DEFAULT_REPORT_DIR
+    report = approve_tree(data_repo_dir, dataset=dataset, report_dir=geographic_report_dir)
+    verify_approval(data_repo_dir, report, dataset)
     subprocess.run(
         ["git", "commit", "-m", message],
         cwd=data_repo_dir,
@@ -606,6 +618,7 @@ def commit_and_push(data_repo_dir: str, message: str) -> None:
         capture_output=True,
         text=True,
     )
+    verify_approval(data_repo_dir, report, dataset, committed=True)
     subprocess.run(
         ["git", "push"], cwd=data_repo_dir, check=True, capture_output=True, text=True
     )

@@ -22,6 +22,8 @@ def enrich_spot(spot: dict, elevation_sampler=None) -> dict:
                             if elevation_sampler is not None else None)
     enriched.pop("row", None)
     enriched.pop("col", None)
+    for key in list(enriched):
+        if key.startswith('_geographic_'):enriched.pop(key)
     return enriched
 
 

@@ -715,9 +715,15 @@ def test_compute_new_version_stays_monotone_across_double_digit_minor_versions()
 def test_commit_and_push_calls_git():
     """The central guard runs between git add and commit."""
     from src.publish import commit_and_push
-    with patch("src.publish.subprocess.run") as mock_run:
+    with patch("src.publish.subprocess.run") as mock_run, \
+         patch('src.geographic_data.GeographicDataset'), \
+         patch('src.geographic_publication.approve_tree') as approve, \
+         patch('src.geographic_publication.verify_approval') as verify:
         mock_run.return_value = MagicMock(returncode=0)
         commit_and_push("/tmp/repo", "test message")
+    approve.assert_called_once()
+    assert verify.call_count == 2
+    assert verify.call_args.kwargs['committed'] is True
     assert mock_run.call_count == 4
     cmds = [c.args[0] for c in mock_run.call_args_list]
     assert cmds[0] == ["git", "add", "."]
@@ -732,7 +738,7 @@ def _init_publish_git_repo(path, *, generated="old", with_manifest=True):
     spots = path / "spots"
     spots.mkdir(parents=True)
     _write_envelope(
-        spots / "T.json", "T", [{"id": "old", "country": "FR"}]
+        spots / "T.json", "T", [{"id": "old", "country": "FR", "lat":45.0,"lon":0.0}]
     )
     if with_manifest:
         clusters = path / "clusters"
@@ -810,7 +816,9 @@ def test_commit_and_push_allows_spot_publication_with_changed_manifest(tmp_path)
     _change_spot(repo)
     _change_manifest(repo, "new")
 
-    commit_and_push(str(repo), "spot change")
+    from tests.geographic_helpers import make_e3_dataset as make_dataset
+    commit_and_push(str(repo), "spot change",geographic_dataset=make_dataset(tmp_path/'geo'),
+                    geographic_report_dir=tmp_path/'reports')
 
     assert json.loads(_git_head(repo, "spots", "T.json"))["spots"][0]["id"] == "new"
     assert json.loads(_git_head(repo, "clusters", "index.json"))["generated"] == "new"
@@ -822,7 +830,9 @@ def test_commit_and_push_allows_cluster_only_publication(tmp_path):
     _change_manifest(repo, "new")
     (repo / "clusters" / "L1.json").write_text("[]", encoding="utf-8")
 
-    commit_and_push(str(repo), "cluster refresh")
+    from tests.geographic_helpers import make_e3_dataset as make_dataset
+    commit_and_push(str(repo), "cluster refresh",geographic_dataset=make_dataset(tmp_path/'geo'),
+                    geographic_report_dir=tmp_path/'reports')
 
     assert json.loads(_git_head(repo, "clusters", "index.json"))["generated"] == "new"
     assert json.loads(_git_head(repo, "spots", "T.json"))["spots"][0]["id"] == "old"
@@ -839,7 +849,9 @@ def test_commit_and_push_allows_first_manifest_with_spot_publication(tmp_path):
         encoding="utf-8",
     )
 
-    commit_and_push(str(repo), "initial clusters")
+    from tests.geographic_helpers import make_e3_dataset as make_dataset
+    commit_and_push(str(repo), "initial clusters",geographic_dataset=make_dataset(tmp_path/'geo'),
+                    geographic_report_dir=tmp_path/'reports')
 
     assert json.loads(_git_head(repo, "clusters", "index.json"))["generated"] == "first"
 

@@ -47,6 +47,10 @@ from src.publish import (
 from src.clusters import write_cluster_files
 from src.regions import build_region_ownerships, get_region, load_regions
 from src.geography import classify_candidates, validate_country_codes
+from src.selection import CandidateQualifier
+from src.geographic_confidence import priority as geographic_priority
+from src.geographic_data import GeographicDataset
+from src.geographic_publication import guarded_apply, DEFAULT_REPORT_DIR
 from src.tile_export import (
     classify_spots_into_tiles,
     enumerate_tiles_in_bbox,
@@ -140,7 +144,7 @@ def _filter_candidates_to_bbox(candidates: list[dict], bbox) -> tuple[list[dict]
     those candidates must not participate in redundancy, coverage, naming, or
     tile export.
     """
-    lon_min, lat_min, lon_max, lat_max = bbox
+    from src.geographic_geometry import inside
     kept: list[dict] = []
     rejected = 0
     for candidate in candidates:
@@ -150,7 +154,7 @@ def _filter_candidates_to_bbox(candidates: list[dict], bbox) -> tuple[list[dict]
         except (KeyError, TypeError, ValueError):
             rejected += 1
             continue
-        if lon_min <= lon <= lon_max and lat_min <= lat <= lat_max:
+        if inside(lon, lat, bbox):
             kept.append(candidate)
         else:
             rejected += 1
@@ -158,6 +162,8 @@ def _filter_candidates_to_bbox(candidates: list[dict], bbox) -> tuple[list[dict]
 
 def run(args) -> int:
     """Execute the 7-step pipeline. Returns 0 on success, 1 on error."""
+    sampler = None
+    geographic_dataset = None
     try:
         region = get_region(args.region)
         logger.info("Region: %s (%s)", region["name"], args.region)
@@ -168,8 +174,9 @@ def run(args) -> int:
         # incomplete filtered extract must never yield a partial run.
         _validate_geonames_inputs(country_codes)
 
-        with ElevationSampler(Path(args.dem_manifest_dir) / f"{args.region}.json", args.dem_cache_dir):
-            pass
+        sampler = ElevationSampler(Path(args.dem_manifest_dir) / f"{args.region}.json", args.dem_cache_dir)
+        geographic_dataset = GeographicDataset(getattr(args, 'geographic_manifest', 'input/geography/manifest.json'),require_e3=True)
+        geographic_dataset.require_region(args.region, region)
 
         input_path = Path(args.input_dir) / args.region / f"{args.year}.tif"
         if not input_path.exists():
@@ -218,7 +225,19 @@ def run(args) -> int:
 
         # Step 2: Mesh scan (darkest pixel per cell)
         logger.info("Step 2: Mesh scan (darkest pixel per cell)")
-        candidates = mesh_darkest(darkness, transform, MESH_KM)
+        selection_stats = {}
+        rejection_path = output_dir / 'reviewed-water-rejections.jsonl'
+        with rejection_path.open('w',encoding='utf-8') as rejection_stream:
+            qualifier = CandidateQualifier(
+                region, transform, crs, sampler, classify=classify_candidates,
+                reviewed_water=geographic_dataset,
+                region_name=args.region,
+                rejection_sink=lambda record: rejection_stream.write(json.dumps(record)+'\n'))
+            candidates = mesh_darkest(darkness, transform, MESH_KM, qualify=qualifier,
+                                      crs=crs, stats=selection_stats,priority_key=geographic_priority)
+        logger.info("  Mesh selection stats: %s; qualification: %s", selection_stats, dict(qualifier.counts))
+        if qualifier.counts['wbm_nodata']:
+            logger.warning("WBM NoData candidates rejected: %d", qualifier.counts['wbm_nodata'])
         logger.info("  Found %d candidate spots", len(candidates))
 
         # Step 2b: Attach bortle (and re-attach definitive darkness) to each candidate.
@@ -253,10 +272,13 @@ def run(args) -> int:
             bbox_rejected,
             region["bbox"],
         )
+        classes = sampler.wbm_classes([p['lat'] for p in candidates], [p['lon'] for p in candidates])
+        if len(classes) != len(candidates) or any(value != 0 for value in classes):
+            raise ValueError('WBM qualification failed: a non-land candidate reached redundancy')
 
         # Step 3: Redundancy filter
         logger.info("Step 3: Redundancy filter")
-        filtered = redundancy_filter(candidates, REDUNDANCY_KM)
+        filtered = redundancy_filter(candidates, REDUNDANCY_KM,priority_key=geographic_priority)
         logger.info("  After redundancy filter: %d spots", len(filtered))
 
         # Step 4: Coverage guarantee via GeoNames places
@@ -264,7 +286,7 @@ def run(args) -> int:
         communes = load_places(region)
         logger.info("  Loaded %d localities (GeoNames)", len(communes))
         covered = ensure_coverage(
-            filtered, candidates, communes, MIN_SPOTS_PER_AREA, COVERAGE_RADIUS_KM
+            filtered, candidates, communes, MIN_SPOTS_PER_AREA, COVERAGE_RADIUS_KM,priority_key=geographic_priority
         )
         logger.info("  After coverage guarantee: %d spots", len(covered))
 
@@ -281,9 +303,9 @@ def run(args) -> int:
         named = naming_index.enrich_spots(covered)
         if any(not isinstance(spot.get("name"), str) or not spot["name"].strip() for spot in named):
             raise ValueError("GeoNames naming cascade produced an empty name")
-        with ElevationSampler(Path(args.dem_manifest_dir) / f"{args.region}.json", args.dem_cache_dir) as sampler:
-            enriched = enrich_all(named, elevation_sampler=sampler)
-            logger.info("  Elevation sample counts: %s", dict(sampler.counts))
+        enriched = enrich_all(named, elevation_sampler=sampler)
+        logger.info("  Elevation sample counts: %s", dict(sampler.counts))
+        logger.info("  WBM IO stats: %s", dict(sampler.wbm_io))
         logger.info("  Enriched %d spots", len(enriched))
 
         # Step 6: Tile export + version
@@ -382,7 +404,9 @@ def run(args) -> int:
                     )
                 _ensure_clone_is_not_output(data_repo_dir, output_dir)
                 commit_msg = f"data: update {args.region} spots v{version} ({args.year})"
-                commit_and_push(str(data_repo_dir), commit_msg)
+                commit_and_push(str(data_repo_dir), commit_msg,
+                                geographic_dataset=geographic_dataset,
+                                geographic_report_dir=getattr(args, 'geographic_report_dir', DEFAULT_REPORT_DIR))
                 logger.info(
                     "  Published version %s to %s (branch %s)",
                     version,
@@ -395,8 +419,13 @@ def run(args) -> int:
         logger.info("Pipeline complete.")
         return 0
     except Exception:
-        logger.exception("Pipeline failed")
+        logger.exception("Error: pipeline failed")
         return 1
+    finally:
+        if sampler is not None:
+            sampler.close()
+        if geographic_dataset is not None:
+            geographic_dataset.close()
 
 
 def main() -> int:
@@ -521,10 +550,12 @@ def run_regenerate_clusters(args) -> int:
                 write_cluster_files(clone_dir / "spots", clone_dir / "clusters", data_year=args.year, generated=_generated_date())
             if not args.no_clusters:
                 _ensure_clone_is_not_output(clone_dir, output_dir)
-                commit_and_push(str(clone_dir), f"data: regenerate clusters ({args.year})")
+                commit_and_push(str(clone_dir), f"data: regenerate clusters ({args.year})",
+                                geographic_dataset=GeographicDataset(getattr(args, 'geographic_manifest', 'input/geography/manifest.json')),
+                                geographic_report_dir=getattr(args, 'geographic_report_dir', DEFAULT_REPORT_DIR))
         return 0
     except Exception:
-        logger.exception("Cluster regeneration failed")
+        logger.exception("Error: cluster regeneration failed")
         return 1
 
 
@@ -541,11 +572,17 @@ def run_country_migration(args) -> int:
             if not spots_dir.is_dir():
                 logger.error("No local spots directory: %s", spots_dir)
                 return 1
-            report = migrate_country_tags(
-                spots_dir,
-                regions=regions,
-                delete_orphans=getattr(args, "prune_orphan_spots", False),
-            )
+            def transform(stage):
+                result = migrate_country_tags(
+                    stage / 'spots', regions=regions,
+                    delete_orphans=getattr(args, 'prune_orphan_spots', False))
+                write_cluster_files(stage / 'spots', stage / 'clusters',
+                                    data_year=_migration_data_year(stage, args), generated=_generated_date())
+                return result
+            report = guarded_apply(
+                Path(args.output_dir), transform,
+                dataset=GeographicDataset(getattr(args, 'geographic_manifest', 'input/geography/manifest.json')),
+                report_dir=getattr(args, 'geographic_report_dir', DEFAULT_REPORT_DIR))
         else:
             with tempfile.TemporaryDirectory() as clone_ctx:
                 clone_dir = Path(clone_ctx)
@@ -565,11 +602,13 @@ def run_country_migration(args) -> int:
                     data_year=_migration_data_year(clone_dir, args),
                     generated=_generated_date(),
                 )
-                commit_and_push(str(clone_dir), f"data: migrate country tags ({args.year})")
+                commit_and_push(str(clone_dir), f"data: migrate country tags ({args.year})",
+                                geographic_dataset=GeographicDataset(getattr(args, 'geographic_manifest', 'input/geography/manifest.json')),
+                                geographic_report_dir=getattr(args, 'geographic_report_dir', DEFAULT_REPORT_DIR))
         print(json.dumps(report, indent=2, ensure_ascii=False))
         return 0
     except Exception:
-        logger.exception("Country migration failed")
+        logger.exception("Error: country migration failed")
         return 1
 
 
