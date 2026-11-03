@@ -8,6 +8,7 @@ from shapely.geometry import Point, box
 from shapely.ops import unary_union
 
 from .geography import load_geography, validate_country_codes
+from .geographic_geometry import domain
 
 REQUIRED_FIELDS = {"bbox", "equal_area_epsg", "admin_level", "osm_country_code"}
 
@@ -34,7 +35,7 @@ class RegionOwnership:
 def build_region_ownership(region: dict, *, geography=None, shared_codes=()) -> RegionOwnership:
     """Clip each configured country's Natural Earth geometry to the current bbox."""
     geo = geography or load_geography()
-    bbox = box(*region["bbox"])
+    bbox = domain(region["bbox"])
     return RegionOwnership(
         {code: geo.countries[code].intersection(bbox) for code in region["osm_country_code"]},
         frozenset(shared_codes),
@@ -132,7 +133,7 @@ def _validate_region(
                 f"Region {name!r}: bbox coordinate {index} must be integer"
             )
         values.append(numeric)
-    if values[0] >= values[2] or values[1] >= values[3]:
+    if values[0] == values[2] or values[0]-values[2]==360 or values[1] >= values[3]:
         raise ValueError(f"Region {name!r}: bbox coordinates must be ordered")
 
 
@@ -152,7 +153,7 @@ def validate_publishable_partition(regions: dict[str, dict], *, geography=None) 
     for name, region in regions.items():
         codes = region["osm_country_code"]
         country_geometry = unary_union([geo.countries[code] for code in codes])
-        extents[name] = country_geometry.intersection(box(*region["bbox"]))
+        extents[name] = country_geometry.intersection(domain(region["bbox"]))
 
     items = list(regions.items())
     for index, (left_name, left) in enumerate(items):
