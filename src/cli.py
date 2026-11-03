@@ -1,5 +1,7 @@
 """argparse wrapper for the dark-sky pipeline."""
 import argparse
+import tempfile
+from pathlib import Path
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -52,6 +54,10 @@ def create_parser() -> argparse.ArgumentParser:
     parser.add_argument("--budget-mb", type=float, default=500.0, help="RAM budget for input loading (MB)")
     parser.add_argument("--dem-manifest-dir", default="data/elevation/manifests", help="Regional DEM manifests")
     parser.add_argument("--dem-cache-dir", default="input/elevation", help="Local DEM and water mask cache")
+    parser.add_argument("--geographic-manifest", default="input/geography/manifest.json",
+                        help="Verified offline geographic evidence and reviewed-water manifest")
+    parser.add_argument("--geographic-report-dir", default=str(Path(tempfile.gettempdir())/'darksky-geographic-audits'),
+                        help="Private final-payload geographic approval reports")
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose logging")
     return parser
 

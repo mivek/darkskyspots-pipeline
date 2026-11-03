@@ -3,6 +3,7 @@
 import argparse
 import json
 import sys
+import tempfile
 from contextlib import ExitStack
 from pathlib import Path
 
@@ -13,7 +14,7 @@ from src.regions import build_region_ownerships, load_regions
 from run import _generated_date, _migration_data_year
 
 
-def migrate(repo, manifest_dir, cache_dir, year=None):
+def _migrate_staged(repo, manifest_dir, cache_dir, year=None):
     repo = Path(repo)
     if not (repo / "spots").is_dir():
         raise ValueError(f"Missing spots directory in {repo}")
@@ -50,14 +51,34 @@ def migrate(repo, manifest_dir, cache_dir, year=None):
     return {'changed_tiles': len(updates), 'samples': counts}
 
 
+def migrate(repo, manifest_dir, cache_dir, year=None, *, geographic_dataset=None,
+            geographic_report_dir=None):
+    """Preserve the destination until migration/clusters pass final validation."""
+    from src.geographic_publication import guarded_apply
+    return guarded_apply(
+        repo, lambda stage: _migrate_staged(stage, manifest_dir, cache_dir, year),
+        dataset=geographic_dataset, report_dir=geographic_report_dir)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--repo', required=True, help='Local data repository to update')
     parser.add_argument('--manifest-dir', default='data/elevation/manifests')
     parser.add_argument('--cache-dir', default='input/elevation')
     parser.add_argument('--year', type=int, help='Fallback if cluster manifest has no data year')
+    parser.add_argument('--geographic-manifest', help='Verified offline geographic dataset manifest')
+    parser.add_argument('--geographic-report-dir',
+                        default=str(Path(tempfile.gettempdir())/'darksky-geographic-audits'))
     args = parser.parse_args()
-    print(json.dumps(migrate(args.repo, args.manifest_dir, args.cache_dir, args.year), indent=2))
+    from src.geographic_data import GeographicDataset
+    dataset = GeographicDataset(args.geographic_manifest) if args.geographic_manifest else None
+    print(json.dumps(migrate(args.repo, args.manifest_dir, args.cache_dir, args.year,
+                             geographic_dataset=dataset,
+                             geographic_report_dir=args.geographic_report_dir), indent=2))
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except Exception as exc:
+        print(f'Error: {exc}', file=sys.stderr)
+        raise SystemExit(1)
