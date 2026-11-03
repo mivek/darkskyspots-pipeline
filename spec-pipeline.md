@@ -56,12 +56,21 @@ change the spot output.
 ### 3. Mesh darkest-pixel scan
 
 `src/extract.py` divides the darkness array into approximately 5 km mesh
-cells. It selects one pixel per cell with `np.nanargmax` on the `darkness`
-array (the darkest pixel), skips cells containing only NaN values, and converts
-the selected pixel center to latitude and longitude. Equal maxima select the
-first pixel in row-major order. Each candidate initially contains its
-coordinates, darkness, and source `row`/`col`. The orchestrator then attaches
-the definitive darkness and Bortle values from the selected raster pixels.
+cells, preserving the original grid origin. Normal generation selects the
+darkest candidate within the highest available E3 tier: A, B1, B2. Only
+geographically admissible WBM-land centres can enter these tiers; C is excluded.
+NaN cells and cells without an admissible centre produce
+no candidate. Equal maxima select the first pixel in row-major order. A
+rejected cell is ranked once, then alternatives are qualified in descending
+darkness order. Candidate batches are bounded to 4096 active cells.
+
+The angular mesh explicitly requires an unrotated EPSG:4326 VIIRS grid.
+Candidate coordinates are WGS84 pixel centres; they are never shifted to an
+intermediate WBM sample. The orchestrator attaches the definitive darkness and
+Bortle values from the selected source `row`/`col`. ALR and its halo are
+computed unchanged before qualification. The unqualified darkest-pixel helper
+remains available for tests and historical comparisons, not as a production
+fallback.
 
 ### 4. Natural Earth land and country clip
 
@@ -78,14 +87,35 @@ the largest equal-area portion of that pixel wins. A missing pixel footprint or
 an exact area tie uses the lexical ISO code as the final deterministic
 tie-breaker.
 
-The ALR context can produce candidates outside the nominal region. After the
-Natural Earth classification, the orchestrator applies the inclusive region
-bbox and removes those halo candidates. The resulting list is the one passed
-to redundancy, coverage, naming, and tile export.
+Natural Earth classification and the inclusive nominal bbox are applied to
+each proposed alternative before WBM qualification. The existing country
+resolver, including source-pixel intersection areas, is reused. Cells whose
+envelopes cannot intersect land or the configured country/bbox extent may be
+skipped conservatively; envelope tests never assign a country. Prepared
+geometry indexes accelerate the same predicates without changing boundaries.
+
+Only WBM class 0 is admissible. Classes 1/2/3 and valid WBM NoData reject the
+candidate and try the next pixel of the same cell, with separate counters for
+ocean, lake, river and NoData. Missing/corrupt/unreadable rasters and unexpected
+classes abort generation. NoData counts are reported for review. A valid land
+class is not rejected for a negative/zero altitude or DEM NoData. No water
+buffer, land erosion, majority vote or coastal exception is applied.
+
+WBM reads are grouped by native raster block, with a 64 MiB LRU including
+validity masks and a separate 32 MiB GDAL cache. Identity CRS transformations
+are skipped. The verified reader is shared with altitude enrichment; WBM
+qualification does not change enrichment counters or the manifest format.
+The resulting candidate list is the sole pool for redundancy, coverage,
+naming and tile export, so coverage cannot reintroduce rejected water points.
+The shared E3 classifier additionally evaluates indexed authoritative
+OSMCoastline/hydrographic geometry and native WorldCover 2021 v200 support and
+centre samples. RTree is lookup-only; exact predicates, holes and fragment unions
+remain authoritative. See [E3 qualification](docs/geographic-qualification.md).
 
 ### 5. Redundancy filter
 
-Candidates are sorted from darkest to least dark. A candidate is removed only
+Candidates are sorted A → B1 → B2, then darkest within each tier, preserving
+stable ties. Lower tiers never suppress retained higher tiers. A candidate is removed only
 when an already-kept candidate of the same Bortle class is less than 15 km
 away. Candidates of different Bortle classes are retained even when they are
 closer than that distance.
@@ -97,7 +127,8 @@ closer than that distance.
 region bbox plus a 100 km prefilter margin.
 
 For each retained locality, the pipeline counts spots within 100 km. If fewer
-than four are available, it adds the darkest unused points from the already
+than four are available, it adds unused points A → B1 → B2, darkest within each
+tier, from the already
 filtered mesh candidate pool within that radius. This is an attempted
 per-locality coverage rule: if the candidate pool is smaller than the target,
 the code does not invent spots and does not fail the run.
@@ -210,6 +241,11 @@ SHA-256 hash of each level file. Serialization and ordering are deterministic.
 
 The publication step stages the cloned repository, validates the staged
 changes, commits, and pushes the selected branch.
+The shared final E3 audit includes preserved regions and mandatory WBM. Approval
+binds an actual staged Git tree and geographic/code/decision revisions. Verify
+the index before commit and the committed tree before push. Coordinated initial
+migration generates every region and clusters in one temporary complete snapshot;
+any unresolved region blocks that complete tree.
 
 If any path under `spots/` is staged, the guard requires a staged,
 JSON-readable `clusters/index.json` whose non-empty `generated` value differs

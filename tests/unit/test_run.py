@@ -25,7 +25,16 @@ def mock_filtered_geonames_api(monkeypatch):
     sampler.__enter__.return_value = sampler
     sampler.counts = {}
     sampler.sample.return_value = 123
+    sampler.wbm_classes.side_effect = lambda lats, lons: np.zeros(len(lats), dtype=np.int16)
+    sampler.wbm_io = {}
     monkeypatch.setattr(run, "ElevationSampler", lambda *args, **kwargs: sampler)
+    geographic = MagicMock()
+    geographic.is_e3 = True
+    geographic.classify.side_effect = lambda points, *_args: [
+        dict(spot=dict(p), confidence='A', reasons=[], base_evidence={'wbm_class': 0}) for p in points
+    ]
+    geographic.qualify.side_effect = lambda points, **_kwargs: points
+    monkeypatch.setattr(run, 'GeographicDataset', lambda *_args, **_kwargs: geographic)
 
     index = MagicMock()
     index.enrich_spots.side_effect = lambda spots: [
@@ -79,6 +88,33 @@ def _write_input(tmp_path, region="france"):
     input_dir = tmp_path / "input" / region
     input_dir.mkdir(parents=True, exist_ok=True)
     (input_dir / "2025.tif").write_bytes(b"input")
+
+
+def test_normal_generation_passes_mandatory_wbm_qualification(tmp_path):
+    import run as pipeline
+    from rasterio.transform import from_bounds
+    from src.selection import CandidateQualifier
+    _write_input(tmp_path)
+    args = _make_args(tmp_path, no_clusters=True)
+    with ExitStack() as stack:
+        collaborators = [stack.enter_context(p) for p in _mock_raster_steps(from_bounds(-5, 41, 10, 51, 2, 2))]
+        assert pipeline.run(args) == 0
+    qualification = collaborators[3].call_args.kwargs['qualify']
+    assert isinstance(qualification, CandidateQualifier)
+    assert qualification.water is True and qualification.sampler is not None
+    assert collaborators[3].call_args.kwargs['crs'] == qualification.crs
+
+
+def test_corrupt_terrain_stops_before_alr_without_legacy_fallback(tmp_path, monkeypatch, caplog):
+    import run as pipeline
+    _write_input(tmp_path)
+    def corrupt(*_args, **_kwargs):
+        raise ValueError('Corrupt elevation wbm: test')
+    monkeypatch.setattr(pipeline, 'ElevationSampler', corrupt)
+    with patch('run.slice_and_compute') as alr:
+        assert pipeline.run(_make_args(tmp_path, no_clusters=True)) == 1
+    alr.assert_not_called()
+    assert 'Corrupt elevation wbm' in caplog.text
 
 
 def _mock_raster_steps(transform):
@@ -969,8 +1005,8 @@ def test_published_migration_cluster_failure_never_reaches_commit(tmp_path):
     commit.assert_not_called()
 
 
-def test_local_migration_does_not_regenerate_or_publish_clusters(tmp_path):
-    """The no-push migration path remains a local spot-only transformation."""
+def test_local_migration_stages_clusters_without_publication(tmp_path):
+    """Local migration prepares its complete payload in a temporary copy."""
     from run import run_country_migration
 
     spots_dir = tmp_path / "output" / "spots"
@@ -987,7 +1023,9 @@ def test_local_migration_does_not_regenerate_or_publish_clusters(tmp_path):
         assert run_country_migration(args) == 0
 
     migrate.assert_called_once()
-    clusters.assert_not_called()
+    clusters.assert_called_once()
+    assert clusters.call_args.args[0] != spots_dir
+    assert clusters.call_args.args[0].name == 'spots'
     commit.assert_not_called()
 
 
@@ -1076,7 +1114,8 @@ def test_published_regeneration_audits_country_tags_before_commit(tmp_path):
     def clone(_url, _branch, target_dir):
         _write_envelope(Path(target_dir) / "spots", "N051E000", [])
 
-    def commit(data_repo_dir, _message):
+    def commit(data_repo_dir, _message, **kwargs):
+        assert kwargs['geographic_dataset'] is not None
         assert (Path(data_repo_dir) / "spots" / "N051E000.json").exists()
         committed["called"] = True
 

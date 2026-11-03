@@ -9,6 +9,68 @@ Local Python batch pipeline that transforms VIIRS radiance GeoTIFFs into per-til
 
 ## Quick start
 
+Normal generation additionally requires a verified local geographic package.
+The package must implement E3 confidence (A → B1 → B2, then darkness), including
+verified WorldCover 2021 v200 and indexed hydrographic evidence.
+Geographic preparation requires Shapely >=2.1 and GEOS >=3.10; incompatible
+versions or missing constrained-triangulation capability fail explicitly.
+See [geographic qualification](docs/geographic-qualification.md) and the
+[separate geometry and spot licensing assessments](docs/geographic-licensing.md).
+Preparation is explicit and generation performs no geographic downloads:
+
+```bash
+python tools/fetch_geography_sources.py --sources /path/to/frozen/sources --snapshot-date 261030
+python tools/prepare_geography.py --sources /path/to/frozen/sources --reviews /path/to/reviews.json --output input/geography-source
+python tools/prepare_e3.py --base-manifest input/geography-source/manifest.json --worldcover-manifest /path/to/frozen/worldcover/manifest.json --output input/geography
+```
+
+The explicit fetch bootstraps the processed OSMCoastline archive and index
+once, then acquires the intersecting regional water extracts. Neighbouring
+country extracts may be needed where their boundaries differ from Natural
+Earth; this does not change national attribution. Unavailable parent packages
+are recorded and replaced by intersecting child packages at the same pinned
+date. Integrity or server errors are never treated as valid empty inputs.
+
+The source cache contains the frozen Geofabrik index, pinned OSMCoastline
+archive and extracted members, and Geofabrik water members with provenance
+and checksums. Review decisions are geographic features, never spot IDs.
+`review-contexts.json` reports fingerprints for explicit human review; it does
+not approve decisions automatically. A changed package requires a new revision
+directory. Override the package using `--geographic-manifest`.
+
+The shared publication gate audits the final merged Git tree, including
+preserved regions. Missing coverage, unreviewed final disagreements and pending
+spot-licensing assessment block publication. Candidate-only previews cannot
+issue publication approval. Audit an explicitly staged temporary copy with:
+
+```bash
+python tools/audit_geography.py --repo /tmp/publication-copy --manifest input/geography/manifest.json --report-dir /tmp/geographic-audits
+```
+
+Human review decisions can be reused when their relevant local geometry has
+not changed. Each publication attempt gets its own tree-bound report. Altitude
+migration validates a temporary copy before changing its destination.
+Reports default to `/tmp/darksky-geographic-audits` and must be outside any
+migration destination. Update reviews without re-encoding unchanged evidence:
+
+```bash
+python tools/prepare_geography.py --base-manifest input/geography/manifest.json --reviews /path/to/revised-reviews.json --output input/geography-next
+```
+
+The [final E3 validation report](validation/e3_final.md) and its
+[machine-readable record](validation/e3_final.json) contain the frozen
+three-region comparison, reproducibility fingerprints, performance results and
+review safeguards. Code readiness is separate from publication readiness:
+generated-spot licensing and durable artifact release/restore remain pending.
+No data publication is authorized.
+
+Production must install an exact verified revision from durable storage
+before running the pipeline. See [artifact retention and offline installation](docs/geographic-artifacts.md).
+Temporary simulation directories are not production artifact storage.
+Use the [coordinated initial migration](docs/geographic-qualification.md#coordinated-initial-migration)
+to assemble all three regions and audit one complete snapshot. It has no apply,
+commit or push mode. Region-by-region publication cannot bypass the global gate.
+
 ```bash
 pip install -r requirements.txt
 
@@ -124,11 +186,17 @@ ISO alpha-2 codes; the Natural Earth 1:10m polygons decide which countries can
 publish.
 
 The 300 km ALR margin avoids raster edge effects and remains in the luminosity
-calculation. Mesh minima can consequently be found in that halo, but the
-orchestrator removes candidates outside the inclusive nominal bbox immediately
-after land/country clipping and before redundancy. The same filtered list is
-used for coverage, naming, and tile export. There is no coastal buffer; islands
-inside the configured countries are retained.
+calculation. Within each mesh cell, generation selects A before B1 before B2,
+then the darkest VIIRS pixel in that tier. Every candidate first passes Natural
+Earth land/country qualification, the inclusive nominal bbox and WBM land.
+Rejected or lower-priority maxima trigger ranked examination of the same cell.
+Equal values retain the row-major tie-break. Redundancy and coverage also use
+confidence priority. The qualified pool supplies naming and tile export.
+No coastal buffer is applied; source disagreements create explicit uncertainty.
+An island without an eligible VIIRS
+pixel centre produces no candidate; coordinates are never moved between pixel
+centres. The angular mesh requires an unrotated EPSG:4326 VIIRS grid; other
+CRSs fail explicitly instead of being interpreted as degrees.
 
 Changing a published region bbox or country configuration is a spot-level
 migration. Run the
@@ -259,6 +327,69 @@ The dated investigation and decision are recorded in
 - **Populated places (GeoNames):** [GeoNames](https://www.geonames.org) data used under the [Creative Commons Attribution 4.0 License](https://creativecommons.org/licenses/by/4.0/). Data is sourced from the [cities500](https://download.geonames.org/export/dump/cities500.zip) export.
 
 ## Spot elevation
+
+Normal spot generation requires the prepared WBM as well as the DEM. Water
+classes (ocean, lake, river) and valid WBM NoData pixels are not eligible for
+selection. NoData is counted separately and reported as a warning; the selector
+tries the next pixel. Missing, corrupt, unreadable rasters and unexpected WBM
+classes stop the run, with no Natural Earth-only fallback. A DEM NoData value
+does not invalidate a WBM land candidate: its altitude can still be `null`.
+
+Selection reads WBM points in groups by native raster block. A 64 MiB LRU
+accounts for both values and validity masks; GDAL's cache is limited to 32 MiB
+while the terrain reader is open. Verified datasets are reused for enrichment.
+Rejected cells are ranked once, not rescanned for every alternative. These
+changes do not mask or modify the ALR input, halo, darkness or Bortle arrays.
+
+### Offline selection comparison
+
+The comparison tool runs A (historical selection), B (A with water removed),
+C (geographically eligible maxima) and D (geographically eligible WBM land
+maxima) on the same full-precision arrays. It compares A to committed data
+before proceeding, records last-bit darkness differences separately (absolute
+tolerance `1e-12`; coordinates, Bortle and country must match exactly), and
+reports selection, redundancy and locality coverage independently. Larger
+historical differences stop the comparison unless explicitly marked exploratory
+with `--allow-historical-drift`.
+
+```bash
+darkspots/bin/python tools/compare_wbm.py \
+    --data-repo /path/to/darkskyspots-data --reference 1502e35 \
+    --output-dir /tmp/darksky-wbm-simulation --snapshots
+
+darkspots/bin/python tools/compare_wbm.py \
+    --data-repo /path/to/darkskyspots-data \
+    --output-dir /tmp/darksky-wbm-simulation --benchmark-region france
+
+darkspots/bin/python tools/audit_wbm_osm.py \
+    --simulation /tmp/darksky-wbm-simulation \
+    --diagnostic /tmp/darksky-water-diagnostic \
+    --output /tmp/darksky-wbm-simulation/osm-audit.json
+
+darkspots/bin/python tools/check_wbm_results.py \
+    --simulation /tmp/darksky-wbm-simulation \
+    --data-repo /path/to/darkskyspots-data
+```
+
+The output must be separate from the source data repository. Optional snapshots
+use the existing regional ownership merger and regenerate global clusters only
+inside that output directory. No tool above publishes or pushes. The OSM audit
+uses only the previously downloaded Geofabrik and OSMCoastline snapshots and
+checks the entire D candidate pool, including new points. Missing inland
+extract coverage is reported explicitly and never treated as evidence of dry
+land. OSM is not a generation dependency.
+
+The independent checker rereads WBM points using scalar raster windows,
+verifies unchanged historical land maxima, explains later redundancy removals,
+and audits the temporary global snapshots, cluster hashes and representative
+fields. Generate snapshots before running this checker.
+
+Comparison array caches include input, parameter and implementation provenance
+and file hashes. Use a new output directory when those inputs change. Optional
+`--context-km region=km` overrides concern the ALR kernel; an input folder named
+after a larger context does not establish which kernel parameters produced it.
+
+### Terrain preparation and altitude enrichment
 
 Preparation uses Copernicus DEM GLO-30 DGED and its water body mask (WBM),
 with GLO-90 as a fallback. The DEM is a surface model: trees, buildings,
