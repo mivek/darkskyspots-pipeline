@@ -321,10 +321,12 @@ The dated investigation and decision are recorded in
 ## Credits
 
 - **ALR method:** Duriscoe et al. (2018). Implemented in Python by Katy Abbott (NPS) at [github.com/mivek/nightskyquality](https://github.com/mivek/nightskyquality) (MIT).
-- **VIIRS radiance data:** NASA Black Marble products (VNP46A4 / VJ146A4) — CC0.
+- **VIIRS radiance data:** retained 2025 raw NASA Black Marble VJ146A4 radiance from lightpollutionmap.info. [NASA LAADS policy](https://ladsweb.modaps.eosdis.nasa.gov/learn/) permits unrestricted use/redistribution and requests citation; the distributor describes NASA raw data as CC0. See the [actual E3 provenance and limitations](docs/licensing/e3-2025-assessment.md), rather than treating every distributor layer as CC0.
 - **Light pollution map redistribution:** Jurij Stare, [lightpollutionmap.info](https://www.lightpollutionmap.info).
-- **Place names and administrative boundaries:** OpenStreetMap contributors (ODbL).
+- **Geographic coastline/hydrography evidence:** © OpenStreetMap contributors, via OSMCoastline and Geofabrik (ODbL 1.0). Place naming uses GeoNames; land/country attribution uses public-domain Natural Earth v5.1.1.
 - **Populated places (GeoNames):** [GeoNames](https://www.geonames.org) data used under the [Creative Commons Attribution 4.0 License](https://creativecommons.org/licenses/by/4.0/). Data is sourced from the [cities500](https://download.geonames.org/export/dump/cities500.zip) export.
+- **Land cover:** ESA WorldCover 10 m 2021 v200 (CC BY 4.0), with its official attribution, citation and modification statement in the [data notices](https://github.com/mivek/darkskyspots-data/blob/main/ATTRIBUTION.md).
+- **Generated database:** @mivek has chosen ODbL 1.0 for the Darkspots spot and derived cluster databases. [Assessment and separate notice review](docs/geographic-licensing.md). This does not relicense upstream inputs or authorize publication.
 
 ## Spot elevation
 
@@ -454,8 +456,12 @@ new `generated` value. Review the diff before publication. Representatives
 contain `altitude`, and the new `generated` value invalidates client caches.
 The script does not publish the results itself.
 
-Copernicus DEM © DLR e.V. 2010–2014 and © Airbus Defence and Space GmbH
-2014–2018, provided under COPERNICUS by the European Union and ESA.
+produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved
+
+The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM-30
+
+Retain applicable notices and non-endorsement obligations in downstream copies;
+no supplier endorsement is implied.
 [Product and terms](https://dataspace.copernicus.eu/explore-data/data-collections/copernicus-contributing-missions/collections-description/COP-DEM).
 
 Also check the summits at their verified geographic coordinates:

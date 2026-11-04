@@ -1,0 +1,2162 @@
+{
+  "assessment_date": "2026-11-04",
+  "responsible_maintainer": "@mivek",
+  "original_geographic_manifest_sha256": "6ac72c9735f6f9d2d93c6e47e1a1a60ee011820f628f977225cfc52684fc39ff",
+  "viirs": {
+    "product": "NASA Black Marble VJ146A4",
+    "collection": "2 (provider documentation)",
+    "year": 2025,
+    "subset": "AllAngle_Composite_Snow_Free (provider documentation)",
+    "distributor": "Jurij Stare, lightpollutionmap.info",
+    "acquisition_source": "Confirmed by @mivek in the task instruction",
+    "files": {
+      "global": {
+        "path": "input/viirs_2025_raw.tif",
+        "size": 1034233344,
+        "sha256": "1d085195298ddb12c30d2f13e5799cf02f34845719cf14ff3807bca7b05102c3",
+        "crc32": "627d2673"
+      },
+      "france": {
+        "path": "input/france/2025.tif",
+        "size": 10424205,
+        "sha256": "a71d0015f63fdf5d24435736ac9209b513db4e2f210b124cf2a962524258c761",
+        "exact_pixel_subset_of_retained_global": true,
+        "bands": 1,
+        "dtype": "float32",
+        "crs": "EPSG:4326",
+        "transform": [
+          0.004166666666666667,
+          0.0,
+          -5.804166666666674,
+          0.0,
+          -0.004166666666666667,
+          53.77083333333333
+        ],
+        "nodata": -999.9000244140625,
+        "embedded_tags": {
+          "AREA_OR_POINT": "Area"
+        },
+        "historical_download_url": null,
+        "historical_download_date": null
+      },
+      "uk_ireland": {
+        "path": "input/uk_ireland/2025.tif",
+        "size": 7001495,
+        "sha256": "cc76900015f10727e1cdaf3c01b46f523328dbf73c43281460e48388c260bbca",
+        "exact_pixel_subset_of_retained_global": true,
+        "bands": 1,
+        "dtype": "float32",
+        "crs": "EPSG:4326",
+        "transform": [
+          0.004166666666666667,
+          0.0,
+          -16.058333333333337,
+          0.0,
+          -0.004166666666666667,
+          57.704166666666666
+        ],
+        "nodata": -999.9000244140625,
+        "embedded_tags": {
+          "AREA_OR_POINT": "Area"
+        },
+        "historical_download_url": null,
+        "historical_download_date": null
+      },
+      "canaries": {
+        "path": "input/canaries/2025.tif",
+        "size": 655705,
+        "sha256": "f1656c88ae5a1e29365df41bfb90429f54dea6cf53118568911c99110ec9b04d",
+        "exact_pixel_subset_of_retained_global": true,
+        "bands": 1,
+        "dtype": "float32",
+        "crs": "EPSG:4326",
+        "transform": [
+          0.004166666666666667,
+          0.0,
+          -22.76666666666668,
+          0.0,
+          -0.004166666666666667,
+          33.15416666666667
+        ],
+        "nodata": -999.9000244140625,
+        "embedded_tags": {
+          "AREA_OR_POINT": "Area"
+        },
+        "historical_download_url": null,
+        "historical_download_date": null
+      }
+    },
+    "current_publisher_download": {
+      "url": "https://www2.lightpollutionmap.info/data/v2/viirs_2025_raw.zip",
+      "observed_date": "2026-11-04",
+      "observation": "Read-only planning inspection of the publisher ZIP central directory",
+      "member": "viirs_2025_raw.tif",
+      "member_size": 1034233344,
+      "member_crc32": "627d2673",
+      "evidential_limit": "Matching size/CRC32 is corroboration, not cryptographic identity or historical acquisition proof. No remote SHA-256 comparison was performed."
+    },
+    "historical_global_download_url": null,
+    "historical_global_download_date": null,
+    "original_nasa_granule_identifiers": null
+  },
+  "osm": {
+    "coastline": {
+      "last_modified": "Sat, 31 Oct 2026 03:43:36 GMT",
+      "license": "ODbL 1.0",
+      "members": [
+        {
+          "path": "land_polygons.cpg",
+          "sha256": "146d6789ffe033a5297c1ad046e6a62ee35319b86b021444f05b6ea2aa8a1f4a",
+          "size": 6
+        },
+        {
+          "path": "land_polygons.dbf",
+          "sha256": "1d30ccc7811256a8dd5f3f41a215170b29b237bf37e0f1cf671b67ceebad0225",
+          "size": 16604540
+        },
+        {
+          "path": "land_polygons.prj",
+          "sha256": "a02a27b1d1982c8516d83398e85a3c8b1aef1713c13ef4d84d7bde17430c07c4",
+          "size": 145
+        },
+        {
+          "path": "land_polygons.shp",
+          "sha256": "f1636460ab634d1f06a0bd72b957fbc8a8a85eabeabf5919f790573990ba0f33",
+          "size": 1320851716
+        },
+        {
+          "path": "land_polygons.shx",
+          "sha256": "30d638b45eaa928f3cc95bc29d40beb95cea0e34f14d042657387373115e2e2a",
+          "size": 6991444
+        }
+      ],
+      "provider": "OSMCoastline land polygons / OpenStreetMap",
+      "retrieved_utc": "2026-10-31T22:21:19.807748+00:00",
+      "sha256": "1da76610d4267a15c40f77106f062af0768548253add8ad7ca56a9f617300709",
+      "size": 928680609,
+      "url": "https://osmdata.openstreetmap.de/download/land-polygons-split-4326.zip"
+    },
+    "hydrography": {
+      "alsace": {
+        "archive_size": 224945459,
+        "bytes_transferred": 11035955,
+        "etag": "\"d686533-65f1afb5e83c4\"",
+        "files": [
+          {
+            "member": "gis_osm_water_a_free_1.cpg",
+            "path": "gis_osm_water_a_free_1.cpg",
+            "sha256": "146d6789ffe033a5297c1ad046e6a62ee35319b86b021444f05b6ea2aa8a1f4a",
+            "size": 6
+          },
+          {
+            "member": "gis_osm_water_a_free_1.dbf",
+            "path": "gis_osm_water_a_free_1.dbf",
+            "sha256": "8632328fcccd38b64e7047cdb3e02f119d3ef9732842761d3d4d7a1a171ca4d7",
+            "size": 1382012
+          },
+          {
+            "member": "gis_osm_water_a_free_1.prj",
+            "path": "gis_osm_water_a_free_1.prj",
+            "sha256": "ffc9162903c37f0867d1e7f36c20036a165f7aa555dda24c1ae0ee4328d2977f",
+            "size": 144
+          },
+          {
+            "member": "gis_osm_water_a_free_1.shp",
+            "path": "gis_osm_water_a_free_1.shp",
+            "sha256": "fd4fa946b8262d3999ee509463bf7a8897513edf904a217d69f67db150bfabd4",
+            "size": 4644460
+          },
+          {
+            "member": "gis_osm_water_a_free_1.shx",
+            "path": "gis_osm_water_a_free_1.shx",
+            "sha256": "2b56e1b7f0657703dad427433327118776163c2a343c69f99d7ef2f952c11733",
+            "size": 76340
+          }
+        ],
+        "last_modified": "Sat, 31 Oct 2026 04:02:31 GMT",
+        "license": "ODbL 1.0",
+        "provider": "Geofabrik / OpenStreetMap",
+        "retrieved_utc": "2026-11-01T21:51:45.148658+00:00",
+        "url": "https://download.geofabrik.de/europe/france/alsace-261030-free.shp.zip"
+      },
+      "andorra": {
+        "archive_size": 6347833,
+        "bytes_transferred": 2153529,
+        "etag": "\"60dc39-65f19ba09751a\"",
+        "files": [
+          {
+            "member": "gis_osm_water_a_free_1.cpg",
+            "path": "gis_osm_water_a_free_1.cpg",
+            "sha256": "146d6789ffe033a5297c1ad046e6a62ee35319b86b021444f05b6ea2aa8a1f4a",
+            "size": 6
+          },
+          {
+            "member": "gis_osm_water_a_free_1.dbf",
+            "path": "gis_osm_water_a_free_1.dbf",
+            "sha256": "08e3e2fbca169d1f64bbfb4a92952919cbc152a9063961bb317122b6a00e5fdb",
+            "size": 51782
+          },
+          {
+            "member": "gis_osm_water_a_free_1.prj",
+            "path": "gis_osm_water_a_free_1.prj",
+            "sha256": "ffc9162903c37f0867d1e7f36c20036a165f7aa555dda24c1ae0ee4328d2977f",
+            "size": 144
+          },
+          {
+            "member": "gis_osm_water_a_free_1.shp",
+            "path": "gis_osm_water_a_free_1.shp",
+            "sha256": "b62726a5feeada1839d107960e713d61914252d2f5ea3607e35dbc930ba98d65",
+            "size": 290116
+          },
+          {
+            "member": "gis_osm_water_a_free_1.shx",
+            "path": "gis_osm_water_a_free_1.shx",
+            "sha256": "9e34fd2d2badb4601d38da09cc176b7c0e045afd54a69939e66d0c7751caeebe",
+            "size": 2948
+          }
+        ],
+        "last_modified": "Sat, 31 Oct 2026 02:32:40 GMT",
+        "license": "ODbL 1.0",
+        "provider": "Geofabrik / OpenStreetMap",
+        "retrieved_utc": "2026-11-01T22:48:44.747739+00:00",
+        "url": "https://download.geofabrik.de/europe/andorra-261030-free.shp.zip"
+      },
+      "aquitaine": {
+        "archive_size": 587712769,
+        "bytes_transferred": 17287425,
+        "files": [
+          {
+            "member": "gis_osm_water_a_free_1.cpg",
+            "path": "sources/geofabrik/aquitaine/gis_osm_water_a_free_1.cpg",
+            "sha256": "146d6789ffe033a5297c1ad046e6a62ee35319b86b021444f05b6ea2aa8a1f4a",
+            "size": 6
+          },
+          {
+            "member": "gis_osm_water_a_free_1.dbf",
+            "path": "sources/geofabrik/aquitaine/gis_osm_water_a_free_1.dbf",
+            "sha256": "96b18257d2ca04866fa34cc4f067c479ec03ee3342027a0449d9eb814214f8f7",
+            "size": 4886952
+          },
+          {
+            "member": "gis_osm_water_a_free_1.prj",
+            "path": "sources/geofabrik/aquitaine/gis_osm_water_a_free_1.prj",
+            "sha256": "ffc9162903c37f0867d1e7f36c20036a165f7aa555dda24c1ae0ee4328d2977f",
+            "size": 144
+          },
+          {
+            "member": "gis_osm_water_a_free_1.shp",
+            "path": "sources/geofabrik/aquitaine/gis_osm_water_a_free_1.shp",
+            "sha256": "857ebca2d4a6d10f4e6afe7841d615c2b93c2f63c9068f54cdc6fd8d9d5f6ce4",
+            "size": 15762932
+          },
+          {
+            "member": "gis_osm_water_a_free_1.shx",
+            "path": "sources/geofabrik/aquitaine/gis_osm_water_a_free_1.shx",
+            "sha256": "3e104fc99344d2c8f9130fd97e079290a429733de6fd270b9e4ea41445633b40",
+            "size": 269716
+          }
+        ],
+        "last_modified": "Sat, 31 Oct 2026 01:37:48 GMT",
+        "license": "ODbL 1.0",
+        "provider": "Geofabrik / OpenStreetMap",
+        "retrieved_utc": "2026-10-31T22:18:18.532375+00:00",
+        "url": "https://download.geofabrik.de/europe/france/aquitaine-261030-free.shp.zip"
+      },
+      "aragon": {
+        "archive_size": 212639063,
+        "bytes_transferred": 11312471,
+        "etag": "\"cac9d57-65f1a8f01d7f7\"",
+        "files": [
+          {
+            "member": "gis_osm_water_a_free_1.cpg",
+            "path": "gis_osm_water_a_free_1.cpg",
+            "sha256": "146d6789ffe033a5297c1ad046e6a62ee35319b86b021444f05b6ea2aa8a1f4a",
+            "size": 6
+          },
+          {
+            "member": "gis_osm_water_a_free_1.dbf",
+            "path": "gis_osm_water_a_free_1.dbf",
+            "sha256": "c8b8dffaa9e122b571252e0fa0dd4440dd7fc5e0df7d9364926cdfa79814c934",
+            "size": 1357072
+          },
+          {
+            "member": "gis_osm_water_a_free_1.prj",
+            "path": "gis_osm_water_a_free_1.prj",
+            "sha256": "ffc9162903c37f0867d1e7f36c20036a165f7aa555dda24c1ae0ee4328d2977f",
+            "size": 144
+          },
+          {
+            "member": "gis_osm_water_a_free_1.shp",
+            "path": "gis_osm_water_a_free_1.shp",
+            "sha256": "56d023db629217b9659f236fb14380cf82ff9173c2c104a22fa833173842076a",
+            "size": 4940908
+          },
+          {
+            "member": "gis_osm_water_a_free_1.shx",
+            "path": "gis_osm_water_a_free_1.shx",
+            "sha256": "4fd8246c86789e9d6dda399889f2f2f9d0e481462cd811d44d647fa40e7a1502",
+            "size": 74964
+          }
+        ],
+        "last_modified": "Sat, 31 Oct 2026 03:32:13 GMT",
+        "license": "ODbL 1.0",
+        "provider": "Geofabrik / OpenStreetMap",
+        "retrieved_utc": "2026-11-01T23:00:42.856666+00:00",
+        "url": "https://download.geofabrik.de/europe/spain/aragon-261030-free.shp.zip"
+      },
+      "auvergne": {
+        "archive_size": 310141277,
+        "bytes_transferred": 12345693,
+        "files": [
+          {
+            "member": "gis_osm_water_a_free_1.cpg",
+            "path": "sources/geofabrik/auvergne/gis_osm_water_a_free_1.cpg",
+            "sha256": "146d6789ffe033a5297c1ad046e6a62ee35319b86b021444f05b6ea2aa8a1f4a",
+            "size": 6
+          },
+          {
+            "member": "gis_osm_water_a_free_1.dbf",
+            "path": "sources/geofabrik/auvergne/gis_osm_water_a_free_1.dbf",
+            "sha256": "396c67a488999e712f80b86c7737d19d3a26b92dc911c3f0669ca98f09e3d07b",
+            "size": 2679182
+          },
+          {
+            "member": "gis_osm_water_a_free_1.prj",
+            "path": "sources/geofabrik/auvergne/gis_osm_water_a_free_1.prj",
+            "sha256": "ffc9162903c37f0867d1e7f36c20036a165f7aa555dda24c1ae0ee4328d2977f",
+            "size": 144
+          },
+          {
+            "member": "gis_osm_water_a_free_1.shp",
+            "path": "sources/geofabrik/auvergne/gis_osm_water_a_free_1.shp",
+            "sha256": "3cb640cd155e3256456855b63c7106c54bb454d81863f2c59d4569f5e8ea6592",
+            "size": 8705784
+          },
+          {
+            "member": "gis_osm_water_a_free_1.shx",
+            "path": "sources/geofabrik/auvergne/gis_osm_water_a_free_1.shx",
+            "sha256": "fba5c23b32ed79c21687f381ff14f1452d8dd7f7d4e7cff8b953d77edffb1a23",
+            "size": 147908
+          }
+        ],
+        "last_modified": "Sat, 31 Oct 2026 01:25:49 GMT",
+        "license": "ODbL 1.0",
+        "provider": "Geofabrik / OpenStreetMap",
+        "retrieved_utc": "2026-10-31T22:18:46.776575+00:00",
+        "url": "https://download.geofabrik.de/europe/france/auvergne-261030-free.shp.zip"
+      },
+      "basse-normandie": {
+        "archive_size": 290444787,
+        "bytes_transferred": 9426419,
+        "files": [
+          {
+            "member": "gis_osm_water_a_free_1.cpg",
+            "path": "sources/geofabrik/basse-normandie/gis_osm_water_a_free_1.cpg",
+            "sha256": "146d6789ffe033a5297c1ad046e6a62ee35319b86b021444f05b6ea2aa8a1f4a",
+            "size": 6
+          },
+          {
+            "member": "gis_osm_water_a_free_1.dbf",
+            "path": "sources/geofabrik/basse-normandie/gis_osm_water_a_free_1.dbf",
+            "sha256": "dced6df8da604b87c3be50d2c601183ac4858245196e6022f6631379fbe9bd39",
+            "size": 2591892
+          },
+          {
+            "member": "gis_osm_water_a_free_1.prj",
+            "path": "sources/geofabrik/basse-normandie/gis_osm_water_a_free_1.prj",
+            "sha256": "ffc9162903c37f0867d1e7f36c20036a165f7aa555dda24c1ae0ee4328d2977f",
+            "size": 144
+          },
+          {
+            "member": "gis_osm_water_a_free_1.shp",
+            "path": "sources/geofabrik/basse-normandie/gis_osm_water_a_free_1.shp",
+            "sha256": "d8187f3fef12075b2d7da1866ee24027b2396e85bd499fffad2294700727dd86",
+            "size": 7932860
+          },
+          {
+            "member": "gis_osm_water_a_free_1.shx",
+            "path": "sources/geofabrik/basse-normandie/gis_osm_water_a_free_1.shx",
+            "sha256": "c10456832b1ae90b6e75f98804a1c95e3db3c726db510e91a58657b0640ef2b4",
+            "size": 143092
+          }
+        ],
+        "last_modified": "Sat, 31 Oct 2026 00:28:59 GMT",
+        "license": "ODbL 1.0",
+        "provider": "Geofabrik / OpenStreetMap",
+        "retrieved_utc": "2026-10-31T22:19:07.029755+00:00",
+        "url": "https://download.geofabrik.de/europe/france/basse-normandie-261030-free.shp.zip"
+      },
+      "belgium": {
+        "archive_size": 1285218364,
+        "bytes_transferred": 31121468,
+        "etag": "\"4c9ae03c-65f1ae75b34a5\"",
+        "files": [
+          {
+            "member": "gis_osm_water_a_free_1.cpg",
+            "path": "gis_osm_water_a_free_1.cpg",
+            "sha256": "146d6789ffe033a5297c1ad046e6a62ee35319b86b021444f05b6ea2aa8a1f4a",
+            "size": 6
+          },
+          {
+            "member": "gis_osm_water_a_free_1.dbf",
+            "path": "gis_osm_water_a_free_1.dbf",
+            "sha256": "38a8b3b471480295a246c06480594b9fbe077d952802be8ee6fe080e7359e24b",
+            "size": 12524972
+          },
+          {
+            "member": "gis_osm_water_a_free_1.prj",
+            "path": "gis_osm_water_a_free_1.prj",
+            "sha256": "ffc9162903c37f0867d1e7f36c20036a165f7aa555dda24c1ae0ee4328d2977f",
+            "size": 144
+          },
+          {
+            "member": "gis_osm_water_a_free_1.shp",
+            "path": "gis_osm_water_a_free_1.shp",
+            "sha256": "782f03561106b4526d75eeb525cfdbd56e686a6b9c89526a44d98ec0eda84caf",
+            "size": 40160132
+          },
+          {
+            "member": "gis_osm_water_a_free_1.shx",
+            "path": "gis_osm_water_a_free_1.shx",
+            "sha256": "d85a48bb573e6430a8ae43cbecaf7e1b1472b3a26af494f66f6f784f477a4c24",
+            "size": 691124
+          }
+        ],
+        "last_modified": "Sat, 31 Oct 2026 03:56:55 GMT",
+        "license": "ODbL 1.0",
+        "provider": "Geofabrik / OpenStreetMap",
+        "retrieved_utc": "2026-11-01T22:52:34.155765+00:00",
+        "url": "https://download.geofabrik.de/europe/belgium-261030-free.shp.zip"
+      },
+      "bourgogne": {
+        "archive_size": 393111842,
+        "bytes_transferred": 19818786,
+        "files": [
+          {
+            "member": "gis_osm_water_a_free_1.cpg",
+            "path": "sources/geofabrik/bourgogne/gis_osm_water_a_free_1.cpg",
+            "sha256": "146d6789ffe033a5297c1ad046e6a62ee35319b86b021444f05b6ea2aa8a1f4a",
+            "size": 6
+          },
+          {
+            "member": "gis_osm_water_a_free_1.dbf",
+            "path": "sources/geofabrik/bourgogne/gis_osm_water_a_free_1.dbf",
+            "sha256": "bb3e17ddc1413224c9abf7f752e7f3e429f59fda60671b89bbe68cc02dfb290d",
+            "size": 5500882
+          },
+          {
+            "member": "gis_osm_water_a_free_1.prj",
+            "path": "sources/geofabrik/bourgogne/gis_osm_water_a_free_1.prj",
+            "sha256": "ffc9162903c37f0867d1e7f36c20036a165f7aa555dda24c1ae0ee4328d2977f",
+            "size": 144
+          },
+          {
+            "member": "gis_osm_water_a_free_1.shp",
+            "path": "sources/geofabrik/bourgogne/gis_osm_water_a_free_1.shp",
+            "sha256": "ea54774bd0a16394cbee5bfc0464298bceddc3ff557ee353437d457cb35bc125",
+            "size": 16252008
+          },
+          {
+            "member": "gis_osm_water_a_free_1.shx",
+            "path": "sources/geofabrik/bourgogne/gis_osm_water_a_free_1.shx",
+            "sha256": "280b4c4f324584064fbddd52b115bddd1dd68dc42e70091fb905b90e5b12d5bd",
+            "size": 303588
+          }
+        ],
+        "last_modified": "Sat, 31 Oct 2026 01:59:05 GMT",
+        "license": "ODbL 1.0",
+        "provider": "Geofabrik / OpenStreetMap",
+        "retrieved_utc": "2026-10-31T22:18:53.271604+00:00",
+        "url": "https://download.geofabrik.de/europe/france/bourgogne-261030-free.shp.zip"
+      },
+      "bretagne": {
+        "archive_size": 593617868,
+        "bytes_transferred": 23192524,
+        "files": [
+          {
+            "member": "gis_osm_water_a_free_1.cpg",
+            "path": "sources/geofabrik/bretagne/gis_osm_water_a_free_1.cpg",
+            "sha256": "146d6789ffe033a5297c1ad046e6a62ee35319b86b021444f05b6ea2aa8a1f4a",
+            "size": 6
+          },
+          {
+            "member": "gis_osm_water_a_free_1.dbf",
+            "path": "sources/geofabrik/bretagne/gis_osm_water_a_free_1.dbf",
+            "sha256": "cb2cef2d48556ac533ba1deaccf90294f41ae95577f2001fbaabeb0bc5798ffc",
+            "size": 4494292
+          },
+          {
+            "member": "gis_osm_water_a_free_1.prj",
+            "path": "sources/geofabrik/bretagne/gis_osm_water_a_free_1.prj",
+            "sha256": "ffc9162903c37f0867d1e7f36c20036a165f7aa555dda24c1ae0ee4328d2977f",
+            "size": 144
+          },
+          {
+            "member": "gis_osm_water_a_free_1.shp",
+            "path": "sources/geofabrik/bretagne/gis_osm_water_a_free_1.shp",
+            "sha256": "a58db18a438cbfbaa31cd5af529e52847d7f7f7115a98dae480053f5501cbce3",
+            "size": 19793564
+          },
+          {
+            "member": "gis_osm_water_a_free_1.shx",
+            "path": "sources/geofabrik/bretagne/gis_osm_water_a_free_1.shx",
+            "sha256": "fc2201e4101c050f3f103e115b571ea542adb7e5fa7cbffb6f343423ddaf09c4",
+            "size": 248052
+          }
+        ],
+        "last_modified": "Sat, 31 Oct 2026 01:33:24 GMT",
+        "license": "ODbL 1.0",
+        "provider": "Geofabrik / OpenStreetMap",
+        "retrieved_utc": "2026-10-31T22:19:03.499593+00:00",
+        "url": "https://download.geofabrik.de/europe/france/bretagne-261030-free.shp.zip"
+      },
+      "canary-islands": {
+        "archive_size": 111111653,
+        "bytes_transferred": 6254053,
+        "files": [
+          {
+            "member": "gis_osm_water_a_free_1.cpg",
+            "path": "sources/geofabrik/canary-islands/gis_osm_water_a_free_1.cpg",
+            "sha256": "146d6789ffe033a5297c1ad046e6a62ee35319b86b021444f05b6ea2aa8a1f4a",
+            "size": 6
+          },
+          {
+            "member": "gis_osm_water_a_free_1.dbf",
+            "path": "sources/geofabrik/canary-islands/gis_osm_water_a_free_1.dbf",
+            "sha256": "2ada05bce5f347388c261e4eae59ea43e0918adaa1b88bf0d60e11326f256920",
+            "size": 3314137
+          },
+          {
+            "member": "gis_osm_water_a_free_1.prj",
+            "path": "sources/geofabrik/canary-islands/gis_osm_water_a_free_1.prj",
+            "sha256": "ffc9162903c37f0867d1e7f36c20036a165f7aa555dda24c1ae0ee4328d2977f",
+            "size": 144
+          },
+          {
+            "member": "gis_osm_water_a_free_1.shp",
+            "path": "sources/geofabrik/canary-islands/gis_osm_water_a_free_1.shp",
+            "sha256": "e43dfa8fa02679024f34eea00fe4c3547e23db3ec69e7c1d21606f0d7e3b35a2",
+            "size": 4496768
+          },
+          {
+            "member": "gis_osm_water_a_free_1.shx",
+            "path": "sources/geofabrik/canary-islands/gis_osm_water_a_free_1.shx",
+            "sha256": "6e9f902b2b36a55a41909ec842fc7a00abbc2655d7a9fd845aa8327a11f15607",
+            "size": 182940
+          }
+        ],
+        "last_modified": "Sat, 31 Oct 2026 03:08:50 GMT",
+        "license": "ODbL 1.0",
+        "provider": "Geofabrik / OpenStreetMap",
+        "retrieved_utc": "2026-10-31T22:19:44.493293+00:00",
+        "url": "https://download.geofabrik.de/africa/canary-islands-261030-free.shp.zip"
+      },
+      "cataluna": {
+        "archive_size": 563583235,
+        "bytes_transferred": 14129411,
+        "etag": "\"21979903-65f1a8f6b4850\"",
+        "files": [
+          {
+            "member": "gis_osm_water_a_free_1.cpg",
+            "path": "gis_osm_water_a_free_1.cpg",
+            "sha256": "146d6789ffe033a5297c1ad046e6a62ee35319b86b021444f05b6ea2aa8a1f4a",
+            "size": 6
+          },
+          {
+            "member": "gis_osm_water_a_free_1.dbf",
+            "path": "gis_osm_water_a_free_1.dbf",
+            "sha256": "768d8bef6c375575ebc40e4e6b8bf1e7d4cc2374bfcb072c485bef1a54f4784c",
+            "size": 2711227
+          },
+          {
+            "member": "gis_osm_water_a_free_1.prj",
+            "path": "gis_osm_water_a_free_1.prj",
+            "sha256": "ffc9162903c37f0867d1e7f36c20036a165f7aa555dda24c1ae0ee4328d2977f",
+            "size": 144
+          },
+          {
+            "member": "gis_osm_water_a_free_1.shp",
+            "path": "gis_osm_water_a_free_1.shp",
+            "sha256": "be934a1370ff50b82e7fb70470aee5a3714488fdb02572c25a90b47373beea92",
+            "size": 14306372
+          },
+          {
+            "member": "gis_osm_water_a_free_1.shx",
+            "path": "gis_osm_water_a_free_1.shx",
+            "sha256": "100b89ea58d97f312ab14f67826af6b5327643454ffd6ef68748e23f85558128",
+            "size": 149676
+          }
+        ],
+        "last_modified": "Sat, 31 Oct 2026 03:32:20 GMT",
+        "license": "ODbL 1.0",
+        "provider": "Geofabrik / OpenStreetMap",
+        "retrieved_utc": "2026-11-01T23:00:54.649457+00:00",
+        "url": "https://download.geofabrik.de/europe/spain/cataluna-261030-free.shp.zip"
+      },
+      "centre": {
+        "archive_size": 467429500,
+        "bytes_transferred": 31221884,
+        "files": [
+          {
+            "member": "gis_osm_water_a_free_1.cpg",
+            "path": "sources/geofabrik/centre/gis_osm_water_a_free_1.cpg",
+            "sha256": "146d6789ffe033a5297c1ad046e6a62ee35319b86b021444f05b6ea2aa8a1f4a",
+            "size": 6
+          },
+          {
+            "member": "gis_osm_water_a_free_1.dbf",
+            "path": "sources/geofabrik/centre/gis_osm_water_a_free_1.dbf",
+            "sha256": "6a741dc1ecb3522d35891af3c7ad38778238b3b9326e8681097e5b475b0900a8",
+            "size": 10407827
+          },
+          {
+            "member": "gis_osm_water_a_free_1.prj",
+            "path": "sources/geofabrik/centre/gis_osm_water_a_free_1.prj",
+            "sha256": "ffc9162903c37f0867d1e7f36c20036a165f7aa555dda24c1ae0ee4328d2977f",
+            "size": 144
+          },
+          {
+            "member": "gis_osm_water_a_free_1.shp",
+            "path": "sources/geofabrik/centre/gis_osm_water_a_free_1.shp",
+            "sha256": "e3424a67958cff56748a99a173cc6b8a4143f0b727f345030b06ef5a0cd42268",
+            "size": 31736704
+          },
+          {
+            "member": "gis_osm_water_a_free_1.shx",
+            "path": "sources/geofabrik/centre/gis_osm_water_a_free_1.shx",
+            "sha256": "22075aea4aeaf829a786150924f7ee61a9ac81053ace402e4e822d5632911ef6",
+            "size": 574316
+          }
+        ],
+        "last_modified": "Sat, 31 Oct 2026 03:00:37 GMT",
+        "license": "ODbL 1.0",
+        "provider": "Geofabrik / OpenStreetMap",
+        "retrieved_utc": "2026-10-31T22:18:44.927555+00:00",
+        "url": "https://download.geofabrik.de/europe/france/centre-261030-free.shp.zip"
+      },
+      "champagne-ardenne": {
+        "archive_size": 206856231,
+        "bytes_transferred": 9723943,
+        "etag": "\"c546027-65f1a8f47d222\"",
+        "files": [
+          {
+            "member": "gis_osm_water_a_free_1.cpg",
+            "path": "gis_osm_water_a_free_1.cpg",
+            "sha256": "146d6789ffe033a5297c1ad046e6a62ee35319b86b021444f05b6ea2aa8a1f4a",
+            "size": 6
+          },
+          {
+            "member": "gis_osm_water_a_free_1.dbf",
+            "path": "gis_osm_water_a_free_1.dbf",
+            "sha256": "26d01ee802342448891063f1ea4d91c29da1f6b285d5738c57b63c509dc5c734",
+            "size": 1777717
+          },
+          {
+            "member": "gis_osm_water_a_free_1.prj",
+            "path": "gis_osm_water_a_free_1.prj",
+            "sha256": "ffc9162903c37f0867d1e7f36c20036a165f7aa555dda24c1ae0ee4328d2977f",
+            "size": 144
+          },
+          {
+            "member": "gis_osm_water_a_free_1.shp",
+            "path": "gis_osm_water_a_free_1.shp",
+            "sha256": "2de4a2253400a8aba4ac2921a54ee27183d6bcb1a77d83e611590b033653e3dd",
+            "size": 6135180
+          },
+          {
+            "member": "gis_osm_water_a_free_1.shx",
+            "path": "gis_osm_water_a_free_1.shx",
+            "sha256": "4813b5ef1e2dc73b7f73a2fbd36911a4f717b5b6191dacb9db4f3d4f2e2af7b6",
+            "size": 98172
+          }
+        ],
+        "last_modified": "Sat, 31 Oct 2026 03:32:17 GMT",
+        "license": "ODbL 1.0",
+        "provider": "Geofabrik / OpenStreetMap",
+        "retrieved_utc": "2026-11-01T21:51:56.965342+00:00",
+        "url": "https://download.geofabrik.de/europe/france/champagne-ardenne-261030-free.shp.zip"
+      },
+      "england": {
+        "archive_size": 3031438780,
+        "bytes_transferred": 95425980,
+        "files": [
+          {
+            "member": "gis_osm_water_a_free_1.cpg",
+            "path": "sources/geofabrik/england/gis_osm_water_a_free_1.cpg",
+            "sha256": "146d6789ffe033a5297c1ad046e6a62ee35319b86b021444f05b6ea2aa8a1f4a",
+            "size": 6
+          },
+          {
+            "member": "gis_osm_water_a_free_1.dbf",
+            "path": "sources/geofabrik/england/gis_osm_water_a_free_1.dbf",
+            "sha256": "7ea4b9f0e9f4c276271d01d76d2bf3a6db194d987d687368b80103e21acce8b0",
+            "size": 28297347
+          },
+          {
+            "member": "gis_osm_water_a_free_1.prj",
+            "path": "sources/geofabrik/england/gis_osm_water_a_free_1.prj",
+            "sha256": "ffc9162903c37f0867d1e7f36c20036a165f7aa555dda24c1ae0ee4328d2977f",
+            "size": 144
+          },
+          {
+            "member": "gis_osm_water_a_free_1.shp",
+            "path": "sources/geofabrik/england/gis_osm_water_a_free_1.shp",
+            "sha256": "173317779d46911c3bdb8026ced88ef0b2d2e9d63662405e9542567988383769",
+            "size": 118537892
+          },
+          {
+            "member": "gis_osm_water_a_free_1.shx",
+            "path": "sources/geofabrik/england/gis_osm_water_a_free_1.shx",
+            "sha256": "317b52cb8e7d26a794bae32733a3f2dcb4e9a090afb1b772758e8c1d83e43bb4",
+            "size": 1561324
+          }
+        ],
+        "last_modified": "Sat, 31 Oct 2026 02:20:42 GMT",
+        "license": "ODbL 1.0",
+        "provider": "Geofabrik / OpenStreetMap",
+        "retrieved_utc": "2026-10-31T22:19:22.222258+00:00",
+        "url": "https://download.geofabrik.de/europe/united-kingdom/england-261030-free.shp.zip"
+      },
+      "franche-comte": {
+        "archive_size": 231853511,
+        "bytes_transferred": 13749703,
+        "etag": "\"dd1cdc7-65f1a8f819b31\"",
+        "files": [
+          {
+            "member": "gis_osm_water_a_free_1.cpg",
+            "path": "gis_osm_water_a_free_1.cpg",
+            "sha256": "146d6789ffe033a5297c1ad046e6a62ee35319b86b021444f05b6ea2aa8a1f4a",
+            "size": 6
+          },
+          {
+            "member": "gis_osm_water_a_free_1.dbf",
+            "path": "gis_osm_water_a_free_1.dbf",
+            "sha256": "b3116dec44b352d444198e001c13b45585c3d393557711b90594afc27151631c",
+            "size": 2108462
+          },
+          {
+            "member": "gis_osm_water_a_free_1.prj",
+            "path": "gis_osm_water_a_free_1.prj",
+            "sha256": "ffc9162903c37f0867d1e7f36c20036a165f7aa555dda24c1ae0ee4328d2977f",
+            "size": 144
+          },
+          {
+            "member": "gis_osm_water_a_free_1.shp",
+            "path": "gis_osm_water_a_free_1.shp",
+            "sha256": "cc4f2e8adad635bd583bcc0a4fe3d5886214e683a83e090da35a590a1acb880b",
+            "size": 7558192
+          },
+          {
+            "member": "gis_osm_water_a_free_1.shx",
+            "path": "gis_osm_water_a_free_1.shx",
+            "sha256": "c16ed2a33a36c1bda80257b951673dd4a7a6f417f41b98239d3d1cc4f0e891b2",
+            "size": 116420
+          }
+        ],
+        "last_modified": "Sat, 31 Oct 2026 03:32:21 GMT",
+        "license": "ODbL 1.0",
+        "provider": "Geofabrik / OpenStreetMap",
+        "retrieved_utc": "2026-11-01T21:52:30.943589+00:00",
+        "url": "https://download.geofabrik.de/europe/france/franche-comte-261030-free.shp.zip"
+      },
+      "freiburg-regbez": {
+        "archive_size": 269084492,
+        "bytes_transferred": 9037644,
+        "etag": "\"1009e74c-65f19cf9c4dc4\"",
+        "files": [
+          {
+            "member": "gis_osm_water_a_free_1.cpg",
+            "path": "gis_osm_water_a_free_1.cpg",
+            "sha256": "146d6789ffe033a5297c1ad046e6a62ee35319b86b021444f05b6ea2aa8a1f4a",
+            "size": 6
+          },
+          {
+            "member": "gis_osm_water_a_free_1.dbf",
+            "path": "gis_osm_water_a_free_1.dbf",
+            "sha256": "3379d83f5e66d43b485789a36c6d37fa0036f6d72680ab5379744143866a4949",
+            "size": 1732332
+          },
+          {
+            "member": "gis_osm_water_a_free_1.prj",
+            "path": "gis_osm_water_a_free_1.prj",
+            "sha256": "ffc9162903c37f0867d1e7f36c20036a165f7aa555dda24c1ae0ee4328d2977f",
+            "size": 144
+          },
+          {
+            "member": "gis_osm_water_a_free_1.shp",
+            "path": "gis_osm_water_a_free_1.shp",
+            "sha256": "70cc2b25c8b0195adc45d2276a5d771ef89d1e5949a9b97ad9ad2de34dec4279",
+            "size": 6101540
+          },
+          {
+            "member": "gis_osm_water_a_free_1.shx",
+            "path": "gis_osm_water_a_free_1.shx",
+            "sha256": "033906ec2faad447eab4afe5820714755ac6f31512657c2e987a9f47efbb02de",
+            "size": 95668
+          }
+        ],
+        "last_modified": "Sat, 31 Oct 2026 02:38:42 GMT",
+        "license": "ODbL 1.0",
+        "provider": "Geofabrik / OpenStreetMap",
+        "retrieved_utc": "2026-11-01T22:52:39.826946+00:00",
+        "url": "https://download.geofabrik.de/europe/germany/baden-wuerttemberg/freiburg-regbez-261030-free.shp.zip"
+      },
+      "haute-normandie": {
+        "archive_size": 208308299,
+        "bytes_transferred": 6981707,
+        "files": [
+          {
+            "member": "gis_osm_water_a_free_1.cpg",
+            "path": "sources/geofabrik/haute-normandie/gis_osm_water_a_free_1.cpg",
+            "sha256": "146d6789ffe033a5297c1ad046e6a62ee35319b86b021444f05b6ea2aa8a1f4a",
+            "size": 6
+          },
+          {
+            "member": "gis_osm_water_a_free_1.dbf",
+            "path": "sources/geofabrik/haute-normandie/gis_osm_water_a_free_1.dbf",
+            "sha256": "8e00ac9412321ae59d7ab9cbf9c43263186b24010141579e6f21f25471e30bb3",
+            "size": 1533682
+          },
+          {
+            "member": "gis_osm_water_a_free_1.prj",
+            "path": "sources/geofabrik/haute-normandie/gis_osm_water_a_free_1.prj",
+            "sha256": "ffc9162903c37f0867d1e7f36c20036a165f7aa555dda24c1ae0ee4328d2977f",
+            "size": 144
+          },
+          {
+            "member": "gis_osm_water_a_free_1.shp",
+            "path": "sources/geofabrik/haute-normandie/gis_osm_water_a_free_1.shp",
+            "sha256": "584d9985bbcae9c4fd8d4192f2846dc2530ea43fcfea2e545046650367e132a7",
+            "size": 5020352
+          },
+          {
+            "member": "gis_osm_water_a_free_1.shx",
+            "path": "sources/geofabrik/haute-normandie/gis_osm_water_a_free_1.shx",
+            "sha256": "35727188ccb107d1a29a5c48eb5b6d6f26c2329d183af8c3e96cee0cb6e64e06",
+            "size": 84708
+          }
+        ],
+        "last_modified": "Sat, 31 Oct 2026 03:16:52 GMT",
+        "license": "ODbL 1.0",
+        "provider": "Geofabrik / OpenStreetMap",
+        "retrieved_utc": "2026-10-31T22:19:10.706897+00:00",
+        "url": "https://download.geofabrik.de/europe/france/haute-normandie-261030-free.shp.zip"
+      },
+      "ile-de-france": {
+        "archive_size": 544655111,
+        "bytes_transferred": 11978503,
+        "files": [
+          {
+            "member": "gis_osm_water_a_free_1.cpg",
+            "path": "sources/geofabrik/ile-de-france/gis_osm_water_a_free_1.cpg",
+            "sha256": "146d6789ffe033a5297c1ad046e6a62ee35319b86b021444f05b6ea2aa8a1f4a",
+            "size": 6
+          },
+          {
+            "member": "gis_osm_water_a_free_1.dbf",
+            "path": "sources/geofabrik/ile-de-france/gis_osm_water_a_free_1.dbf",
+            "sha256": "7b5d8061a6d8a85020bdaec46e4b11d9a01b6388dcd2dd7f4239dc2dfde048a3",
+            "size": 2215327
+          },
+          {
+            "member": "gis_osm_water_a_free_1.prj",
+            "path": "sources/geofabrik/ile-de-france/gis_osm_water_a_free_1.prj",
+            "sha256": "ffc9162903c37f0867d1e7f36c20036a165f7aa555dda24c1ae0ee4328d2977f",
+            "size": 144
+          },
+          {
+            "member": "gis_osm_water_a_free_1.shp",
+            "path": "sources/geofabrik/ile-de-france/gis_osm_water_a_free_1.shp",
+            "sha256": "f225c5ad550173f229669489680525700f56dcdf1f507f5cd63e058acedfa265",
+            "size": 9051364
+          },
+          {
+            "member": "gis_osm_water_a_free_1.shx",
+            "path": "sources/geofabrik/ile-de-france/gis_osm_water_a_free_1.shx",
+            "sha256": "a066751b79f51e2ab2cef63b7e5d214cf5d26ebecd0a830421d962639e500403",
+            "size": 122316
+          }
+        ],
+        "last_modified": "Sat, 31 Oct 2026 02:02:38 GMT",
+        "license": "ODbL 1.0",
+        "provider": "Geofabrik / OpenStreetMap",
+        "retrieved_utc": "2026-10-31T22:19:05.664511+00:00",
+        "url": "https://download.geofabrik.de/europe/france/ile-de-france-261030-free.shp.zip"
+      },
+      "ireland-and-northern-ireland": {
+        "archive_size": 1045175165,
+        "bytes_transferred": 34347901,
+        "files": [
+          {
+            "member": "gis_osm_water_a_free_1.cpg",
+            "path": "sources/geofabrik/ireland-and-northern-ireland/gis_osm_water_a_free_1.cpg",
+            "sha256": "146d6789ffe033a5297c1ad046e6a62ee35319b86b021444f05b6ea2aa8a1f4a",
+            "size": 6
+          },
+          {
+            "member": "gis_osm_water_a_free_1.dbf",
+            "path": "sources/geofabrik/ireland-and-northern-ireland/gis_osm_water_a_free_1.dbf",
+            "sha256": "5437afd71ac842571e3257fdcf3310f8ea32d41009dc32bd2b4fc0a55c879463",
+            "size": 5925587
+          },
+          {
+            "member": "gis_osm_water_a_free_1.prj",
+            "path": "sources/geofabrik/ireland-and-northern-ireland/gis_osm_water_a_free_1.prj",
+            "sha256": "ffc9162903c37f0867d1e7f36c20036a165f7aa555dda24c1ae0ee4328d2977f",
+            "size": 144
+          },
+          {
+            "member": "gis_osm_water_a_free_1.shp",
+            "path": "sources/geofabrik/ireland-and-northern-ireland/gis_osm_water_a_free_1.shp",
+            "sha256": "e4b39a545ba17d8b30af5acb9fb36a404bf1c6fc5ef74cd0ee6a2bec175d2708",
+            "size": 40708204
+          },
+          {
+            "member": "gis_osm_water_a_free_1.shx",
+            "path": "sources/geofabrik/ireland-and-northern-ireland/gis_osm_water_a_free_1.shx",
+            "sha256": "99e41ea14e4d0b70897a31395a070d2636a898698fd6753056f97a791eb8386d",
+            "size": 327020
+          }
+        ],
+        "last_modified": "Sat, 31 Oct 2026 01:30:14 GMT",
+        "license": "ODbL 1.0",
+        "provider": "Geofabrik / OpenStreetMap",
+        "retrieved_utc": "2026-10-31T22:19:41.010729+00:00",
+        "url": "https://download.geofabrik.de/europe/ireland-and-northern-ireland-261030-free.shp.zip"
+      },
+      "karlsruhe-regbez": {
+        "archive_size": 230040592,
+        "bytes_transferred": 7742480,
+        "etag": "\"db62410-65f18773aa8ca\"",
+        "files": [
+          {
+            "member": "gis_osm_water_a_free_1.cpg",
+            "path": "gis_osm_water_a_free_1.cpg",
+            "sha256": "146d6789ffe033a5297c1ad046e6a62ee35319b86b021444f05b6ea2aa8a1f4a",
+            "size": 6
+          },
+          {
+            "member": "gis_osm_water_a_free_1.dbf",
+            "path": "gis_osm_water_a_free_1.dbf",
+            "sha256": "873fa70d878051c3e8fe4db80c6f8ab7123560dcefba3c57e03a2a2a2cdfb75f",
+            "size": 961947
+          },
+          {
+            "member": "gis_osm_water_a_free_1.prj",
+            "path": "gis_osm_water_a_free_1.prj",
+            "sha256": "ffc9162903c37f0867d1e7f36c20036a165f7aa555dda24c1ae0ee4328d2977f",
+            "size": 144
+          },
+          {
+            "member": "gis_osm_water_a_free_1.shp",
+            "path": "gis_osm_water_a_free_1.shp",
+            "sha256": "474b1b47775d262e9d08635a192de5e2078f0a7d682520bea8b2b10d8fb257b9",
+            "size": 3143768
+          },
+          {
+            "member": "gis_osm_water_a_free_1.shx",
+            "path": "gis_osm_water_a_free_1.shx",
+            "sha256": "6cfd7106dffc66e2600cc0b60eb75ca75f9a9f00ddb6e8b30572d7c4a01c7e23",
+            "size": 53164
+          }
+        ],
+        "last_modified": "Sat, 31 Oct 2026 01:02:24 GMT",
+        "license": "ODbL 1.0",
+        "provider": "Geofabrik / OpenStreetMap",
+        "retrieved_utc": "2026-11-01T23:00:05.813798+00:00",
+        "url": "https://download.geofabrik.de/europe/germany/baden-wuerttemberg/karlsruhe-regbez-261030-free.shp.zip"
+      },
+      "languedoc-roussillon": {
+        "archive_size": 484733148,
+        "bytes_transferred": 14971100,
+        "files": [
+          {
+            "member": "gis_osm_water_a_free_1.cpg",
+            "path": "sources/geofabrik/languedoc-roussillon/gis_osm_water_a_free_1.cpg",
+            "sha256": "146d6789ffe033a5297c1ad046e6a62ee35319b86b021444f05b6ea2aa8a1f4a",
+            "size": 6
+          },
+          {
+            "member": "gis_osm_water_a_free_1.dbf",
+            "path": "sources/geofabrik/languedoc-roussillon/gis_osm_water_a_free_1.dbf",
+            "sha256": "a3711e17c290e2a2d0ac6018fe0c41a68e416e5fd59af91b39200ebd312738e1",
+            "size": 2166172
+          },
+          {
+            "member": "gis_osm_water_a_free_1.prj",
+            "path": "sources/geofabrik/languedoc-roussillon/gis_osm_water_a_free_1.prj",
+            "sha256": "ffc9162903c37f0867d1e7f36c20036a165f7aa555dda24c1ae0ee4328d2977f",
+            "size": 144
+          },
+          {
+            "member": "gis_osm_water_a_free_1.shp",
+            "path": "sources/geofabrik/languedoc-roussillon/gis_osm_water_a_free_1.shp",
+            "sha256": "535856b8f6ad7dad5e794cbf70be7b925365ddcbd32d983707e248e01d1c85a5",
+            "size": 13546924
+          },
+          {
+            "member": "gis_osm_water_a_free_1.shx",
+            "path": "sources/geofabrik/languedoc-roussillon/gis_osm_water_a_free_1.shx",
+            "sha256": "38677b85a3c41c9991c7e165bca6e90c2cf0945b22e633ff64d59d83a5a998b1",
+            "size": 119604
+          }
+        ],
+        "last_modified": "Sat, 31 Oct 2026 01:26:06 GMT",
+        "license": "ODbL 1.0",
+        "provider": "Geofabrik / OpenStreetMap",
+        "retrieved_utc": "2026-10-31T22:17:39.751240+00:00",
+        "url": "https://download.geofabrik.de/europe/france/languedoc-roussillon-261030-free.shp.zip"
+      },
+      "limousin": {
+        "archive_size": 198091408,
+        "bytes_transferred": 13542032,
+        "etag": "\"bcea290-65f1a2ed2f574\"",
+        "files": [
+          {
+            "member": "gis_osm_water_a_free_1.cpg",
+            "path": "gis_osm_water_a_free_1.cpg",
+            "sha256": "146d6789ffe033a5297c1ad046e6a62ee35319b86b021444f05b6ea2aa8a1f4a",
+            "size": 6
+          },
+          {
+            "member": "gis_osm_water_a_free_1.dbf",
+            "path": "gis_osm_water_a_free_1.dbf",
+            "sha256": "0db492d4d15d39d349640c2af8c01393abdcb2b3792e346742bb27af4ab88e86",
+            "size": 3276147
+          },
+          {
+            "member": "gis_osm_water_a_free_1.prj",
+            "path": "gis_osm_water_a_free_1.prj",
+            "sha256": "ffc9162903c37f0867d1e7f36c20036a165f7aa555dda24c1ae0ee4328d2977f",
+            "size": 144
+          },
+          {
+            "member": "gis_osm_water_a_free_1.shp",
+            "path": "gis_osm_water_a_free_1.shp",
+            "sha256": "8c10055e7584045bf3cda5d73c2f49ca9d38921dd71fa37655b82f202715f676",
+            "size": 11315936
+          },
+          {
+            "member": "gis_osm_water_a_free_1.shx",
+            "path": "gis_osm_water_a_free_1.shx",
+            "sha256": "36e7cf534e97ac20a2983e4b113c556b6ba0a33f890c7f2627034dfa9e7a86cb",
+            "size": 180844
+          }
+        ],
+        "last_modified": "Sat, 31 Oct 2026 03:05:19 GMT",
+        "license": "ODbL 1.0",
+        "provider": "Geofabrik / OpenStreetMap",
+        "retrieved_utc": "2026-11-01T21:53:18.030261+00:00",
+        "url": "https://download.geofabrik.de/europe/france/limousin-261030-free.shp.zip"
+      },
+      "lorraine": {
+        "archive_size": 313840194,
+        "bytes_transferred": 11850306,
+        "etag": "\"12b4d242-65f18778fae87\"",
+        "files": [
+          {
+            "member": "gis_osm_water_a_free_1.cpg",
+            "path": "gis_osm_water_a_free_1.cpg",
+            "sha256": "146d6789ffe033a5297c1ad046e6a62ee35319b86b021444f05b6ea2aa8a1f4a",
+            "size": 6
+          },
+          {
+            "member": "gis_osm_water_a_free_1.dbf",
+            "path": "gis_osm_water_a_free_1.dbf",
+            "sha256": "d9e14c0990275ad18ec2e156b7413468374bb46180e9d4efdfedb6909b7e7c24",
+            "size": 2453852
+          },
+          {
+            "member": "gis_osm_water_a_free_1.prj",
+            "path": "gis_osm_water_a_free_1.prj",
+            "sha256": "ffc9162903c37f0867d1e7f36c20036a165f7aa555dda24c1ae0ee4328d2977f",
+            "size": 144
+          },
+          {
+            "member": "gis_osm_water_a_free_1.shp",
+            "path": "gis_osm_water_a_free_1.shp",
+            "sha256": "6cf11fc291ddc2120b24dac0ca4fbc92d3a14427b52ce018d328d67e648e3f84",
+            "size": 8230888
+          },
+          {
+            "member": "gis_osm_water_a_free_1.shx",
+            "path": "gis_osm_water_a_free_1.shx",
+            "sha256": "ad220373aeb0477bbe4abd481a6fed7de45bff6505393ea8f857e9b4973406d7",
+            "size": 135476
+          }
+        ],
+        "last_modified": "Sat, 31 Oct 2026 01:02:30 GMT",
+        "license": "ODbL 1.0",
+        "provider": "Geofabrik / OpenStreetMap",
+        "retrieved_utc": "2026-11-01T21:53:28.373429+00:00",
+        "url": "https://download.geofabrik.de/europe/france/lorraine-261030-free.shp.zip"
+      },
+      "luxembourg": {
+        "archive_size": 85789195,
+        "bytes_transferred": 6097419,
+        "etag": "\"51d0a0b-65f18f0486ae8\"",
+        "files": [
+          {
+            "member": "gis_osm_water_a_free_1.cpg",
+            "path": "gis_osm_water_a_free_1.cpg",
+            "sha256": "146d6789ffe033a5297c1ad046e6a62ee35319b86b021444f05b6ea2aa8a1f4a",
+            "size": 6
+          },
+          {
+            "member": "gis_osm_water_a_free_1.dbf",
+            "path": "gis_osm_water_a_free_1.dbf",
+            "sha256": "b903de5ebb99da0b1a2bd1fae201230b97278f58524a06ddde9ac11c786a2a46",
+            "size": 773157
+          },
+          {
+            "member": "gis_osm_water_a_free_1.prj",
+            "path": "gis_osm_water_a_free_1.prj",
+            "sha256": "ffc9162903c37f0867d1e7f36c20036a165f7aa555dda24c1ae0ee4328d2977f",
+            "size": 144
+          },
+          {
+            "member": "gis_osm_water_a_free_1.shp",
+            "path": "gis_osm_water_a_free_1.shp",
+            "sha256": "a58f7dbb6c15e4ed88a29a4d13537a37c842b41d28a145834af4f3ef2ff17312",
+            "size": 1842864
+          },
+          {
+            "member": "gis_osm_water_a_free_1.shx",
+            "path": "gis_osm_water_a_free_1.shx",
+            "sha256": "037ce38540b3017abaa8dbd682c1c78954046c230b245d7d046243045952b218",
+            "size": 42748
+          }
+        ],
+        "last_modified": "Sat, 31 Oct 2026 01:36:15 GMT",
+        "license": "ODbL 1.0",
+        "provider": "Geofabrik / OpenStreetMap",
+        "retrieved_utc": "2026-11-01T23:00:11.485452+00:00",
+        "url": "https://download.geofabrik.de/europe/luxembourg-261030-free.shp.zip"
+      },
+      "midi-pyrenees": {
+        "archive_size": 696059467,
+        "bytes_transferred": 20776523,
+        "etag": "\"297d064b-65f1a24a21da5\"",
+        "files": [
+          {
+            "member": "gis_osm_water_a_free_1.cpg",
+            "path": "gis_osm_water_a_free_1.cpg",
+            "sha256": "146d6789ffe033a5297c1ad046e6a62ee35319b86b021444f05b6ea2aa8a1f4a",
+            "size": 6
+          },
+          {
+            "member": "gis_osm_water_a_free_1.dbf",
+            "path": "gis_osm_water_a_free_1.dbf",
+            "sha256": "7ee5a34231a2d46d336aa1a038389aa3b4b3abe8ccef38be99fd5cd8ad36e0e1",
+            "size": 4916387
+          },
+          {
+            "member": "gis_osm_water_a_free_1.prj",
+            "path": "gis_osm_water_a_free_1.prj",
+            "sha256": "ffc9162903c37f0867d1e7f36c20036a165f7aa555dda24c1ae0ee4328d2977f",
+            "size": 144
+          },
+          {
+            "member": "gis_osm_water_a_free_1.shp",
+            "path": "gis_osm_water_a_free_1.shp",
+            "sha256": "9801e08fa9d4a360e14981de49bb510e9e502a9cc81031af87cb1568ecb7e9d1",
+            "size": 15894192
+          },
+          {
+            "member": "gis_osm_water_a_free_1.shx",
+            "path": "gis_osm_water_a_free_1.shx",
+            "sha256": "e3ca1ac8f645e91c5e4530b58a2b4223228c2f3214ba032e6940310a99ff50d2",
+            "size": 271340
+          }
+        ],
+        "last_modified": "Sat, 31 Oct 2026 03:02:28 GMT",
+        "license": "ODbL 1.0",
+        "provider": "Geofabrik / OpenStreetMap",
+        "retrieved_utc": "2026-11-01T21:53:42.850213+00:00",
+        "url": "https://download.geofabrik.de/europe/france/midi-pyrenees-261030-free.shp.zip"
+      },
+      "monaco": {
+        "archive_size": 746919,
+        "bytes_transferred": 746919,
+        "etag": "\"b65a7-65f187763dfa0\"",
+        "files": [
+          {
+            "member": "gis_osm_water_a_free_1.cpg",
+            "path": "gis_osm_water_a_free_1.cpg",
+            "sha256": "146d6789ffe033a5297c1ad046e6a62ee35319b86b021444f05b6ea2aa8a1f4a",
+            "size": 6
+          },
+          {
+            "member": "gis_osm_water_a_free_1.dbf",
+            "path": "gis_osm_water_a_free_1.dbf",
+            "sha256": "e2575453257eaf81830254063a1a66b041f0eff7fad5e71ee493b0911bcf7826",
+            "size": 3787
+          },
+          {
+            "member": "gis_osm_water_a_free_1.prj",
+            "path": "gis_osm_water_a_free_1.prj",
+            "sha256": "ffc9162903c37f0867d1e7f36c20036a165f7aa555dda24c1ae0ee4328d2977f",
+            "size": 144
+          },
+          {
+            "member": "gis_osm_water_a_free_1.shp",
+            "path": "gis_osm_water_a_free_1.shp",
+            "sha256": "a3d99aec9afbe983d660564f14fac7799dcf7211c315f98bb9bfe16749af5fc5",
+            "size": 9756
+          },
+          {
+            "member": "gis_osm_water_a_free_1.shx",
+            "path": "gis_osm_water_a_free_1.shx",
+            "sha256": "c7b59835b4c5f882704287720863bd2e8be8fb9345f065a3dabc40276b4fe815",
+            "size": 300
+          }
+        ],
+        "last_modified": "Sat, 31 Oct 2026 01:02:27 GMT",
+        "license": "ODbL 1.0",
+        "provider": "Geofabrik / OpenStreetMap",
+        "retrieved_utc": "2026-11-01T23:00:12.305972+00:00",
+        "url": "https://download.geofabrik.de/europe/monaco-261030-free.shp.zip"
+      },
+      "navarra": {
+        "archive_size": 75021132,
+        "bytes_transferred": 7912268,
+        "etag": "\"478bb4c-65f1afbe49064\"",
+        "files": [
+          {
+            "member": "gis_osm_water_a_free_1.cpg",
+            "path": "gis_osm_water_a_free_1.cpg",
+            "sha256": "146d6789ffe033a5297c1ad046e6a62ee35319b86b021444f05b6ea2aa8a1f4a",
+            "size": 6
+          },
+          {
+            "member": "gis_osm_water_a_free_1.dbf",
+            "path": "gis_osm_water_a_free_1.dbf",
+            "sha256": "16b1ab2e0ec5c6ce9b28e8a85ae85f36176e73bb58e28b0cbbf42a31f2c1e836",
+            "size": 337287
+          },
+          {
+            "member": "gis_osm_water_a_free_1.prj",
+            "path": "gis_osm_water_a_free_1.prj",
+            "sha256": "ffc9162903c37f0867d1e7f36c20036a165f7aa555dda24c1ae0ee4328d2977f",
+            "size": 144
+          },
+          {
+            "member": "gis_osm_water_a_free_1.shp",
+            "path": "gis_osm_water_a_free_1.shp",
+            "sha256": "71bf9e617478f4f703b9dbf37088ba82e90957e44bcbaf6c8315ab8be7b0955d",
+            "size": 1213092
+          },
+          {
+            "member": "gis_osm_water_a_free_1.shx",
+            "path": "gis_osm_water_a_free_1.shx",
+            "sha256": "a3dab4dcbe29c411b6f5322e5ee503adc50f14d928253d2035b4ecc8ae0c3cdc",
+            "size": 18700
+          }
+        ],
+        "last_modified": "Sat, 31 Oct 2026 04:02:40 GMT",
+        "license": "ODbL 1.0",
+        "provider": "Geofabrik / OpenStreetMap",
+        "retrieved_utc": "2026-11-01T23:01:01.199863+00:00",
+        "url": "https://download.geofabrik.de/europe/spain/navarra-261030-free.shp.zip"
+      },
+      "nord-ovest": {
+        "archive_size": 1101681423,
+        "bytes_transferred": 19550991,
+        "etag": "\"41aa530f-65f1a8f66cfc7\"",
+        "files": [
+          {
+            "member": "gis_osm_water_a_free_1.cpg",
+            "path": "gis_osm_water_a_free_1.cpg",
+            "sha256": "146d6789ffe033a5297c1ad046e6a62ee35319b86b021444f05b6ea2aa8a1f4a",
+            "size": 6
+          },
+          {
+            "member": "gis_osm_water_a_free_1.dbf",
+            "path": "gis_osm_water_a_free_1.dbf",
+            "sha256": "6efaf0db10e3ff5c0860b9e1b7921f8232db768c913069746a29e558efbe48b3",
+            "size": 3479872
+          },
+          {
+            "member": "gis_osm_water_a_free_1.prj",
+            "path": "gis_osm_water_a_free_1.prj",
+            "sha256": "ffc9162903c37f0867d1e7f36c20036a165f7aa555dda24c1ae0ee4328d2977f",
+            "size": 144
+          },
+          {
+            "member": "gis_osm_water_a_free_1.shp",
+            "path": "gis_osm_water_a_free_1.shp",
+            "sha256": "6c7385f7da55ce6b5aa354855d5b613622f229f2aa3b9baf6f3275de15610655",
+            "size": 17447836
+          },
+          {
+            "member": "gis_osm_water_a_free_1.shx",
+            "path": "gis_osm_water_a_free_1.shx",
+            "sha256": "976b038dcd8c90025cbceedce10feae597c2455e0118ec4bd036f71ec4eee1c0",
+            "size": 192084
+          }
+        ],
+        "last_modified": "Sat, 31 Oct 2026 03:32:19 GMT",
+        "license": "ODbL 1.0",
+        "provider": "Geofabrik / OpenStreetMap",
+        "retrieved_utc": "2026-11-01T23:00:21.915635+00:00",
+        "url": "https://download.geofabrik.de/europe/italy/nord-ovest-261030-free.shp.zip"
+      },
+      "nord-pas-de-calais": {
+        "archive_size": 435665609,
+        "bytes_transferred": 12040905,
+        "etag": "\"19f7bac9-65f1a8ed87df7\"",
+        "files": [
+          {
+            "member": "gis_osm_water_a_free_1.cpg",
+            "path": "gis_osm_water_a_free_1.cpg",
+            "sha256": "146d6789ffe033a5297c1ad046e6a62ee35319b86b021444f05b6ea2aa8a1f4a",
+            "size": 6
+          },
+          {
+            "member": "gis_osm_water_a_free_1.dbf",
+            "path": "gis_osm_water_a_free_1.dbf",
+            "sha256": "d5a5a31cb32616d521ca4be0667a9c6005a01945b1add79c07b101b29db63653",
+            "size": 3280497
+          },
+          {
+            "member": "gis_osm_water_a_free_1.prj",
+            "path": "gis_osm_water_a_free_1.prj",
+            "sha256": "ffc9162903c37f0867d1e7f36c20036a165f7aa555dda24c1ae0ee4328d2977f",
+            "size": 144
+          },
+          {
+            "member": "gis_osm_water_a_free_1.shp",
+            "path": "gis_osm_water_a_free_1.shp",
+            "sha256": "98fc23b71ff928d003f4819cba6cf282cef68846ee5cd06d33c1e5887996f540",
+            "size": 11351068
+          },
+          {
+            "member": "gis_osm_water_a_free_1.shx",
+            "path": "gis_osm_water_a_free_1.shx",
+            "sha256": "7dd2916b451fb6920f0dd6144fa25a5a950ec017148d3a0668d38ba4aa98156a",
+            "size": 181084
+          }
+        ],
+        "last_modified": "Sat, 31 Oct 2026 03:32:10 GMT",
+        "license": "ODbL 1.0",
+        "provider": "Geofabrik / OpenStreetMap",
+        "retrieved_utc": "2026-11-01T21:53:50.477268+00:00",
+        "url": "https://download.geofabrik.de/europe/france/nord-pas-de-calais-261030-free.shp.zip"
+      },
+      "pais-vasco": {
+        "archive_size": 144749132,
+        "bytes_transferred": 6337100,
+        "etag": "\"8a0b24c-65f1afaba5ff6\"",
+        "files": [
+          {
+            "member": "gis_osm_water_a_free_1.cpg",
+            "path": "gis_osm_water_a_free_1.cpg",
+            "sha256": "146d6789ffe033a5297c1ad046e6a62ee35319b86b021444f05b6ea2aa8a1f4a",
+            "size": 6
+          },
+          {
+            "member": "gis_osm_water_a_free_1.dbf",
+            "path": "gis_osm_water_a_free_1.dbf",
+            "sha256": "12252d25a0067672a1001304c8a723ce90893700f3137a435fe804bd82939b2e",
+            "size": 293062
+          },
+          {
+            "member": "gis_osm_water_a_free_1.prj",
+            "path": "gis_osm_water_a_free_1.prj",
+            "sha256": "ffc9162903c37f0867d1e7f36c20036a165f7aa555dda24c1ae0ee4328d2977f",
+            "size": 144
+          },
+          {
+            "member": "gis_osm_water_a_free_1.shp",
+            "path": "gis_osm_water_a_free_1.shp",
+            "sha256": "e0d4859d3f2a8b8b4593dee03c698ba14d4ec081e7cc0273b4692ec43ee6358d",
+            "size": 1456808
+          },
+          {
+            "member": "gis_osm_water_a_free_1.shx",
+            "path": "gis_osm_water_a_free_1.shx",
+            "sha256": "162f0125c26097537d0cae2bf6916456fa52ec58f72c831c73cc3ff7a75b3c44",
+            "size": 16260
+          }
+        ],
+        "last_modified": "Sat, 31 Oct 2026 04:02:20 GMT",
+        "license": "ODbL 1.0",
+        "provider": "Geofabrik / OpenStreetMap",
+        "retrieved_utc": "2026-11-01T23:01:05.532757+00:00",
+        "url": "https://download.geofabrik.de/europe/spain/pais-vasco-261030-free.shp.zip"
+      },
+      "pays-de-la-loire": {
+        "archive_size": 669775588,
+        "bytes_transferred": 49018596,
+        "etag": "\"27ebf6e4-65f194e1389f2\"",
+        "files": [
+          {
+            "member": "gis_osm_water_a_free_1.cpg",
+            "path": "gis_osm_water_a_free_1.cpg",
+            "sha256": "146d6789ffe033a5297c1ad046e6a62ee35319b86b021444f05b6ea2aa8a1f4a",
+            "size": 6
+          },
+          {
+            "member": "gis_osm_water_a_free_1.dbf",
+            "path": "gis_osm_water_a_free_1.dbf",
+            "sha256": "c78a43e6143f490f07e086189880e56e725034c391089a7bbfff8ca34f94e658",
+            "size": 16370662
+          },
+          {
+            "member": "gis_osm_water_a_free_1.prj",
+            "path": "gis_osm_water_a_free_1.prj",
+            "sha256": "ffc9162903c37f0867d1e7f36c20036a165f7aa555dda24c1ae0ee4328d2977f",
+            "size": 144
+          },
+          {
+            "member": "gis_osm_water_a_free_1.shp",
+            "path": "gis_osm_water_a_free_1.shp",
+            "sha256": "9fade5415f9ac24cc27e7c05253a1c8af1565d4c4c2b8141f3bf505b86aa0d53",
+            "size": 62520052
+          },
+          {
+            "member": "gis_osm_water_a_free_1.shx",
+            "path": "gis_osm_water_a_free_1.shx",
+            "sha256": "136bc88cd76cc43b0d1056679b79a4f5a2c45d1045acd987a592025c2c9e14c5",
+            "size": 903300
+          }
+        ],
+        "last_modified": "Sat, 31 Oct 2026 02:02:28 GMT",
+        "license": "ODbL 1.0",
+        "provider": "Geofabrik / OpenStreetMap",
+        "retrieved_utc": "2026-11-01T21:54:13.724289+00:00",
+        "url": "https://download.geofabrik.de/europe/france/pays-de-la-loire-261030-free.shp.zip"
+      },
+      "picardie": {
+        "archive_size": 268969454,
+        "bytes_transferred": 13116910,
+        "files": [
+          {
+            "member": "gis_osm_water_a_free_1.cpg",
+            "path": "sources/geofabrik/picardie/gis_osm_water_a_free_1.cpg",
+            "sha256": "146d6789ffe033a5297c1ad046e6a62ee35319b86b021444f05b6ea2aa8a1f4a",
+            "size": 6
+          },
+          {
+            "member": "gis_osm_water_a_free_1.dbf",
+            "path": "sources/geofabrik/picardie/gis_osm_water_a_free_1.dbf",
+            "sha256": "73d0fadaf2fd21a8117fcb99cf9d8cee17302079666bbe5ad2492c43c2da1e68",
+            "size": 2711517
+          },
+          {
+            "member": "gis_osm_water_a_free_1.prj",
+            "path": "sources/geofabrik/picardie/gis_osm_water_a_free_1.prj",
+            "sha256": "ffc9162903c37f0867d1e7f36c20036a165f7aa555dda24c1ae0ee4328d2977f",
+            "size": 144
+          },
+          {
+            "member": "gis_osm_water_a_free_1.shp",
+            "path": "sources/geofabrik/picardie/gis_osm_water_a_free_1.shp",
+            "sha256": "af8ddac49052a3115ee30eba452fefa6259cee6cba1df52e8af4c9e12c3f88ff",
+            "size": 10002196
+          },
+          {
+            "member": "gis_osm_water_a_free_1.shx",
+            "path": "sources/geofabrik/picardie/gis_osm_water_a_free_1.shx",
+            "sha256": "5675378cf133eb00bfdbe9935342be9b6d6968077bb54130a6717604fb97ccc0",
+            "size": 149692
+          }
+        ],
+        "last_modified": "Sat, 31 Oct 2026 02:05:49 GMT",
+        "license": "ODbL 1.0",
+        "provider": "Geofabrik / OpenStreetMap",
+        "retrieved_utc": "2026-10-31T22:19:15.997960+00:00",
+        "url": "https://download.geofabrik.de/europe/france/picardie-261030-free.shp.zip"
+      },
+      "poitou-charentes": {
+        "archive_size": 417014534,
+        "bytes_transferred": 22749958,
+        "files": [
+          {
+            "member": "gis_osm_water_a_free_1.cpg",
+            "path": "sources/geofabrik/poitou-charentes/gis_osm_water_a_free_1.cpg",
+            "sha256": "146d6789ffe033a5297c1ad046e6a62ee35319b86b021444f05b6ea2aa8a1f4a",
+            "size": 6
+          },
+          {
+            "member": "gis_osm_water_a_free_1.dbf",
+            "path": "sources/geofabrik/poitou-charentes/gis_osm_water_a_free_1.dbf",
+            "sha256": "8f57778f9690956c5a620bb9681c7fc7c5beb6f5299d8e1cb80490fa351b9412",
+            "size": 6886212
+          },
+          {
+            "member": "gis_osm_water_a_free_1.prj",
+            "path": "sources/geofabrik/poitou-charentes/gis_osm_water_a_free_1.prj",
+            "sha256": "ffc9162903c37f0867d1e7f36c20036a165f7aa555dda24c1ae0ee4328d2977f",
+            "size": 144
+          },
+          {
+            "member": "gis_osm_water_a_free_1.shp",
+            "path": "sources/geofabrik/poitou-charentes/gis_osm_water_a_free_1.shp",
+            "sha256": "916440a6210d34bdacc0925c92c41ceefb58e1750e0b8a28c499c68a078e07b4",
+            "size": 24324504
+          },
+          {
+            "member": "gis_osm_water_a_free_1.shx",
+            "path": "sources/geofabrik/poitou-charentes/gis_osm_water_a_free_1.shx",
+            "sha256": "19ac7f0310d4b4bb2e22f4ebab44db0817c584671c737424eed0e0b1892e2618",
+            "size": 380020
+          }
+        ],
+        "last_modified": "Sat, 31 Oct 2026 00:32:34 GMT",
+        "license": "ODbL 1.0",
+        "provider": "Geofabrik / OpenStreetMap",
+        "retrieved_utc": "2026-10-31T22:18:54.861436+00:00",
+        "url": "https://download.geofabrik.de/europe/france/poitou-charentes-261030-free.shp.zip"
+      },
+      "provence-alpes-cote-d-azur": {
+        "archive_size": 650701797,
+        "bytes_transferred": 13167589,
+        "files": [
+          {
+            "member": "gis_osm_water_a_free_1.cpg",
+            "path": "sources/geofabrik/provence-alpes-cote-d-azur/gis_osm_water_a_free_1.cpg",
+            "sha256": "146d6789ffe033a5297c1ad046e6a62ee35319b86b021444f05b6ea2aa8a1f4a",
+            "size": 6
+          },
+          {
+            "member": "gis_osm_water_a_free_1.dbf",
+            "path": "sources/geofabrik/provence-alpes-cote-d-azur/gis_osm_water_a_free_1.dbf",
+            "sha256": "02662369dd15858954f3b0bbc3e7bc2d9aecde402a1d149a6006eca6ec3533ad",
+            "size": 2186762
+          },
+          {
+            "member": "gis_osm_water_a_free_1.prj",
+            "path": "sources/geofabrik/provence-alpes-cote-d-azur/gis_osm_water_a_free_1.prj",
+            "sha256": "ffc9162903c37f0867d1e7f36c20036a165f7aa555dda24c1ae0ee4328d2977f",
+            "size": 144
+          },
+          {
+            "member": "gis_osm_water_a_free_1.shp",
+            "path": "sources/geofabrik/provence-alpes-cote-d-azur/gis_osm_water_a_free_1.shp",
+            "sha256": "9b9ac8c31d96168f6bbea93a408dfc653a41b153ce5d07d1c59c919c48aa528f",
+            "size": 12253528
+          },
+          {
+            "member": "gis_osm_water_a_free_1.shx",
+            "path": "sources/geofabrik/provence-alpes-cote-d-azur/gis_osm_water_a_free_1.shx",
+            "sha256": "4dc9a2b076fff70ce1c7e8f64c489c948b6ff75b2e82c63bc28ca43de110af97",
+            "size": 120740
+          }
+        ],
+        "last_modified": "Sat, 31 Oct 2026 02:14:04 GMT",
+        "license": "ODbL 1.0",
+        "provider": "Geofabrik / OpenStreetMap",
+        "retrieved_utc": "2026-10-31T22:17:41.592700+00:00",
+        "url": "https://download.geofabrik.de/europe/france/provence-alpes-cote-d-azur-261030-free.shp.zip"
+      },
+      "rheinland-pfalz": {
+        "archive_size": 471324316,
+        "bytes_transferred": 9950876,
+        "etag": "\"1c17d69c-65f19512cd936\"",
+        "files": [
+          {
+            "member": "gis_osm_water_a_free_1.cpg",
+            "path": "gis_osm_water_a_free_1.cpg",
+            "sha256": "146d6789ffe033a5297c1ad046e6a62ee35319b86b021444f05b6ea2aa8a1f4a",
+            "size": 6
+          },
+          {
+            "member": "gis_osm_water_a_free_1.dbf",
+            "path": "gis_osm_water_a_free_1.dbf",
+            "sha256": "dc2d6b3fb49588981d78fe09e5859d57d96e01abade4ab431f28cd6a07a7fe7b",
+            "size": 2408177
+          },
+          {
+            "member": "gis_osm_water_a_free_1.prj",
+            "path": "gis_osm_water_a_free_1.prj",
+            "sha256": "ffc9162903c37f0867d1e7f36c20036a165f7aa555dda24c1ae0ee4328d2977f",
+            "size": 144
+          },
+          {
+            "member": "gis_osm_water_a_free_1.shp",
+            "path": "gis_osm_water_a_free_1.shp",
+            "sha256": "9ba06dc064d6d39a8f11f3b201c7d75323d8d7b412ea69e66a68eef07054561f",
+            "size": 6587120
+          },
+          {
+            "member": "gis_osm_water_a_free_1.shx",
+            "path": "gis_osm_water_a_free_1.shx",
+            "sha256": "75c76b876530d514ebf0a661277fb55491a5a76c01c7a7cce5b97f580347ad13",
+            "size": 132956
+          }
+        ],
+        "last_modified": "Sat, 31 Oct 2026 02:03:20 GMT",
+        "license": "ODbL 1.0",
+        "provider": "Geofabrik / OpenStreetMap",
+        "retrieved_utc": "2026-11-01T23:00:27.004630+00:00",
+        "url": "https://download.geofabrik.de/europe/germany/rheinland-pfalz-261030-free.shp.zip"
+      },
+      "rhone-alpes": {
+        "archive_size": 921344682,
+        "bytes_transferred": 23763626,
+        "files": [
+          {
+            "member": "gis_osm_water_a_free_1.cpg",
+            "path": "sources/geofabrik/rhone-alpes/gis_osm_water_a_free_1.cpg",
+            "sha256": "146d6789ffe033a5297c1ad046e6a62ee35319b86b021444f05b6ea2aa8a1f4a",
+            "size": 6
+          },
+          {
+            "member": "gis_osm_water_a_free_1.dbf",
+            "path": "sources/geofabrik/rhone-alpes/gis_osm_water_a_free_1.dbf",
+            "sha256": "2af188964dea697e8ffb931bf29cd3ad33361c618d373a071e5ec1a87ebf2761",
+            "size": 5584257
+          },
+          {
+            "member": "gis_osm_water_a_free_1.prj",
+            "path": "sources/geofabrik/rhone-alpes/gis_osm_water_a_free_1.prj",
+            "sha256": "ffc9162903c37f0867d1e7f36c20036a165f7aa555dda24c1ae0ee4328d2977f",
+            "size": 144
+          },
+          {
+            "member": "gis_osm_water_a_free_1.shp",
+            "path": "sources/geofabrik/rhone-alpes/gis_osm_water_a_free_1.shp",
+            "sha256": "8037cd9650eac2454ab467c76692db53095446a4d3c56ae5a601c00b362799a6",
+            "size": 20493776
+          },
+          {
+            "member": "gis_osm_water_a_free_1.shx",
+            "path": "sources/geofabrik/rhone-alpes/gis_osm_water_a_free_1.shx",
+            "sha256": "d87e2aa568e24182ae3a1f051f313b9af186f2ccaea8bf1dd4e9a32755dffc99",
+            "size": 308188
+          }
+        ],
+        "last_modified": "Sat, 31 Oct 2026 02:40:00 GMT",
+        "license": "ODbL 1.0",
+        "provider": "Geofabrik / OpenStreetMap",
+        "retrieved_utc": "2026-10-31T22:18:32.274533+00:00",
+        "url": "https://download.geofabrik.de/europe/france/rhone-alpes-261030-free.shp.zip"
+      },
+      "saarland": {
+        "archive_size": 87880603,
+        "bytes_transferred": 3994523,
+        "etag": "\"53cf39b-65f18e344b1ed\"",
+        "files": [
+          {
+            "member": "gis_osm_water_a_free_1.cpg",
+            "path": "gis_osm_water_a_free_1.cpg",
+            "sha256": "146d6789ffe033a5297c1ad046e6a62ee35319b86b021444f05b6ea2aa8a1f4a",
+            "size": 6
+          },
+          {
+            "member": "gis_osm_water_a_free_1.dbf",
+            "path": "gis_osm_water_a_free_1.dbf",
+            "sha256": "30e909faed1026c799d9c456bfe251f188cbe225049de044db96b5a455cc824a",
+            "size": 432842
+          },
+          {
+            "member": "gis_osm_water_a_free_1.prj",
+            "path": "gis_osm_water_a_free_1.prj",
+            "sha256": "ffc9162903c37f0867d1e7f36c20036a165f7aa555dda24c1ae0ee4328d2977f",
+            "size": 144
+          },
+          {
+            "member": "gis_osm_water_a_free_1.shp",
+            "path": "gis_osm_water_a_free_1.shp",
+            "sha256": "9080f0476f98f5302a58fa321ef9b5d6d91758796d6ace4e64a9e2f149699ce2",
+            "size": 970336
+          },
+          {
+            "member": "gis_osm_water_a_free_1.shx",
+            "path": "gis_osm_water_a_free_1.shx",
+            "sha256": "57911e47d5a00178ff4cd4f92edf3ac1a8a59ade52003bbd26b6fa46c2f02e92",
+            "size": 23972
+          }
+        ],
+        "last_modified": "Sat, 31 Oct 2026 01:32:37 GMT",
+        "license": "ODbL 1.0",
+        "provider": "Geofabrik / OpenStreetMap",
+        "retrieved_utc": "2026-11-01T23:00:29.690666+00:00",
+        "url": "https://download.geofabrik.de/europe/germany/saarland-261030-free.shp.zip"
+      },
+      "scotland": {
+        "archive_size": 608865481,
+        "bytes_transferred": 46828745,
+        "etag": "\"244a8cc9-65f1959924e63\"",
+        "files": [
+          {
+            "member": "gis_osm_water_a_free_1.cpg",
+            "path": "gis_osm_water_a_free_1.cpg",
+            "sha256": "146d6789ffe033a5297c1ad046e6a62ee35319b86b021444f05b6ea2aa8a1f4a",
+            "size": 6
+          },
+          {
+            "member": "gis_osm_water_a_free_1.dbf",
+            "path": "gis_osm_water_a_free_1.dbf",
+            "sha256": "af40a49908053d0d9e735a845e6c0bebd135bb8bbfaf7dd0d1fd8d2fc1813062",
+            "size": 8943762
+          },
+          {
+            "member": "gis_osm_water_a_free_1.prj",
+            "path": "gis_osm_water_a_free_1.prj",
+            "sha256": "ffc9162903c37f0867d1e7f36c20036a165f7aa555dda24c1ae0ee4328d2977f",
+            "size": 144
+          },
+          {
+            "member": "gis_osm_water_a_free_1.shp",
+            "path": "gis_osm_water_a_free_1.shp",
+            "sha256": "f9365939e9b4a4f0bd0fe707018c5cd2e95154f5c3b1d16656847e546e3446b4",
+            "size": 60531684
+          },
+          {
+            "member": "gis_osm_water_a_free_1.shx",
+            "path": "gis_osm_water_a_free_1.shx",
+            "sha256": "adc23cd68679364017c654a999316c52ebb1ff220afd6721700d47f85976dd23",
+            "size": 493540
+          }
+        ],
+        "last_modified": "Sat, 31 Oct 2026 02:05:41 GMT",
+        "license": "ODbL 1.0",
+        "provider": "Geofabrik / OpenStreetMap",
+        "retrieved_utc": "2026-11-01T21:54:24.892268+00:00",
+        "url": "https://download.geofabrik.de/europe/united-kingdom/scotland-261030-free.shp.zip"
+      },
+      "switzerland": {
+        "archive_size": 928727808,
+        "bytes_transferred": 18563840,
+        "etag": "\"375b4300-65f187734a9a0\"",
+        "files": [
+          {
+            "member": "gis_osm_water_a_free_1.cpg",
+            "path": "gis_osm_water_a_free_1.cpg",
+            "sha256": "146d6789ffe033a5297c1ad046e6a62ee35319b86b021444f05b6ea2aa8a1f4a",
+            "size": 6
+          },
+          {
+            "member": "gis_osm_water_a_free_1.dbf",
+            "path": "gis_osm_water_a_free_1.dbf",
+            "sha256": "384d952d967fa464ef054d2764e9a7f31fc204881c0c575f2f247edb313003a7",
+            "size": 4540547
+          },
+          {
+            "member": "gis_osm_water_a_free_1.prj",
+            "path": "gis_osm_water_a_free_1.prj",
+            "sha256": "ffc9162903c37f0867d1e7f36c20036a165f7aa555dda24c1ae0ee4328d2977f",
+            "size": 144
+          },
+          {
+            "member": "gis_osm_water_a_free_1.shp",
+            "path": "gis_osm_water_a_free_1.shp",
+            "sha256": "3dcddb622cf7482cfeb60d3df4827ec4dd756a2546c672c5fc4c815b98786866",
+            "size": 20922216
+          },
+          {
+            "member": "gis_osm_water_a_free_1.shx",
+            "path": "gis_osm_water_a_free_1.shx",
+            "sha256": "4e4b0bfcc2d5da76c4179390c989d25a8de821bd5b27d9dd72105464c7fd86f2",
+            "size": 250604
+          }
+        ],
+        "last_modified": "Sat, 31 Oct 2026 01:02:24 GMT",
+        "license": "ODbL 1.0",
+        "provider": "Geofabrik / OpenStreetMap",
+        "retrieved_utc": "2026-11-01T23:01:22.657657+00:00",
+        "url": "https://download.geofabrik.de/europe/switzerland-261030-free.shp.zip"
+      },
+      "wales": {
+        "archive_size": 288126134,
+        "bytes_transferred": 19690678,
+        "files": [
+          {
+            "member": "gis_osm_water_a_free_1.cpg",
+            "path": "sources/geofabrik/wales/gis_osm_water_a_free_1.cpg",
+            "sha256": "146d6789ffe033a5297c1ad046e6a62ee35319b86b021444f05b6ea2aa8a1f4a",
+            "size": 6
+          },
+          {
+            "member": "gis_osm_water_a_free_1.dbf",
+            "path": "sources/geofabrik/wales/gis_osm_water_a_free_1.dbf",
+            "sha256": "25e707eaf10009f2f30447cd8c2e430ebaf18a423ebdc07b6fe5d9024db478fd",
+            "size": 2621327
+          },
+          {
+            "member": "gis_osm_water_a_free_1.prj",
+            "path": "sources/geofabrik/wales/gis_osm_water_a_free_1.prj",
+            "sha256": "ffc9162903c37f0867d1e7f36c20036a165f7aa555dda24c1ae0ee4328d2977f",
+            "size": 144
+          },
+          {
+            "member": "gis_osm_water_a_free_1.shp",
+            "path": "sources/geofabrik/wales/gis_osm_water_a_free_1.shp",
+            "sha256": "c04ce2ee9fd7eb10a818cf807b297595ca86f39b2f179a8378b5399b5816121f",
+            "size": 12446108
+          },
+          {
+            "member": "gis_osm_water_a_free_1.shx",
+            "path": "sources/geofabrik/wales/gis_osm_water_a_free_1.shx",
+            "sha256": "a37753c3a8bbd932c2a46499df0b29c3e36ae7969d0562d9a7610aa986d5311b",
+            "size": 144716
+          }
+        ],
+        "last_modified": "Sat, 31 Oct 2026 01:02:44 GMT",
+        "license": "ODbL 1.0",
+        "provider": "Geofabrik / OpenStreetMap",
+        "retrieved_utc": "2026-10-31T22:19:25.409031+00:00",
+        "url": "https://download.geofabrik.de/europe/united-kingdom/wales-261030-free.shp.zip"
+      }
+    },
+    "geofabrik_source_index_sha256": "9b1d170b09eee255c0e56925788eb367646397c1ba1882f36b4c5c79133691fc"
+  },
+  "worldcover": {
+    "product": "ESA WorldCover 2021 v200",
+    "doi": "10.5281/zenodo.7254221",
+    "manifest": {
+      "size": 19059,
+      "sha256": "117d72ce8adcbf7949764f8b7f63f781dcb32b547371fc35aef97ddc8b83f36a"
+    },
+    "tile_count": 24
+  },
+  "geonames": {
+    "schema_version": 1,
+    "feature_codes_source": "src.geonames.FILTERED_FEATURE_CODES",
+    "countries": {
+      "FR": {
+        "source_url": "https://download.geonames.org/export/dump/FR.zip",
+        "source_path": "sources/FR.zip",
+        "downloaded_at": "2026-08-25",
+        "source_sha256": "f39c60910f77bd8dec59ed6ee27a5e2550887b2a3adb3824ba576adb84f86c3c",
+        "extract_path": "extracts/FR.tsv",
+        "extract_sha256": "32dc0a82d48f6cbc062d07138daa935e5591cded7145fbaccf768ef50bb2b6c1",
+        "codes_applied": [
+          "ADM1",
+          "ADM2",
+          "CAPE",
+          "CLDA",
+          "CNYN",
+          "FRST",
+          "GRGE",
+          "HDLD",
+          "HTH",
+          "ISL",
+          "ISLS",
+          "LCTY",
+          "LK",
+          "LKC",
+          "LKN",
+          "LKS",
+          "MT",
+          "MTS",
+          "PASS",
+          "PK",
+          "PKS",
+          "PLAT",
+          "PPL",
+          "PPLA",
+          "PPLA2",
+          "PPLA3",
+          "PPLA4",
+          "PPLA5",
+          "PPLC",
+          "PPLF",
+          "PPLG",
+          "PPLL",
+          "PPLR",
+          "PPLS",
+          "PRK",
+          "PROM",
+          "RESF",
+          "RESN",
+          "RESW",
+          "RGN",
+          "RGNL",
+          "RSV",
+          "SDL",
+          "TUND",
+          "UPLD",
+          "VLC"
+        ]
+      },
+      "ES": {
+        "source_url": "https://download.geonames.org/export/dump/ES.zip",
+        "source_path": "sources/ES.zip",
+        "downloaded_at": "2026-08-25",
+        "source_sha256": "4f488b79a54699b3d178878103052fa89af9b3ef1e1ec0be71d0eeda76b9202c",
+        "extract_path": "extracts/ES.tsv",
+        "extract_sha256": "6cbfe0b981c882435d0a6cf910d4fa451e6bc95a59f3e75dc4e632796fffbf48",
+        "codes_applied": [
+          "ADM1",
+          "ADM2",
+          "CAPE",
+          "CLDA",
+          "CNYN",
+          "FRST",
+          "GRGE",
+          "HDLD",
+          "HTH",
+          "ISL",
+          "ISLS",
+          "LCTY",
+          "LK",
+          "LKC",
+          "LKN",
+          "LKS",
+          "MT",
+          "MTS",
+          "PASS",
+          "PK",
+          "PKS",
+          "PLAT",
+          "PPL",
+          "PPLA",
+          "PPLA2",
+          "PPLA3",
+          "PPLA4",
+          "PPLA5",
+          "PPLC",
+          "PPLF",
+          "PPLG",
+          "PPLL",
+          "PPLR",
+          "PPLS",
+          "PRK",
+          "PROM",
+          "RESF",
+          "RESN",
+          "RESW",
+          "RGN",
+          "RGNL",
+          "RSV",
+          "SDL",
+          "TUND",
+          "UPLD",
+          "VLC"
+        ]
+      },
+      "GB": {
+        "source_url": "https://download.geonames.org/export/dump/GB.zip",
+        "source_path": "sources/GB.zip",
+        "downloaded_at": "2026-08-25",
+        "source_sha256": "eaeab49c89415f5b3a11827c8922a830aadf9fed0b78076b30b5ba27bad25c70",
+        "extract_path": "extracts/GB.tsv",
+        "extract_sha256": "4c6368f6722988ad539c4ba83541ed680d129425072ba8ff7885788c99c90917",
+        "codes_applied": [
+          "ADM1",
+          "ADM2",
+          "CAPE",
+          "CLDA",
+          "CNYN",
+          "FRST",
+          "GRGE",
+          "HDLD",
+          "HTH",
+          "ISL",
+          "ISLS",
+          "LCTY",
+          "LK",
+          "LKC",
+          "LKN",
+          "LKS",
+          "MT",
+          "MTS",
+          "PASS",
+          "PK",
+          "PKS",
+          "PLAT",
+          "PPL",
+          "PPLA",
+          "PPLA2",
+          "PPLA3",
+          "PPLA4",
+          "PPLA5",
+          "PPLC",
+          "PPLF",
+          "PPLG",
+          "PPLL",
+          "PPLR",
+          "PPLS",
+          "PRK",
+          "PROM",
+          "RESF",
+          "RESN",
+          "RESW",
+          "RGN",
+          "RGNL",
+          "RSV",
+          "SDL",
+          "TUND",
+          "UPLD",
+          "VLC"
+        ]
+      },
+      "IE": {
+        "source_url": "https://download.geonames.org/export/dump/IE.zip",
+        "source_path": "sources/IE.zip",
+        "downloaded_at": "2026-08-27",
+        "source_sha256": "145fe7e1d3f5d172fe0d2a77f71e41f30e4096c17644a0879d72c4c682f351d5",
+        "extract_path": "extracts/IE.tsv",
+        "extract_sha256": "2fcdca3454f0ff8490a10000a44cdd3b4893b456c805282a039f923f914256ef",
+        "codes_applied": [
+          "ADM1",
+          "ADM2",
+          "CAPE",
+          "CLDA",
+          "CNYN",
+          "FRST",
+          "GRGE",
+          "HDLD",
+          "HTH",
+          "ISL",
+          "ISLS",
+          "LCTY",
+          "LK",
+          "LKC",
+          "LKN",
+          "LKS",
+          "MT",
+          "MTS",
+          "PASS",
+          "PK",
+          "PKS",
+          "PLAT",
+          "PPL",
+          "PPLA",
+          "PPLA2",
+          "PPLA3",
+          "PPLA4",
+          "PPLA5",
+          "PPLC",
+          "PPLF",
+          "PPLG",
+          "PPLL",
+          "PPLR",
+          "PPLS",
+          "PRK",
+          "PROM",
+          "RESF",
+          "RESN",
+          "RESW",
+          "RGN",
+          "RGNL",
+          "RSV",
+          "SDL",
+          "TUND",
+          "UPLD",
+          "VLC"
+        ]
+      }
+    },
+    "cities500_text_matches_retained_archive_member": true
+  },
+  "natural_earth": {
+    "version": "5.1.1",
+    "layers": [
+      "ne_10m_land",
+      "ne_10m_admin_0_countries"
+    ]
+  },
+  "copernicus": {
+    "product": "GLO-30 DGED and WBM",
+    "versions": [
+      "2024_1"
+    ]
+  },
+  "retained_local_file_checksums": {
+    "data/cities500.zip": {
+      "size": 13479238,
+      "sha256": "27d43f97396380ba0df7b0477f307363653ae47722848812eabef3f98e6a36e1"
+    },
+    "data/cities500.txt": {
+      "size": 40554704,
+      "sha256": "a5a2363a0a0a24a48d9b49b4c4b28ee81a89f4ea9a1298e276606961b89ba65c"
+    },
+    "data/geonames/manifest.yaml": {
+      "size": 3479,
+      "sha256": "d79d062796fb8228730a25e590e592ac26d64373db54619469b949c1419dc5ec"
+    },
+    "data/geonames/extracts/ES.tsv": {
+      "size": 1650265,
+      "sha256": "6cbfe0b981c882435d0a6cf910d4fa451e6bc95a59f3e75dc4e632796fffbf48"
+    },
+    "data/geonames/extracts/FR.tsv": {
+      "size": 4229631,
+      "sha256": "32dc0a82d48f6cbc062d07138daa935e5591cded7145fbaccf768ef50bb2b6c1"
+    },
+    "data/geonames/extracts/GB.tsv": {
+      "size": 1898603,
+      "sha256": "4c6368f6722988ad539c4ba83541ed680d129425072ba8ff7885788c99c90917"
+    },
+    "data/geonames/extracts/IE.tsv": {
+      "size": 886222,
+      "sha256": "2fcdca3454f0ff8490a10000a44cdd3b4893b456c805282a039f923f914256ef"
+    },
+    "data/natural_earth/README.md": {
+      "size": 1173,
+      "sha256": "76830985b25a7335790ee7f9ec00bf38dfe1432931b4a9be18f67a628a0e4e15"
+    },
+    "data/natural_earth/ne_10m_admin_0_countries.VERSION.txt": {
+      "size": 6,
+      "sha256": "f9893302cd3158f3b5aea394dcd2a91574869e9e6ff69e9235b10a3bf8c983fb"
+    },
+    "data/natural_earth/ne_10m_admin_0_countries.cpg": {
+      "size": 5,
+      "sha256": "3ad3031f5503a4404af825262ee8232cc04d4ea6683d42c5dd0a2f2a27ac9824"
+    },
+    "data/natural_earth/ne_10m_admin_0_countries.dbf": {
+      "size": 878482,
+      "sha256": "c5dbd3dd5fd7e2ef49051fc88562c03819e8ea63a382642df6eadd1243bf4b49"
+    },
+    "data/natural_earth/ne_10m_admin_0_countries.prj": {
+      "size": 145,
+      "sha256": "a02a27b1d1982c8516d83398e85a3c8b1aef1713c13ef4d84d7bde17430c07c4"
+    },
+    "data/natural_earth/ne_10m_admin_0_countries.shp": {
+      "size": 8806224,
+      "sha256": "7ce119ef6342e43cff7c0c3004e0911ab7ec1988a14734372031d2012180e7bc"
+    },
+    "data/natural_earth/ne_10m_admin_0_countries.shx": {
+      "size": 2164,
+      "sha256": "ca19ec112d054c77bc8f7ac00e3b110d5dff32cc9bcf4cd1b8b66bdd0f611d32"
+    },
+    "data/natural_earth/ne_10m_land.VERSION.txt": {
+      "size": 6,
+      "sha256": "f9893302cd3158f3b5aea394dcd2a91574869e9e6ff69e9235b10a3bf8c983fb"
+    },
+    "data/natural_earth/ne_10m_land.cpg": {
+      "size": 5,
+      "sha256": "3ad3031f5503a4404af825262ee8232cc04d4ea6683d42c5dd0a2f2a27ac9824"
+    },
+    "data/natural_earth/ne_10m_land.dbf": {
+      "size": 350,
+      "sha256": "e422520372e65c6fb8220888580e5331d04699bcd71c27e53ad42e241a531cbd"
+    },
+    "data/natural_earth/ne_10m_land.prj": {
+      "size": 145,
+      "sha256": "a02a27b1d1982c8516d83398e85a3c8b1aef1713c13ef4d84d7bde17430c07c4"
+    },
+    "data/natural_earth/ne_10m_land.shp": {
+      "size": 7166824,
+      "sha256": "4cad3a49bc75c1a4c2f3d7efae04f2f8e63151c96764b2658effabf524331fa6"
+    },
+    "data/natural_earth/ne_10m_land.shx": {
+      "size": 188,
+      "sha256": "f3b02a190c3020eeafd0f48de982619826b57ecd853cbc68e4fc049652891a04"
+    },
+    "data/elevation/manifests/canaries.json": {
+      "size": 14662,
+      "sha256": "dd5a57794d21eadda1ac617401b1bb8add9a2a761caf7693f524504a7ce8cccb"
+    },
+    "data/elevation/manifests/france.json": {
+      "size": 116024,
+      "sha256": "31afc933c9a3397136cebfb0cbdf08451373d00d1e8e399ecde563f39a01c1cb"
+    },
+    "data/elevation/manifests/uk_ireland.json": {
+      "size": 74367,
+      "sha256": "2462f8b18874115b69f531088b016d504698b6628619b52ffd022198c32759fd"
+    },
+    "regions.yaml": {
+      "size": 417,
+      "sha256": "b066f6a76a65b5ecbd14bd71a9d5dbd420828bacda82fd6468d28f2d668de50d"
+    },
+    "input/geography/e3-regression-reference/inventory.json": {
+      "size": 7819,
+      "sha256": "fe8cc14f1c6f341d28f2afc0d0fcf61112d50d14705d7c267338a17cc2ff6035"
+    }
+  },
+  "note": "Metadata and checksums only. No source geometries, raster pixels or private packages are included. Unknown acquisition dates are not inferred from file modification times."
+}

@@ -1,0 +1,84 @@
+{
+  "technical_publication_audit": "passed",
+  "documentary_source_rights_review": "completed; see separate notice review",
+  "legal_certification": false,
+  "final_maintainer_review": "pending",
+  "responsible_maintainer": "@mivek",
+  "published": false,
+  "geographic_manifest_sha256": "34cc9365f131d3c6a0abaf2d7c83e3bc74d38630cd6b9787ed278893e25caaa6",
+  "original_geographic_manifest_sha256": "6ac72c9735f6f9d2d93c6e47e1a1a60ee011820f628f977225cfc52684fc39ff",
+  "original_geographic_package_unchanged": true,
+  "geographic_changes": "licensing section only; all other files identical",
+  "tree_oid": "511315b53262f329c8daa503f3f4273ce7cf79e3",
+  "previous_tree_oid": "d9513a965b887bc7183f9d0045041a3ea65f171d",
+  "data_only_tree_oid": "d9513a965b887bc7183f9d0045041a3ea65f171d",
+  "tree_changes": [
+    "A\tATTRIBUTION.md",
+    "A\tLICENSE",
+    "A\tREADME.md"
+  ],
+  "material_differences": "Only the three added notice files change the publication tree. Report status, licensing/geographic revision, tree identity and attempt ID change; all geographic findings, selection/envelopes, spot and cluster bytes, generation metadata, decisions and implementation revision are unchanged.",
+  "regional_spot_counts": {
+    "france": 2207,
+    "uk_ireland": 1217,
+    "canaries": 66
+  },
+  "final_spot_count": 3490,
+  "confidence_counts": {
+    "A": 3490
+  },
+  "country_counts": {
+    "ES": 66,
+    "FR": 2207,
+    "GB": 840,
+    "IE": 377
+  },
+  "identifiers_unique_and_correct": true,
+  "sorted_identifiers_sha256": "9edf46e5d2504e7efbfe21919212a75f5542e2ade8848fe77dce0bbca2b6a822",
+  "independently_verified_altitudes": 3490,
+  "altitudes_sha256": "9c9a9012d908b89bee05e0dc0fa4ff63fe59c5091c2dd0c8e1e8116445454114",
+  "cluster_hashes": {
+    "clusters/L1.json": "1c843f0169d744e1e07d94e03f9a1c642eaf81e55c1b35aee72dc982e24ebded",
+    "clusters/L2.json": "d85e6e0579c5c9b102f1ad9c2b7ce2eac1c1d84e43a0c0fb60510bc0ed217387",
+    "clusters/L3.json": "2507b1c475f4dbba2b8158a478a719fca8d131cb4f26bc3e24f56387bc911792",
+    "clusters/L4.json": "8f617be92de54eb46f76044aef0af7d209b90698be6dbabe0a36afcf19ef89d6",
+    "clusters/L5.json": "b84159d6f46004012cd57788ea10464edd33e15578d416aded4e9c5ecd56c5d9",
+    "clusters/L6.json": "aa0f25365dae7e0284c34c4ebcd2fbd0ec4919451853715642c1c15b865f028a"
+  },
+  "cluster_index_sha256": "f8319bfd5d2b6fce6f7413eadf7dbf5a29b78afb3f373758878745dd9ec67014",
+  "cluster_counts_and_representatives_verified": true,
+  "frozen_selection_and_envelope_bytes_identical": true,
+  "geographic_findings_identical": true,
+  "implementation_revision": "dfd866513f00aa3079b5e21e6ce435f86c4d90c5575fe38b97b891a4496ae7c1",
+  "decisions_revision": "7583f4c6a9ab74172c427d0207c40260042f8725d9411a5dce1aa8ddb2f19e88",
+  "frozen_arrays_unchanged": true,
+  "published_dataset_unchanged": true,
+  "snapshot_has_no_remote": true,
+  "final_report": {
+    "path": "input/geography/e3-odbl-2026-11-04-migration/final-report.json",
+    "size": 5492197,
+    "sha256": "224f57b176d7804428ec15bed4b2173fc5aaba8a7010c978c0f37ca1594dbe90"
+  },
+  "initial_report": {
+    "path": "input/geography/e3-odbl-2026-11-04-migration/report.json",
+    "size": 5496833,
+    "sha256": "a01346153948e59f63e301f3a6cf1c2b94525b9c4bbb14ce23bb3a64a1fd8759"
+  },
+  "archives": {
+    "geographic-package.tar": {
+      "size": 2462023680,
+      "sha256": "fbbd59a4946d368208863c387839ea4b4430a45c1eb5c40237fabc70de12154d"
+    },
+    "staged-snapshot.tar": {
+      "size": 2426880,
+      "sha256": "fa3bd196feee9cf107ab831a845934c8141afc240b1383852a106cfb51ac27bb"
+    }
+  },
+  "tests": "129 passed (focused existing tests)",
+  "outstanding_release_prerequisites": [
+    "@mivek review of exact licensing and release artifacts",
+    "Nextcloud transfer and authenticated retention record",
+    "successful independent restoration",
+    "separate publication authorization"
+  ]
+}

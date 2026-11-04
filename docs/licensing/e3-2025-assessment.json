@@ -1,0 +1,32 @@
+{
+  "assessment": "docs/geographic-licensing.md",
+  "attribution": "© OpenStreetMap contributors; Geofabrik; OSMCoastline; Copernicus DEM",
+  "geometry_distribution": "ODbL-1.0",
+  "imagery_derivation": "No imagery-derived geometry is automatically prepared",
+  "spot_distribution": "assessed",
+  "spot_assessment_record": {
+    "reference": "docs/licensing/e3-2025-assessment.md",
+    "reference_sha256": "41de8ba5ec3d26f8b5042956b0b5cbad63eeb74065f57a03764ee1b8f434c224",
+    "reviewed_by": "@mivek",
+    "reviewed_by_role": "Maintainer responsible for the confirmed distribution decision; not an independent legal reviewer",
+    "resulting_database_license": "ODbL-1.0",
+    "decision_date": "2026-11-04",
+    "authority": "Maintainer decisions confirmed in the task instruction; GitHub-handle-only identification confirmed in follow-up",
+    "mandatory_odbl_classification": "not conclusively established",
+    "source_rights_assessment": "completed at the documentary level; no identified restriction preventing distribution with the prepared notices",
+    "documentary_review": "docs/licensing/e3-2025-notice-review.md",
+    "documentary_review_sha256": "113721fc483cdf95873e9eb5ab4701e4984e0b671ceb2b641ee31be076c9a623",
+    "provenance": "docs/licensing/e3-2025-provenance.json",
+    "provenance_sha256": "323d78b9d9ba4873ee216273c8e99da79c83545ac3c48613de9b032887583f3a",
+    "public_database_location": "https://github.com/mivek/darkskyspots-data",
+    "e3_release_status": "release payload prepared; final maintainer review and publication authorization pending",
+    "notice_files": {
+      "README.md": "a26fcd0c1ac8c15989b76edccaad197564c5df44c74c440e156c4239b48690ff",
+      "LICENSE": "607680718977f6f6c9607972afd98f208573f19251315ed1362a8589b51beaf5",
+      "ATTRIBUTION.md": "803a11ec7d9331f3ba145ff89ff64617beeff53d80c9873b558241193b64c679"
+    },
+    "official_terms_inventory_sha256": "88202844cf75d6786757a8f4d22a05ea306d302e7b594d7fb0ba7dd7cb02c3d2",
+    "independent_legal_certification": false,
+    "final_maintainer_release_review": "pending"
+  }
+}
