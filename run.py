@@ -25,7 +25,7 @@ from src.config import (
     TILE_SIZE_DEG,
 )
 from src.coverage import attach_near_town, ensure_coverage, load_places
-from src.enrich import enrich_all
+from src.enrich import enrich_all, spot_id
 from src.elevation import ElevationSampler
 from src.geonames import (
     GeoNamesIndex,
@@ -311,8 +311,18 @@ def run(args) -> int:
         named = naming_index.enrich_spots(covered)
         if any(not isinstance(spot.get("name"), str) or not spot["name"].strip() for spot in named):
             raise ValueError("GeoNames naming cascade produced an empty name")
+        if accessibility_index is not None and accessibility_index.manifest.get("schema") == 2:
+            assignment_spots = [
+                {**spot, "id": spot.get("id") or spot_id(float(spot["lat"]), float(spot["lon"]))}
+                for spot in named
+            ]
+            assignment_counts = accessibility_enricher.audit_assignments(assignment_spots)
+            logger.info("  Accessibility assignments: %s", assignment_counts)
         enriched = enrich_all(named, elevation_sampler=sampler,
                               accessibility_enricher=accessibility_enricher)
+        if accessibility_index is not None and accessibility_index.manifest.get("schema") == 2:
+            accessibility_counts = accessibility_enricher.audit_assignments(enriched, enriched=True)
+            logger.info("  Accessibility enrichment outcomes: %s", accessibility_counts)
         logger.info("  Elevation sample counts: %s", dict(sampler.counts))
         logger.info("  WBM IO stats: %s", dict(sampler.wbm_io))
         logger.info("  Enriched %d spots", len(enriched))
@@ -631,7 +641,7 @@ def run_country_migration(args) -> int:
 
 
 def _validate_accessibility_dispatch(args) -> None:
-    """Validate pilot-only accessibility before any dispatcher side effects."""
+    """Validate local-only Canary accessibility before dispatcher side effects."""
     if not getattr(args, "accessibility_manifest", None):
         return
     if not getattr(args, "no_push", False):

@@ -57,7 +57,7 @@ def create_parser() -> argparse.ArgumentParser:
     parser.add_argument("--geographic-manifest", default="input/geography/manifest.json",
                         help="Verified offline geographic evidence and reviewed-water manifest")
     parser.add_argument("--accessibility-manifest", default=None,
-                        help="Optional prepared Tenerife accessibility dataset (local runs only)")
+                        help="Optional prepared accessibility dataset (local Canary runs only)")
     parser.add_argument("--geographic-report-dir", default=str(Path(tempfile.gettempdir())/'darksky-geographic-audits'),
                         help="Private final-payload geographic approval reports")
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose logging")
@@ -79,7 +79,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     special_mode = args.regenerate_clusters or audit_mode or migration_mode
     if args.accessibility_manifest:
         if not args.no_push:
-            parser.error("--accessibility-manifest is pilot-only and requires --no-push")
+            parser.error("--accessibility-manifest is local-only and requires --no-push")
         if args.region != "canaries" or special_mode:
             parser.error("--accessibility-manifest is supported only for a normal local canaries run")
     if args.no_clusters and not args.no_push and not audit_mode:

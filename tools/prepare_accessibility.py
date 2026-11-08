@@ -14,7 +14,9 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--pbf", required=True)
     parser.add_argument("--source-url", required=True)
-    parser.add_argument("--scope", required=True, choices=("tenerife",))
+    parser.add_argument("--scope", required=True, choices=("tenerife", "canaries"))
+    parser.add_argument("--config", default="config/accessibility.yaml",
+                        help="Declarative geographic specification for generalized scopes")
     parser.add_argument("--dem-manifest", required=True)
     parser.add_argument("--dem-cache-dir", default="input/elevation")
     parser.add_argument("--coverage-polygon")
@@ -23,6 +25,7 @@ def main() -> int:
     result = prepare_accessibility(
         args.pbf, args.source_url, args.scope, args.dem_manifest, args.output_dir,
         coverage_polygon=args.coverage_polygon, dem_cache_dir=args.dem_cache_dir,
+        geographic_config=args.config,
     )
     print(json.dumps(result, ensure_ascii=False, indent=2))
     return 0

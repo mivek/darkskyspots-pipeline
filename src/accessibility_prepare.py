@@ -28,9 +28,13 @@ from .accessibility_index import (
     ACCESS_POLICY_REVISION,
     DISTANCE_POLICY_REVISION,
     ELEVATION_POLICY_REVISION,
+    GENERALIZED_POLICIES,
+    GENERALIZED_PROFILE,
     PREPARATION_REVISION,
     TO_UTM,
+    AccessibilityIndex,
 )
+from .accessibility_scope import GeographicSpecification
 from .resource_metrics import PeakRssSampler
 
 SOURCE_URL = "https://download.geofabrik.de/africa/canary-islands-261107.osm.pbf"
@@ -110,7 +114,7 @@ def validate_accessibility_manifest(manifest_path: str | Path) -> dict[str, Any]
     """Validate source, index hashes, manifest identity and SQLite integrity."""
     path = Path(manifest_path).resolve()
     data = json.loads(path.read_text(encoding="utf-8"))
-    if data.get("schema") != 1 or data.get("status") != "complete":
+    if data.get("schema") not in {1, 2} or data.get("status") != "complete":
         raise ValueError("Accessibility manifest is incomplete or unsupported")
     root = path.parent
     for name, info in data.get("files", {}).items():
@@ -131,6 +135,8 @@ def validate_accessibility_manifest(manifest_path: str | Path) -> dict[str, Any]
             raise ValueError("Accessibility SQLite index failed integrity_check")
     finally:
         connection.close()
+    with AccessibilityIndex(path):
+        pass
     return data
 
 
@@ -266,7 +272,7 @@ def _object_timestamp(obj) -> str | None:
     return timestamp.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
-def _extract_osm(pbf: Path, db_path: Path, node_cache: Path, domain) -> dict[str, Any]:
+def _extract_osm(pbf: Path, db_path: Path, node_cache: Path, domain, transformer=TO_UTM) -> dict[str, Any]:
     """Stream OSM objects into an index with disk-backed location lookup."""
     try:
         import osmium
@@ -320,7 +326,7 @@ def _extract_osm(pbf: Path, db_path: Path, node_cache: Path, domain) -> dict[str
             tags = self._tags(obj)
             feature_class, state = classify_feature(tags, "node", "Point")
             if feature_class is not None and state in {"active", "audit_only"}:
-                point = Point(*TO_UTM.transform(lon, lat))
+                point = Point(*transformer.transform(lon, lat))
                 self._store(obj, "node", feature_class, state, point, tags)
 
         def way(self, obj):
@@ -337,7 +343,7 @@ def _extract_osm(pbf: Path, db_path: Path, node_cache: Path, domain) -> dict[str
                 return
             try:
                 geometry = from_wkb(bytes.fromhex(factory.create_linestring(obj)))
-                geometry = shapely_transform(geometry, TO_UTM.transform, interleaved=False)
+                geometry = shapely_transform(geometry, transformer.transform, interleaved=False)
                 if geometry.is_empty or len(obj.nodes) < 2:
                     raise ValueError("way has no usable line geometry")
             except Exception as exc:
@@ -363,7 +369,7 @@ def _extract_osm(pbf: Path, db_path: Path, node_cache: Path, domain) -> dict[str
                     location = self.location_storage.get(member.ref)
                     if location.valid():
                         lon, lat = float(location.lon), float(location.lat)
-                        point = Point(*TO_UTM.transform(lon, lat))
+                        point = Point(*transformer.transform(lon, lat))
                         if domain.covers(point):
                             geometries.append(point)
                         else:
@@ -390,7 +396,7 @@ def _extract_osm(pbf: Path, db_path: Path, node_cache: Path, domain) -> dict[str
                 return
             try:
                 geometry = from_wkb(bytes.fromhex(factory.create_multipolygon(obj)))
-                geometry = shapely_transform(geometry, TO_UTM.transform, interleaved=False)
+                geometry = shapely_transform(geometry, transformer.transform, interleaved=False)
                 osm_type = "way" if obj.from_way() else "relation"
                 area_class, _area_state = classify_feature(tags, osm_type, geometry.geom_type)
                 if area_class != "parking":
@@ -505,16 +511,39 @@ def prepare_accessibility(
     *,
     coverage_polygon: str | Path | None = None,
     dem_cache_dir: str | Path = "input/elevation",
+    geographic_config: str | Path = "config/accessibility.yaml",
 ) -> dict[str, Any]:
-    """Build a validated, immutable index from the one approved dated PBF."""
+    """Build a validated, immutable index for the legacy pilot or a declared G1 scope."""
     preparation_started = time.perf_counter()
     pbf = Path(pbf).resolve()
     output_dir = Path(output_dir).resolve()
     dem_manifest = Path(dem_manifest).resolve()
-    if scope != "tenerife":
-        raise ValueError("Only the Tenerife pilot scope is supported")
-    if source_url != SOURCE_URL:
-        raise ValueError(f"The pilot requires the exact pinned source URL: {SOURCE_URL}")
+    specification = None
+    if scope == "tenerife":
+        if source_url != SOURCE_URL:
+            raise ValueError(f"The pilot requires the exact pinned source URL: {SOURCE_URL}")
+        scope_bbox = SCOPE_BBOX
+        preparation_buffer_m = PREPARATION_BUFFER_M
+        radii_m = PILOT_RADII_M
+        output_radius_m = PILOT_OUTPUT_RADIUS_M
+        crs = CRS
+        profile = "tenerife-legacy-v1"
+    else:
+        specification = GeographicSpecification.load(geographic_config, scope)
+        if source_url != specification.source["source_url"]:
+            raise ValueError("Source URL does not match the configured immutable geographic specification")
+        configured_pbf = Path(specification.source["pbf_path"]).resolve()
+        if pbf != configured_pbf:
+            raise ValueError(f"PBF path does not match configured pinned source: {configured_pbf}")
+        scope_bbox = specification.bbox
+        preparation_buffer_m = specification.preparation_buffer_m
+        radii_m = specification.supported_radii_m
+        output_radius_m = specification.public_search_radius_m
+        crs = specification.metric_crs
+        profile = specification.profile
+        configured_dem = Path(specification.dem_manifest).resolve()
+        if dem_manifest != configured_dem:
+            raise ValueError(f"DEM/WBM manifest does not match configured scope: {configured_dem}")
     if not pbf.is_file():
         raise FileNotFoundError(pbf)
     if coverage_polygon is None:
@@ -546,13 +575,21 @@ def prepare_accessibility(
         pass
 
     polygon = parse_geofabrik_poly(coverage_polygon)
-    projected = shapely_transform(
-        polygon, Transformer.from_crs("EPSG:4326", CRS, always_xy=True).transform,
-        interleaved=False,
-    )
-    domain = _domain_geometry()
-    if not projected.covers(domain):
-        raise ValueError("Geofabrik coverage polygon does not cover the complete Tenerife preparation domain")
+    assignment_core = None
+    if specification is None:
+        projected = shapely_transform(
+            polygon, Transformer.from_crs("EPSG:4326", CRS, always_xy=True).transform,
+            interleaved=False,
+        )
+        domain = _domain_geometry()
+        transformer = TO_UTM
+        if not projected.covers(domain):
+            raise ValueError("Geofabrik coverage polygon does not cover the complete Tenerife preparation domain")
+    else:
+        assignment_core, domain, projected, transformer, _inverse, max_distortion = specification.projected_geometries(polygon)
+        configured_coverage = Path(specification.source["coverage_polygon_path"]).resolve()
+        if coverage_polygon != configured_coverage:
+            raise ValueError(f"Coverage polygon path does not match configured pinned source: {configured_coverage}")
     pbf_header = _read_pbf_header(pbf)
     http_path = pbf.with_name(pbf.name + ".http.json")
     downloaded_metadata = json.loads(http_path.read_text(encoding="utf-8")) if http_path.exists() else {}
@@ -564,6 +601,11 @@ def prepare_accessibility(
         raise ValueError("PBF download metadata does not match the retained source")
     if coverage_http_metadata.get("sha256") != sha256_file(coverage_polygon):
         raise ValueError("Coverage polygon download metadata does not match the retained source")
+    if specification is not None and (
+        http_metadata.get("url") != source_url
+        or coverage_http_metadata.get("url") != specification.source["coverage_polygon_url"]
+    ):
+        raise ValueError("Source retrieval URLs do not match the pinned geographic specification")
     provenance = {
         "provider": "Geofabrik",
         "source_url": source_url,
@@ -572,7 +614,7 @@ def prepare_accessibility(
         "pbf_sha256": sha256_file(pbf),
         "http_metadata": http_metadata,
         "pbf_header": pbf_header,
-        "coverage_polygon_url": COVERAGE_URL,
+        "coverage_polygon_url": (COVERAGE_URL if specification is None else specification.source["coverage_polygon_url"]),
         "coverage_polygon_size": coverage_polygon.stat().st_size,
         "coverage_polygon_sha256": sha256_file(coverage_polygon),
         "coverage_polygon_http_metadata": coverage_http_metadata,
@@ -583,18 +625,30 @@ def prepare_accessibility(
         "pbf_sha256": provenance["pbf_sha256"],
         "coverage_polygon_sha256": provenance["coverage_polygon_sha256"],
         "dem_manifest_sha256": sha256_file(dem_manifest),
-        "scope_bbox": list(SCOPE_BBOX),
-        "preparation_buffer_m": PREPARATION_BUFFER_M,
-        "radii_m": list(PILOT_RADII_M),
-        "output_radius_m": PILOT_OUTPUT_RADIUS_M,
-        "crs": CRS,
+        "scope_bbox": list(scope_bbox),
+        "preparation_buffer_m": preparation_buffer_m,
+        "radii_m": list(radii_m),
+        "output_radius_m": output_radius_m,
+        "crs": crs,
         "software": software,
-        "preparation_revision": PREPARATION_REVISION,
+        "preparation_revision": (PREPARATION_REVISION if specification is None
+                                  else GENERALIZED_POLICIES["preparation_revision"]),
         "access_policy_revision": ACCESS_POLICY_REVISION,
         "distance_policy_revision": DISTANCE_POLICY_REVISION,
         "elevation_policy_revision": ELEVATION_POLICY_REVISION,
     }
-    dataset_id = "tfe-f021a-" + hashlib.sha256(canonical_json_bytes(source_identity)).hexdigest()[:16]
+    if specification is None:
+        dataset_id = "tfe-f021a-" + hashlib.sha256(canonical_json_bytes(source_identity)).hexdigest()[:16]
+    else:
+        source_identity.update({
+            "scope": scope,
+            "profile": profile,
+            "assignment_exclusions": list(specification.assignment_exclusions),
+            "assignment_core_sha256": hashlib.sha256(to_wkb(assignment_core)).hexdigest(),
+            "prepared_domain_sha256": hashlib.sha256(to_wkb(domain)).hexdigest(),
+            "provider_coverage_sha256": hashlib.sha256(to_wkb(projected)).hexdigest(),
+        })
+        dataset_id = "can-g1-" + hashlib.sha256(canonical_json_bytes(source_identity)).hexdigest()[:16]
     if os.environ.get("TMPDIR"):
         Path(os.environ["TMPDIR"]).mkdir(parents=True, exist_ok=True)
 
@@ -625,7 +679,7 @@ def prepare_accessibility(
                 high_water["temporary_bytes"] = max(high_water["temporary_bytes"], staged_bytes + cache_bytes)
         monitor_thread = threading.Thread(target=monitor_disk, daemon=True)
         monitor_thread.start()
-        stats = _extract_osm(pbf, index_path, node_cache, domain)
+        stats = _extract_osm(pbf, index_path, node_cache, domain, transformer=transformer)
         monitor_stop.set()
         monitor_thread.join()
         connection = sqlite3.connect(index_path)
@@ -644,13 +698,13 @@ def prepare_accessibility(
         index_hash = sha256_file(index_path)
         peak_rss_mib = rss_sampler.stop()
         manifest = {
-            "schema": 1,
+            "schema": 1 if specification is None else 2,
             "status": "complete",
             "dataset_id": dataset_id,
-            "scope": "tenerife",
-            "scope_bbox": list(SCOPE_BBOX),
-            "preparation_buffer_m": PREPARATION_BUFFER_M,
-            "crs": CRS,
+            "scope": scope,
+            "scope_bbox": list(scope_bbox),
+            "preparation_buffer_m": preparation_buffer_m,
+            "crs": crs,
             "geometry_storage": "zlib-compressed projected WKB",
             "domain_wkb_hex": to_wkb(domain).hex(),
             "coverage_wkb_hex": to_wkb(projected).hex(),
@@ -678,6 +732,8 @@ def prepare_accessibility(
                 "staging_high_water_bytes": high_water["index_bytes"],
                 "node_cache_high_water_bytes": high_water["node_cache_bytes"],
                 "retained_source_bytes": pbf.stat().st_size + coverage_polygon.stat().st_size,
+                "index_apparent_bytes": index_size,
+                "index_allocated_bytes": getattr(index_path.stat(), "st_blocks", 0) * 512 or index_size,
             },
             "index": {"path": "index.sqlite", "size": index_size, "sha256": index_hash},
             "files": {
@@ -687,6 +743,21 @@ def prepare_accessibility(
             "attribution": "© OpenStreetMap contributors",
             "coverage_note": "Completeness is relative to supported OSM objects in this extract and the prepared domain; it does not assert that all real-world features are mapped.",
         }
+        if specification is not None:
+            manifest["identity"] = source_identity
+            manifest["profile"] = profile
+            manifest["assignment_core_wkb_hex"] = to_wkb(assignment_core).hex()
+            manifest["specification"] = {
+                "profile": profile,
+                "assignment_region": specification.assignment_region,
+                "source_provider": specification.source["provider"],
+                "metric_crs": specification.metric_crs,
+                "public_search_radius_m": specification.public_search_radius_m,
+                "supported_radii_m": list(specification.supported_radii_m),
+                "max_projection_distortion_fraction": max_distortion,
+                "accepted_projection_distortion_fraction": 0.005,
+            }
+            manifest["assignment_exclusions"] = list(specification.assignment_exclusions)
         (stage / "manifest.json").write_bytes(canonical_json_bytes(manifest))
         validate_accessibility_manifest(stage / "manifest.json")
         stage.rename(output_dir)

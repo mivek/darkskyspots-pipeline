@@ -530,7 +530,7 @@ def _write_test_index(tmp_path, *, add_road=False, road_ids=(40,), path_complete
     source_id = "tfe-f021a-" + hashlib.sha256(canonical_json_bytes(identity)).hexdigest()[:16]
     manifest = {
         "schema": 1, "status": "complete", "dataset_id": source_id,
-        "scope_bbox": identity["scope_bbox"], "policies": identity,
+        "scope_bbox": identity["scope_bbox"], "crs": identity["crs"], "policies": identity,
         "index": {"path": "index.sqlite", "size": index_path.stat().st_size,
                   "sha256": sha256_file(index_path)},
         "files": {}, "domain_wkb_hex": to_wkb(domain).hex(),
@@ -562,7 +562,43 @@ def test_current_runtime_policy_manifest_loads_and_queries(tmp_path):
     with AccessibilityIndex(manifest_path) as index:
         assert {key: index.manifest["policies"][key]
                 for key in SUPPORTED_POLICY_REVISIONS} == SUPPORTED_POLICY_REVISIONS
+        assert index.crs == "EPSG:32628"
         assert index.query_detailed(lat, lon, 100)["classes"]["road"]["status"] == "found"
+
+
+@pytest.mark.parametrize(
+    ("top_level_crs", "policy_crs"),
+    [
+        ("EPSG:32629", "EPSG:32628"),
+        ("EPSG:32628", "EPSG:32629"),
+        ("EPSG:3857", "EPSG:3857"),
+    ],
+)
+def test_legacy_tenerife_crs_must_remain_pinned_before_transform_or_query(
+    tmp_path, top_level_crs, policy_crs
+):
+    from unittest.mock import patch
+
+    manifest_path, lat, lon = _write_test_index(tmp_path, add_road=True)
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    source_id = manifest["dataset_id"]
+    manifest["crs"] = top_level_crs
+    manifest["policies"]["crs"] = policy_crs
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    assert manifest["dataset_id"] == source_id
+    with patch("src.accessibility_index._transformer_for_crs") as transformer, \
+            patch("src.accessibility_index.sqlite3.connect") as connect:
+        with pytest.raises(ValueError, match="Legacy Tenerife accessibility CRS must be EPSG:32628"):
+            AccessibilityIndex(manifest_path)
+    transformer.assert_not_called()
+    connect.assert_not_called()
+
+    # The unchanged source ID must not permit a 32629 transform to miss this
+    # 32628 test road and turn a prior found result into not_found.
+    with pytest.raises(ValueError, match="Legacy Tenerife accessibility CRS"):
+        with AccessibilityIndex(manifest_path) as index:
+            assert index.query_detailed(lat, lon, 100)["classes"]["road"]["status"] == "found"
 
 
 @pytest.mark.parametrize(

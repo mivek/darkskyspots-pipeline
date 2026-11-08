@@ -1,0 +1,17 @@
+schema: 1
+scopes:
+  canaries:
+    profile: canary-islands-g1-v1
+    assignment_region: canaries
+    metric_crs: EPSG:32628
+    preparation_buffer_m: 6000
+    public_search_radius_m: 1000
+    supported_radii_m: [500, 1000, 3000, 5000]
+    assignment_exclusions: []
+    source:
+      provider: Geofabrik
+      pbf_path: input/accessibility/sources/canary-islands-261107.osm.pbf
+      source_url: https://download.geofabrik.de/africa/canary-islands-261107.osm.pbf
+      coverage_polygon_path: input/accessibility/sources/canary-islands.poly
+      coverage_polygon_url: https://download.geofabrik.de/africa/canary-islands.poly
+    dem_manifest: data/elevation/manifests/canaries.json

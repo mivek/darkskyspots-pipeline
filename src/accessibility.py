@@ -294,19 +294,53 @@ class AccessibilityEnricher:
 
     index: Any
     elevation_sampler: Any
-    radius_m: int = 1000
+    radius_m: int | None = None
 
     def __post_init__(self) -> None:
+        if self.radius_m is None:
+            self.radius_m = int(self.index.manifest.get("policies", {}).get("output_radius_m", 1000))
         if isinstance(self.radius_m, bool) or not isinstance(self.radius_m, int) or self.radius_m <= 0:
             raise ValueError("radius_m must be a positive integer")
+        supported = self.index.manifest.get("policies", {}).get("radii_m")
+        if supported is not None and self.radius_m not in supported:
+            raise ValueError(f"Requested accessibility radius is not supported by source: {self.radius_m}")
         validate_dem_manifest = getattr(self.index, "validate_dem_manifest", None)
         manifest_path = getattr(self.elevation_sampler, "manifest_path", None)
         if validate_dem_manifest is not None and manifest_path is not None:
             validate_dem_manifest(manifest_path)
 
+    def audit_assignments(self, spots: list[Mapping[str, Any]], *, enriched: bool = False) -> dict[str, int]:
+        """Count assignment outcomes and reject undeclared scope gaps."""
+        exclusions = set(self.index.manifest.get("assignment_exclusions", []))
+        assigned = excluded = missing = enriched_count = 0
+        missing_ids = []
+        for spot in spots:
+            spot_id = str(spot.get("id", ""))
+            try:
+                lat, lon = float(spot["lat"]), float(spot["lon"])
+            except (KeyError, TypeError, ValueError) as exc:
+                raise ValueError(f"Spot {spot_id!r} has invalid coordinates for accessibility assignment") from exc
+            if self.index.supports_scope_point(lat, lon):
+                assigned += 1
+                if enriched and "accessibility" in spot:
+                    enriched_count += 1
+            elif spot_id in exclusions:
+                excluded += 1
+            else:
+                missing += 1
+                missing_ids.append(spot_id)
+        if missing_ids:
+            raise ValueError("Accessibility assignment has undeclared gaps: " + ", ".join(missing_ids[:20]))
+        return {
+            "assigned": assigned,
+            "enriched": enriched_count,
+            "excluded": excluded,
+            "missing": missing,
+        }
+
     def enrich_spot(self, spot: Mapping[str, Any]) -> dict[str, Any]:
         result = dict(spot)
-        if not self.index.supports_point(float(spot["lat"]), float(spot["lon"]), self.radius_m):
+        if not self.index.supports_scope_point(float(spot["lat"]), float(spot["lon"])):
             return result
         queries = self.index.query_public(
             float(spot["lat"]), float(spot["lon"]), self.radius_m,

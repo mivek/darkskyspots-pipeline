@@ -28,6 +28,14 @@ from .accessibility import (
 TO_UTM = Transformer.from_crs("EPSG:4326", "EPSG:32628", always_xy=True)
 FROM_UTM = Transformer.from_crs("EPSG:32628", "EPSG:4326", always_xy=True)
 
+GENERALIZED_PROFILE = "canary-islands-g1-v1"
+GENERALIZED_POLICIES = {
+    "preparation_revision": "f02-1a-g1-prep-1",
+    "access_policy_revision": "f02-1a-access-3",
+    "distance_policy_revision": "f02-1a-distance-3",
+    "elevation_policy_revision": "f02-1a-elevation-3",
+}
+
 SUPPORTED_POLICY_REVISIONS = {
     "preparation_revision": "f02-1a-prep-4",
     "access_policy_revision": "f02-1a-access-3",
@@ -55,6 +63,10 @@ def validate_policy_compatibility(policies: object) -> None:
 def _project(lon: float, lat: float) -> Point:
     x, y = TO_UTM.transform(lon, lat)
     return Point(x, y)
+
+
+def _transformer_for_crs(source: str, target: str) -> Transformer:
+    return Transformer.from_crs(source, target, always_xy=True)
 
 
 def _identifier_key(record: dict[str, Any]) -> tuple[Any, ...]:
@@ -174,9 +186,28 @@ class AccessibilityIndex:
         self.manifest_path = Path(manifest_path).resolve()
         self.root = self.manifest_path.parent
         self.manifest = json.loads(self.manifest_path.read_text(encoding="utf-8"))
-        if self.manifest.get("schema") != 1 or self.manifest.get("status") != "complete":
+        schema = self.manifest.get("schema")
+        if schema not in {1, 2} or self.manifest.get("status") != "complete":
             raise ValueError("Invalid or incomplete accessibility dataset manifest")
-        validate_policy_compatibility(self.manifest.get("policies"))
+        if schema == 1:
+            validate_policy_compatibility(self.manifest.get("policies"))
+            self.profile = self.manifest.get("profile", "tenerife-legacy-v1")
+            if self.profile != "tenerife-legacy-v1":
+                raise ValueError(f"Unknown legacy accessibility profile: {self.profile!r}")
+            policy_crs = self.manifest["policies"].get("crs")
+            top_level_crs = self.manifest.get("crs")
+            if top_level_crs != "EPSG:32628" or policy_crs != "EPSG:32628":
+                raise ValueError(
+                    "Legacy Tenerife accessibility CRS must be EPSG:32628 in both "
+                    f"the top-level manifest and policies; got {top_level_crs!r} and {policy_crs!r}"
+                )
+            self.crs = "EPSG:32628"
+        else:
+            self._validate_generalized_identity()
+            self.profile = self.manifest["profile"]
+            self.crs = self.manifest["crs"]
+        self.to_metric = _transformer_for_crs("EPSG:4326", self.crs)
+        self.from_metric = _transformer_for_crs(self.crs, "EPSG:4326")
         self.source_id = self.manifest.get("dataset_id")
         if not isinstance(self.source_id, str) or not self.source_id:
             raise ValueError("Accessibility manifest has no dataset id")
@@ -196,22 +227,35 @@ class AccessibilityIndex:
                 raise ValueError(f"Accessibility package asset missing: {name}")
             if packaged.stat().st_size != info["size"] or self._sha256(packaged) != info["sha256"]:
                 raise ValueError(f"Accessibility package asset checksum mismatch: {name}")
-        identity = {
-            key: self.manifest["policies"][key]
-            for key in (
-                "pbf_sha256", "coverage_polygon_sha256", "dem_manifest_sha256",
-                "scope_bbox", "preparation_buffer_m", "radii_m", "output_radius_m", "software",
-                "crs", "preparation_revision",
-                "access_policy_revision", "distance_policy_revision", "elevation_policy_revision",
-            )
-        }
-        expected_source = "tfe-f021a-" + hashlib.sha256(
-            (json.dumps(identity, sort_keys=True, ensure_ascii=False, separators=(",", ":")) + "\n").encode("utf-8")
-        ).hexdigest()[:16]
-        if expected_source != self.source_id:
-            raise ValueError("Accessibility dataset identity does not match its source and policy manifest")
+        if schema == 1:
+            identity = {
+                key: self.manifest["policies"][key]
+                for key in (
+                    "pbf_sha256", "coverage_polygon_sha256", "dem_manifest_sha256",
+                    "scope_bbox", "preparation_buffer_m", "radii_m", "output_radius_m", "software",
+                    "crs", "preparation_revision",
+                    "access_policy_revision", "distance_policy_revision", "elevation_policy_revision",
+                )
+            }
+            expected_source = "tfe-f021a-" + hashlib.sha256(
+                (json.dumps(identity, sort_keys=True, ensure_ascii=False, separators=(",", ":")) + "\n").encode("utf-8")
+            ).hexdigest()[:16]
+            if expected_source != self.source_id:
+                raise ValueError("Accessibility dataset identity does not match its source and policy manifest")
         self._coverage = from_wkb(bytes.fromhex(self.manifest["coverage_wkb_hex"]))
         self._domain = from_wkb(bytes.fromhex(self.manifest["domain_wkb_hex"]))
+        self._assignment_core = from_wkb(bytes.fromhex(
+            self.manifest.get("assignment_core_wkb_hex", self.manifest["domain_wkb_hex"])
+        ))
+        if schema == 2:
+            if any(geometry.is_empty or not geometry.is_valid
+                   for geometry in (self._assignment_core, self._domain, self._coverage)):
+                raise ValueError("Generalized accessibility manifest contains invalid scope geometry")
+            preparation_buffer = self.manifest.get("preparation_buffer_m")
+            expected_domain = self._assignment_core.buffer(preparation_buffer)
+            if (not self._domain.covers(self._assignment_core)
+                    or self._domain.hausdorff_distance(expected_domain) > 1e-6):
+                raise ValueError("Generalized accessibility assignment core and prepared domain contradict")
         uri = f"file:{quote(str(self.index_path))}?mode=ro&immutable=1"
         self.connection = sqlite3.connect(uri, uri=True)
         self.connection.row_factory = sqlite3.Row
@@ -222,6 +266,64 @@ class AccessibilityIndex:
 
     def close(self) -> None:
         self.connection.close()
+
+    def _validate_generalized_identity(self) -> None:
+        if self.manifest.get("profile") != GENERALIZED_PROFILE:
+            raise ValueError(f"Unknown generalized accessibility profile: {self.manifest.get('profile')!r}")
+        policies = self.manifest.get("policies")
+        if not isinstance(policies, Mapping):
+            raise ValueError("Accessibility manifest has no processing policy revisions")
+        for name, expected in GENERALIZED_POLICIES.items():
+            if policies.get(name) != expected:
+                raise ValueError(f"Incompatible generalized accessibility policy {name}: expected {expected!r}")
+        required = {
+            "scope", "profile", "pbf_sha256", "coverage_polygon_sha256", "dem_manifest_sha256",
+            "scope_bbox", "assignment_core_sha256", "prepared_domain_sha256",
+            "provider_coverage_sha256", "preparation_buffer_m", "radii_m", "output_radius_m",
+            "software", "crs", "assignment_exclusions", *GENERALIZED_POLICIES,
+        }
+        identity = self.manifest.get("identity")
+        if not isinstance(identity, Mapping) or set(identity) != required:
+            raise ValueError("Generalized accessibility manifest identity is incomplete or has extra fields")
+        operational = {
+            "scope": self.manifest.get("scope"),
+            "profile": self.manifest.get("profile"),
+            "scope_bbox": self.manifest.get("scope_bbox"),
+            "preparation_buffer_m": self.manifest.get("preparation_buffer_m"),
+            "crs": self.manifest.get("crs"),
+            "radii_m": policies.get("radii_m"),
+            "output_radius_m": policies.get("output_radius_m"),
+            "software": self.manifest.get("software"),
+            "assignment_exclusions": self.manifest.get("assignment_exclusions", []),
+        }
+        if any(identity.get(key) != value for key, value in operational.items()):
+            raise ValueError("Generalized accessibility operational fields contradict canonical identity")
+        if any(identity.get(key) != policies.get(key) for key in GENERALIZED_POLICIES):
+            raise ValueError("Generalized accessibility policy fields contradict canonical identity")
+        geometry_fields = {
+            "assignment_core_sha256": self.manifest.get("assignment_core_wkb_hex"),
+            "prepared_domain_sha256": self.manifest.get("domain_wkb_hex"),
+            "provider_coverage_sha256": self.manifest.get("coverage_wkb_hex"),
+        }
+        for key, geometry_hex in geometry_fields.items():
+            try:
+                actual = hashlib.sha256(bytes.fromhex(geometry_hex)).hexdigest()
+            except (TypeError, ValueError) as exc:
+                raise ValueError(f"Invalid generalized operational geometry: {key}") from exc
+            if identity.get(key) != actual:
+                raise ValueError(f"Generalized accessibility {key} contradicts canonical identity")
+        provenance = self.manifest.get("pbf_provenance", {})
+        dem = self.manifest.get("dem", {})
+        if (identity.get("pbf_sha256") != provenance.get("pbf_sha256")
+                or identity.get("coverage_polygon_sha256") != provenance.get("coverage_polygon_sha256")
+                or identity.get("dem_manifest_sha256") != dem.get("manifest_sha256")
+                or identity.get("dem_manifest_sha256") != policies.get("dem_manifest_sha256")):
+            raise ValueError("Generalized accessibility source provenance contradicts canonical identity")
+        expected = "can-g1-" + hashlib.sha256(
+            (json.dumps(dict(identity), sort_keys=True, ensure_ascii=False, separators=(",", ":")) + "\n").encode("utf-8")
+        ).hexdigest()[:16]
+        if expected != self.manifest.get("dataset_id"):
+            raise ValueError("Generalized accessibility dataset identity does not match canonical manifest identity")
 
     def validate_dem_manifest(self, manifest_path: str | Path) -> str:
         """Require the runtime DEM manifest to match the immutable source ID."""
@@ -237,7 +339,10 @@ class AccessibilityIndex:
         if cached is not None and cached[0] == signature:
             return cached[1]
         actual = self._sha256(path)
-        expected = self.manifest.get("policies", {}).get("dem_manifest_sha256")
+        if self.manifest.get("schema") == 2:
+            expected = self.manifest["identity"]["dem_manifest_sha256"]
+        else:
+            expected = self.manifest.get("policies", {}).get("dem_manifest_sha256")
         if not isinstance(expected, str) or actual != expected:
             raise ValueError(
                 f"DEM manifest identity mismatch: expected {expected!r}, got {actual}"
@@ -260,9 +365,12 @@ class AccessibilityIndex:
         self.close()
 
     def supports_scope_point(self, lat: float, lon: float) -> bool:
-        """Whether the reference coordinate belongs to the Tenerife pilot scope."""
+        """Whether the coordinate belongs to the declared assignment core."""
         if not math.isfinite(lat) or not math.isfinite(lon):
             return False
+        if self.manifest.get("schema") == 2:
+            x, y = self.to_metric.transform(lon, lat)
+            return bool(self._assignment_core.covers(Point(x, y)))
         return bool(self.manifest["scope_bbox"][0] <= lon <= self.manifest["scope_bbox"][2]
                     and self.manifest["scope_bbox"][1] <= lat <= self.manifest["scope_bbox"][3])
 
@@ -297,13 +405,12 @@ class AccessibilityIndex:
         sql += " ORDER BY f.osm_type, CAST(f.osm_id AS INTEGER)"
         return self.connection.execute(sql, args).fetchall()
 
-    @staticmethod
-    def _public_candidate(row: sqlite3.Row, distance: float, nearest: Point) -> dict[str, Any]:
+    def _public_candidate(self, row: sqlite3.Row, distance: float, nearest: Point) -> dict[str, Any]:
         tags = json.loads(row["tags_json"])
         physical_class = row["feature_class"]
         foot, foot_audit = resolve_access_with_audit(tags, "foot", physical_class)
         motorcar, car_audit = resolve_access_with_audit(tags, "motorcar", physical_class)
-        lon, lat = FROM_UTM.transform(nearest.x, nearest.y)
+        lon, lat = self.from_metric.transform(nearest.x, nearest.y)
         result = {
             "osm_type": row["osm_type"],
             "osm_id": row["osm_id"],
@@ -329,7 +436,7 @@ class AccessibilityIndex:
 
     def _candidate_records(self, lat: float, lon: float, radius_m: int,
                            feature_class: str | None = None, *, audit_only: bool | None = False):
-        point = _project(lon, lat)
+        point = Point(*self.to_metric.transform(lon, lat))
         rows = self._features_in_square(point, radius_m, feature_class=feature_class, audit_only=audit_only)
         records = []
         geometry_reads = 0
@@ -349,8 +456,11 @@ class AccessibilityIndex:
         """Query all classes and return machine-auditable candidates and counters."""
         if isinstance(radius_m, bool) or not isinstance(radius_m, int) or radius_m <= 0:
             raise ValueError("radius_m must be a positive integer")
+        if (self.manifest.get("schema") == 2
+                and radius_m not in self.manifest.get("policies", {}).get("radii_m", [])):
+            raise ValueError(f"Unsupported generalized accessibility radius: {radius_m}")
         started = time.perf_counter()
-        point = _project(lon, lat)
+        point = Point(*self.to_metric.transform(lon, lat))
         coverage_reason = self._coverage_reason(point, radius_m)
         by_class: dict[str, Any] = {}
         total_rtree = total_geometry_reads = 0
