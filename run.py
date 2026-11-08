@@ -162,8 +162,10 @@ def _filter_candidates_to_bbox(candidates: list[dict], bbox) -> tuple[list[dict]
 
 def run(args) -> int:
     """Execute the 7-step pipeline. Returns 0 on success, 1 on error."""
+    accessibility_manifest = getattr(args, "accessibility_manifest", None)
     sampler = None
     geographic_dataset = None
+    accessibility_index = None
     try:
         region = get_region(args.region)
         logger.info("Region: %s (%s)", region["name"], args.region)
@@ -177,6 +179,12 @@ def run(args) -> int:
         sampler = ElevationSampler(Path(args.dem_manifest_dir) / f"{args.region}.json", args.dem_cache_dir)
         geographic_dataset = GeographicDataset(getattr(args, 'geographic_manifest', 'input/geography/manifest.json'),require_e3=True)
         geographic_dataset.require_region(args.region, region)
+        accessibility_enricher = None
+        if accessibility_manifest:
+            from src.accessibility import AccessibilityEnricher
+            from src.accessibility_index import AccessibilityIndex
+            accessibility_index = AccessibilityIndex(accessibility_manifest)
+            accessibility_enricher = AccessibilityEnricher(accessibility_index, sampler)
 
         input_path = Path(args.input_dir) / args.region / f"{args.year}.tif"
         if not input_path.exists():
@@ -303,7 +311,8 @@ def run(args) -> int:
         named = naming_index.enrich_spots(covered)
         if any(not isinstance(spot.get("name"), str) or not spot["name"].strip() for spot in named):
             raise ValueError("GeoNames naming cascade produced an empty name")
-        enriched = enrich_all(named, elevation_sampler=sampler)
+        enriched = enrich_all(named, elevation_sampler=sampler,
+                              accessibility_enricher=accessibility_enricher)
         logger.info("  Elevation sample counts: %s", dict(sampler.counts))
         logger.info("  WBM IO stats: %s", dict(sampler.wbm_io))
         logger.info("  Enriched %d spots", len(enriched))
@@ -381,6 +390,13 @@ def run(args) -> int:
                     tile_id_str, env["spots"], str(output_dir), version, source, generated
                 )
 
+            if accessibility_index is not None:
+                from src.accessibility_prepare import write_accessibility_source_record
+                source_record = write_accessibility_source_record(
+                    output_dir, accessibility_index.manifest
+                )
+                logger.info("  Wrote accessibility source record %s", source_record)
+
             logger.info(
                 "  Wrote %d populated + %d empty tiles",
                 len(tiles_dict),
@@ -424,6 +440,8 @@ def run(args) -> int:
     finally:
         if sampler is not None:
             sampler.close()
+        if accessibility_index is not None:
+            accessibility_index.close()
         if geographic_dataset is not None:
             geographic_dataset.close()
 
@@ -612,8 +630,29 @@ def run_country_migration(args) -> int:
         return 1
 
 
+def _validate_accessibility_dispatch(args) -> None:
+    """Validate pilot-only accessibility before any dispatcher side effects."""
+    if not getattr(args, "accessibility_manifest", None):
+        return
+    if not getattr(args, "no_push", False):
+        raise ValueError("--accessibility-manifest requires --no-push; accessibility runs cannot publish")
+    if getattr(args, "region", None) != "canaries":
+        raise ValueError("--accessibility-manifest is supported only for the canaries region")
+    incompatible_modes = (
+        "regenerate_clusters", "list_orphans", "audit_country_tags",
+        "migrate_country_tags", "prune_orphan_spots", "prune_orphans",
+    )
+    selected = [mode for mode in incompatible_modes if getattr(args, mode, False)]
+    if selected:
+        raise ValueError(
+            "--accessibility-manifest supports only a normal canaries run; "
+            f"incompatible mode(s): {', '.join(selected)}"
+        )
+
+
 def run(args) -> int:
     """Dispatch autonomous modes and add cluster generation to the raster run."""
+    _validate_accessibility_dispatch(args)
     if getattr(args, "regenerate_clusters", False):
         return run_regenerate_clusters(args)
     if getattr(args, "list_orphans", False):

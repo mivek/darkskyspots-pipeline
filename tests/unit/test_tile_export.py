@@ -125,6 +125,14 @@ def test_spot_diff_modified():
     assert d["modified"] == 1
 
 
+def test_spot_diff_treats_accessibility_source_or_evidence_as_spot_changes():
+    from src.tile_export import spot_diff
+
+    old = [{"id": "a", "darkness": 0.9}]
+    new = [{"id": "a", "darkness": 0.9, "accessibility": {"schema": 1, "source": "source-a"}}]
+    assert spot_diff(old, new) == {"changed": True, "added": 0, "removed": 0, "modified": 1}
+
+
 def test_spot_diff_all_empty():
     """Both empty -> no change."""
     from src.tile_export import spot_diff

@@ -8,6 +8,8 @@ from numbers import Real
 from pathlib import Path
 from typing import Collection
 
+from .accessibility import validate_accessibility_payload
+
 
 @dataclass(frozen=True)
 class LevelSpec:
@@ -89,6 +91,8 @@ def _normalize_spot(
     normalized["nameDistanceKm"] = (
         None if name_distance is None else float(name_distance)
     )
+    if "accessibility" in source_spot:
+        normalized["accessibility"] = validate_accessibility_payload(source_spot["accessibility"])
     return normalized, lat, lon
 
 

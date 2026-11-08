@@ -167,6 +167,17 @@ rasters, and removes the transient raster `row` and `col` fields. Water and
 NoData yield `null`; valid land elevations, including zero and negative values,
 are rounded to metres. No network service is called during enrichment.
 
+An optional `--accessibility-manifest` hook is available only for a normal local
+`canaries` run with `--no-push`. It runs after the existing final enrichment,
+uses a separately prepared immutable Tenerife OSM index, and attaches the
+optional schema-1 `accessibility` object only to coordinates in the supported
+Tenerife core bbox. It does not change selection, IDs, altitude, naming, country
+ownership or any existing spot values. Queries use straight-line EPSG:32628
+distances, preserve unknown access and elevation states, and require complete
+search-disk coverage before reporting an empty result. Pyosmium is used only by
+the explicit offline preparation tool. See [the accessibility contract and
+preparation instructions](docs/accessibility.md).
+
 ### 9. Tile assignment and versioning
 
 Spots are assigned to one-degree latitude/longitude tiles using the canonical
@@ -226,9 +237,10 @@ Each occupied cell becomes a cluster containing:
 - a representative spot selected by highest darkness, then lowest string ID
   on an exact darkness tie.
 
-The representative projects these fields from the source spot:
+The representative projects these required fields from the source spot:
 `id`, `lat`, `lon`, `darkness`, `bortle`, `near`, `name`, `nameDistanceKm`,
-and `altitude`. Every level is written, including an empty `L<n>.json` when
+and `altitude`. When present, the optional schema-1 `accessibility` object is
+validated and copied to the representative. Every level is written, including an empty `L<n>.json` when
 that level has no occupied cells. Cluster generation rejects a source tile
 spot that lacks any of those nine fields or has an invalid `name` or
 `nameDistanceKm` value.

@@ -95,6 +95,23 @@ def test_enrich_all_altitude_none():
         assert s["altitude"] is None
 
 
+def test_accessibility_hook_runs_after_final_enrichment_without_replacing_fields():
+    from src.enrich import enrich_all
+
+    class Enricher:
+        def enrich_spot(self, spot):
+            assert spot["id"] == "28.2500_-16.6500"
+            assert spot["altitude"] is None
+            return {**spot, "accessibility": {"schema": 1}}
+
+    result = enrich_all(
+        [{"lat": 28.25, "lon": -16.65, "darkness": 0.8, "name": "Reference"}],
+        accessibility_enricher=Enricher(),
+    )[0]
+    assert result["name"] == "Reference"
+    assert result["accessibility"] == {"schema": 1}
+
+
 # --- spot_id tests ---
 
 

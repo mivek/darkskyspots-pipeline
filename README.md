@@ -85,6 +85,17 @@ python run.py \
 
 Output appears in `/output/spots/`. Publication also generates global clusters after copying the current region into the cloned data repository. Add `--no-push` to keep the run local.
 
+## Tenerife accessibility evidence pilot
+
+An offline, optional pilot adds factual nearby road, track, pedestrian path and
+parking evidence to existing Tenerife spots. It does not generate spots, routes,
+connectivity conclusions, access scores, parking availability or recommendations.
+The real PBF, prepared index and pilot outputs stay under ignored `input/` and
+`output/` directories. Pyosmium is preparation-only and pinned separately from
+normal runtime requirements. Follow [the accessibility preparation and data
+contract](docs/accessibility.md) for the exact-source fetch, immutable index
+build and four-radius local audit. Pilot output is not publication approval.
+
 ### England, Wales and Ireland
 
 The `uk_ireland` region covers the United Kingdom and Ireland south of 55°N,
@@ -121,6 +132,7 @@ and a comparison over the shared area before regeneration or publication.
 | `--data-repo-url` | Mode-dependent | — | Required for published runs and published cluster regeneration; optional for local and audit modes. |
 | `--data-repo-branch` | No | `main` | Branch to push to in the data repo. |
 | `--no-push` | No | `false` | Skip step 7 (publish). Output stays in `/output/spots/`. |
+| `--accessibility-manifest` | No | — | Optional Tenerife accessibility evidence; accepted only on a normal local `canaries` run with `--no-push`. |
 | `--no-clusters` | No | `false` | Skip local cluster generation. Rejected for published runs; use only with `--no-push`. |
 | `--regenerate-clusters` | No | `false` | Published mode: clone/audit the complete repository, write clusters/, then commit/push; requires --year and --data-repo-url. With --no-push: read output/spots/, write clusters-local/, and perform no clone, audit, commit, or push; requires only --year. |
 | `--audit-country-tags` | No | `false` | Strictly read-only audit of country tags and geographic region ownership, with a projected migration and prune summary. `--list-orphans` is a deprecated alias. |
@@ -207,11 +219,12 @@ country polygons clipped by region bboxes. A reduced bbox leaves old spots
 outside it untouched by publication; the audit blocks until they are assigned
 to another region or explicitly pruned.
 
-Spot schema compatibility is strict for cluster generation: every spot must contain `id`, `lat`, `lon`, `darkness`, `bortle`, `near`, `name`, `nameDistanceKm`, and `altitude`. A missing field is reported with its tile and spot index and aborts generation; it must not be silently ignored. Removing a field from the spot schema is therefore a data migration that must be handled before regenerating clusters. Extra source fields, including `country` and the GeoNames provenance fields, are ignored in the embedded cluster representative, whose contract is the nine fields above.
+Spot schema compatibility is strict for cluster generation: every spot must contain `id`, `lat`, `lon`, `darkness`, `bortle`, `near`, `name`, `nameDistanceKm`, and `altitude`. A missing field is reported with its tile and spot index and aborts generation; it must not be silently ignored. Removing a field from the spot schema is therefore a data migration that must be handled before regenerating clusters. Extra source fields, including `country` and GeoNames provenance, are ignored in the representative; validated optional accessibility evidence is copied when present.
 
 Published tile spots additionally carry mandatory producer field `country`
 (ISO alpha-2). The app may treat it as optional while reading historical
-caches; cluster representatives project only the nine fields listed above.
+caches; cluster representatives project the nine required fields and copy
+validated optional accessibility evidence when present.
 Country is assigned from the Natural Earth clip, not from a region
 name, so splitting or regrouping regions does not orphan published spots.
 

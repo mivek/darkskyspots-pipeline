@@ -154,6 +154,31 @@ def test_parser_regeneration_requires_year_and_url():
     assert args.regenerate_clusters is True
 
 
+def test_accessibility_manifest_is_local_canaries_only():
+    from src.cli import parse_args
+
+    args = parse_args([
+        "--year", "2025", "--region", "canaries", "--no-push",
+        "--accessibility-manifest", "input/accessibility/datasets/tenerife/manifest.json",
+    ])
+    assert args.accessibility_manifest.endswith("manifest.json")
+    with pytest.raises(SystemExit):
+        parse_args([
+            "--year", "2025", "--region", "france", "--no-push",
+            "--accessibility-manifest", "input/accessibility/manifest.json",
+        ])
+
+
+def test_accessibility_manifest_rejects_publishing_mode():
+    from src.cli import parse_args
+
+    with pytest.raises(SystemExit):
+        parse_args([
+            "--year", "2025", "--region", "canaries", "--data-repo-url", "git@x",
+            "--accessibility-manifest", "input/accessibility/manifest.json",
+        ])
+
+
 def test_parser_rejects_audit_migration_combination():
     from src.cli import parse_args
     with pytest.raises(SystemExit):

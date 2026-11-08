@@ -83,6 +83,116 @@ def _make_args(tmp_path, **overrides):
     return parse_args(cmd)
 
 
+def _write_valid_dispatch_input(tmp_path, region="canaries"):
+    import rasterio
+    from rasterio.transform import from_bounds
+
+    input_dir = tmp_path / "input" / region
+    input_dir.mkdir(parents=True, exist_ok=True)
+    path = input_dir / "2025.tif"
+    with rasterio.open(
+        path, "w", driver="GTiff", width=2, height=2, count=1,
+        dtype="float32", crs="EPSG:4326",
+        transform=from_bounds(-17, 27, -16, 29, 2, 2),
+    ) as dataset:
+        dataset.write(np.ones((2, 2), dtype=np.float32), 1)
+    return path
+
+
+def _dispatch_args(tmp_path, *, mode="normal", no_push=False, region="canaries"):
+    from src.cli import parse_args
+
+    argv = [
+        "--year", "2025", "--region", region,
+        "--data-repo-url", "git@example:user/data.git",
+        "--input-dir", str(tmp_path / "input"),
+        "--output-dir", str(tmp_path / "output"),
+    ]
+    mode_flags = {
+        "normal": [],
+        "regenerate_clusters": ["--regenerate-clusters"],
+        "migrate_country_tags": ["--migrate-country-tags"],
+        "prune_country_tags": ["--migrate-country-tags", "--prune-orphan-spots"],
+        "audit_country_tags": ["--audit-country-tags"],
+        "list_orphans": ["--list-orphans"],
+    }
+    argv.extend(mode_flags[mode])
+    if no_push:
+        argv.append("--no-push")
+    return parse_args(argv)
+
+
+@pytest.mark.parametrize(
+    ("mode", "no_push"),
+    [
+        ("normal", False),
+        ("regenerate_clusters", False),
+        ("migrate_country_tags", False),
+        ("prune_country_tags", False),
+        ("audit_country_tags", False),
+        ("list_orphans", True),
+        ("regenerate_clusters", True),
+    ],
+)
+def test_public_dispatcher_rejects_accessibility_before_every_side_effect(
+    tmp_path, monkeypatch, mode, no_push
+):
+    import run as pipeline
+
+    args = _dispatch_args(tmp_path, mode=mode, no_push=no_push)
+    args.accessibility_manifest = "input/accessibility/datasets/tenerife/manifest.json"
+    _write_valid_dispatch_input(tmp_path)
+    output_dir = Path(args.output_dir)
+    output_dir.mkdir(parents=True)
+    sentinel = output_dir / "pre-existing.txt"
+    sentinel.write_text("preserve", encoding="utf-8")
+    before = {path.relative_to(output_dir): path.read_bytes()
+              for path in output_dir.rglob("*") if path.is_file()}
+
+    side_effects = [
+        "_legacy_run", "run_regenerate_clusters", "run_list_orphans",
+        "run_country_migration", "load_regions", "_audit_before_write",
+        "_validate_geonames_inputs", "ElevationSampler", "GeographicDataset",
+        "_load_geonames_index", "enrich_all", "write_cluster_files",
+        "clone_data_repo", "copy_spots_to_repo", "commit_and_push",
+    ]
+    mocks = {}
+    for name in side_effects:
+        mock = MagicMock(name=name)
+        mocks[name] = mock
+        monkeypatch.setattr(pipeline, name, mock)
+
+    with pytest.raises(ValueError, match="--accessibility-manifest"):
+        pipeline.run(args)
+    for name, mock in mocks.items():
+        mock.assert_not_called()
+    after = {path.relative_to(output_dir): path.read_bytes()
+             for path in output_dir.rglob("*") if path.is_file()}
+    assert after == before
+    assert (Path(args.input_dir) / "canaries" / "2025.tif").is_file()
+
+
+@pytest.mark.parametrize("with_accessibility", [False, True])
+def test_public_dispatcher_keeps_supported_local_and_legacy_runs(
+    tmp_path, with_accessibility
+):
+    import run as pipeline
+
+    region = "canaries" if with_accessibility else "france"
+    args = _dispatch_args(tmp_path, no_push=True, region=region)
+    args.no_clusters = True
+    _write_valid_dispatch_input(tmp_path, region=region)
+    if with_accessibility:
+        args.accessibility_manifest = "input/accessibility/datasets/tenerife/manifest.json"
+    with patch("run._legacy_run", return_value=0) as legacy, \
+         patch("run.clone_data_repo") as clone, \
+         patch("run.commit_and_push") as commit:
+        assert pipeline.run(args) == 0
+    legacy.assert_called_once_with(args)
+    clone.assert_not_called()
+    commit.assert_not_called()
+
+
 def _write_input(tmp_path, region="france"):
     """Create a tiny input file; raster work is mocked by orchestration tests."""
     input_dir = tmp_path / "input" / region

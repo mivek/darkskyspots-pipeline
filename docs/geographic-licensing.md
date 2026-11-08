@@ -55,6 +55,19 @@ responsible maintainer as **@mivek**. The code does not provide a legal sign-off
 Packaged WBM rasters retain their Copernicus terms and provenance separately
 from the OSM-derived vector layers.
 
+## Accessibility evidence
+
+The Tenerife accessibility pilot stores structured OSM road, track, path,
+parking, access-tag and restriction evidence. This is data rather than a
+rendered map. Any later distribution of the index, enriched spots or derived
+clusters must retain “© OpenStreetMap contributors”, identify the exact
+Geofabrik snapshot and modifications, provide the applicable ODbL 1.0
+derivative database/data offer and preparation recipe, and preserve the
+Copernicus DEM notices for endpoint elevation differences. The code and local
+pilot do not constitute a legal assessment or publication approval. See [the
+accessibility contract](accessibility.md) and the source-specific provenance
+embedded in each immutable pilot manifest.
+
 ## WorldCover
 
 ESA WorldCover 2021 v200 uses CC-BY-4.0. Retain its version, source DOI,

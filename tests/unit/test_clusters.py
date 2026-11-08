@@ -90,6 +90,33 @@ def test_representative_uses_darkness_then_id(tmp_path):
     }
 
 
+def test_cluster_copies_valid_optional_accessibility_payload(tmp_path):
+    source = spot("a", 28.2, -16.6, 0.8)
+    source["accessibility"] = {
+        "schema": 1,
+        "source": "tfe-f021a-test",
+        "radiusM": 1000,
+        "road": {"status": "not_found_within_radius"},
+        "track": {"status": "not_found_within_radius"},
+        "path": {"status": "unknown", "reason": "incomplete_geometry"},
+        "parking": {"status": "not_found_within_radius"},
+    }
+    write_tile(tmp_path, "N028W017", [source])
+
+    representative = aggregate_spot_files(tmp_path)[1][0]["rep"]
+
+    assert representative["accessibility"] == source["accessibility"]
+
+
+def test_cluster_rejects_invalid_optional_accessibility_payload(tmp_path):
+    source = spot("a", 28.2, -16.6, 0.8)
+    source["accessibility"] = None
+    write_tile(tmp_path, "N028W017", [source])
+
+    with pytest.raises(ValueError, match="accessibility must be an object"):
+        aggregate_spot_files(tmp_path)
+
+
 def test_missing_cluster_spot_field_names_tile_and_spot(tmp_path):
     write_tile(
         tmp_path,
