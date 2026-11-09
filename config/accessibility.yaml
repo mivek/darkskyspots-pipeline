@@ -15,3 +15,70 @@ scopes:
       coverage_polygon_path: input/accessibility/sources/canary-islands.poly
       coverage_polygon_url: https://download.geofabrik.de/africa/canary-islands.poly
     dem_manifest: data/elevation/manifests/canaries.json
+    dem_manifest_policy: null
+  great_britain:
+    profile: great-britain-g2-v1
+    assignment_region: uk_ireland
+    assignment_countries: [GB]
+    metric_crs: EPSG:32630
+    preparation_buffer_m: 6000
+    public_search_radius_m: 1000
+    supported_radii_m: [500, 1000, 3000, 5000]
+    assignment_exclusions: []
+    source:
+      provider: Geofabrik
+      pbf_path: input/accessibility/sources/great-britain/great-britain-261107.osm.pbf
+      checksum_sidecar_path: input/accessibility/sources/great-britain/great-britain-261107.osm.pbf.md5
+      source_url: https://download.geofabrik.de/europe/great-britain-261107.osm.pbf
+      coverage_polygon_path: input/accessibility/sources/great-britain/great-britain.poly
+      coverage_polygon_url: https://download.geofabrik.de/europe/great-britain.poly
+      source_lock_path: input/accessibility/sources/great-britain/source-lock.json
+    dem_manifest: data/elevation/manifests/uk_ireland-accessibility-g2.json
+    dem_manifest_policy: uk_ireland_accessibility_g2
+  ireland_northern_ireland:
+    profile: ireland-northern-ireland-g2-v1
+    assignment_region: uk_ireland
+    assignment_countries: [GB, IE]
+    metric_crs: EPSG:32629
+    preparation_buffer_m: 6000
+    public_search_radius_m: 1000
+    supported_radii_m: [500, 1000, 3000, 5000]
+    assignment_exclusions: []
+    source:
+      provider: Geofabrik
+      pbf_path: input/accessibility/sources/ireland_northern_ireland/ireland-and-northern-ireland-261107.osm.pbf
+      checksum_sidecar_path: input/accessibility/sources/ireland_northern_ireland/ireland-and-northern-ireland-261107.osm.pbf.md5
+      source_url: https://download.geofabrik.de/europe/ireland-and-northern-ireland-261107.osm.pbf
+      coverage_polygon_path: input/accessibility/sources/ireland_northern_ireland/ireland-and-northern-ireland.poly
+      coverage_polygon_url: https://download.geofabrik.de/europe/ireland-and-northern-ireland.poly
+      source_lock_path: input/accessibility/sources/ireland_northern_ireland/source-lock.json
+    dem_manifest: data/elevation/manifests/uk_ireland-accessibility-g2.json
+    dem_manifest_policy: uk_ireland_accessibility_g2
+
+dem_manifest_policies:
+  uk_ireland_accessibility_g2:
+    region: uk_ireland-accessibility-g2
+    manifest: data/elevation/manifests/uk_ireland-accessibility-g2.json
+    bbox: [-11, 49, 2, 56]
+    product: GLO-30
+    version: '2024_1'
+    base_manifest: data/elevation/manifests/uk_ireland.json
+    base_manifest_sha256: 2462f8b18874115b69f531088b016d504698b6628619b52ffd022198c32759fd
+    base_region: uk_ireland
+    base_bbox: [-11, 49, 2, 55]
+    expected_base_pairs: 56
+    required_additional_cells:
+      - [55, -9]
+      - [55, -8]
+      - [55, -7]
+      - [55, -6]
+      - [55, -5]
+      - [55, -4]
+      - [55, -3]
+      - [55, -2]
+    known_nonterrestrial_cells:
+      - [50, -7]
+      - [50, 1]
+      - [53, 1]
+      - [54, 0]
+      - [53, -6]

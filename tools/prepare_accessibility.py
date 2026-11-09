@@ -14,7 +14,8 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--pbf", required=True)
     parser.add_argument("--source-url", required=True)
-    parser.add_argument("--scope", required=True, choices=("tenerife", "canaries"))
+    parser.add_argument("--scope", required=True,
+                        choices=("tenerife", "canaries", "great_britain", "ireland_northern_ireland"))
     parser.add_argument("--config", default="config/accessibility.yaml",
                         help="Declarative geographic specification for generalized scopes")
     parser.add_argument("--dem-manifest", required=True)

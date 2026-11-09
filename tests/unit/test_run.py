@@ -193,6 +193,33 @@ def test_public_dispatcher_keeps_supported_local_and_legacy_runs(
     commit.assert_not_called()
 
 
+@pytest.mark.parametrize(
+    ("no_push", "datasets", "message"),
+    [
+        (False, {"great_britain": "gb.json", "ireland_northern_ireland": "ie.json"}, "--accessibility-dataset"),
+        (True, {"great_britain": "gb.json"}, "both G2 scopes"),
+        (True, {"unknown": "bad.json"}, "unknown scope"),
+    ],
+)
+def test_direct_dispatch_rejects_invalid_g2_mappings_before_side_effects(
+    tmp_path, monkeypatch, no_push, datasets, message,
+):
+    import run as pipeline
+
+    args = _dispatch_args(tmp_path, no_push=no_push, region="uk_ireland")
+    args.accessibility_datasets = datasets
+    side_effects = ["_legacy_run", "ElevationSampler", "GeographicDataset", "clone_data_repo"]
+    mocks = []
+    for name in side_effects:
+        mock = MagicMock(name=name)
+        monkeypatch.setattr(pipeline, name, mock)
+        mocks.append(mock)
+    with pytest.raises(ValueError, match=message):
+        pipeline.run(args)
+    for mock in mocks:
+        mock.assert_not_called()
+
+
 def _write_input(tmp_path, region="france"):
     """Create a tiny input file; raster work is mocked by orchestration tests."""
     input_dir = tmp_path / "input" / region

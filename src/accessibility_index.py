@@ -35,6 +35,26 @@ GENERALIZED_POLICIES = {
     "distance_policy_revision": "f02-1a-distance-3",
     "elevation_policy_revision": "f02-1a-elevation-3",
 }
+G2_POLICIES = {
+    "preparation_revision": "f02-1a-g2-prep-1",
+    "access_policy_revision": "f02-1a-access-3",
+    "distance_policy_revision": "f02-1a-distance-3",
+    "elevation_policy_revision": "f02-1a-elevation-3",
+}
+GENERALIZED_PROFILE_REGISTRY = {
+    GENERALIZED_PROFILE: {
+        "scope": "canaries", "crs": "EPSG:32628", "prefix": "can-g1-",
+        "policies": GENERALIZED_POLICIES,
+    },
+    "great-britain-g2-v1": {
+        "scope": "great_britain", "crs": "EPSG:32630", "prefix": "g2-gb-",
+        "policies": G2_POLICIES,
+    },
+    "ireland-northern-ireland-g2-v1": {
+        "scope": "ireland_northern_ireland", "crs": "EPSG:32629", "prefix": "g2-ie-ni-",
+        "policies": G2_POLICIES,
+    },
+}
 
 SUPPORTED_POLICY_REVISIONS = {
     "preparation_revision": "f02-1a-prep-4",
@@ -227,6 +247,22 @@ class AccessibilityIndex:
                 raise ValueError(f"Accessibility package asset missing: {name}")
             if packaged.stat().st_size != info["size"] or self._sha256(packaged) != info["sha256"]:
                 raise ValueError(f"Accessibility package asset checksum mismatch: {name}")
+        if schema == 2 and self.profile != GENERALIZED_PROFILE:
+            source_lock_info = self.manifest.get("files", {}).get("source_lock")
+            if not isinstance(source_lock_info, Mapping):
+                raise ValueError("G2 accessibility manifest has no packaged source lock")
+            source_lock_path = (self.root / source_lock_info["path"]).resolve()
+            source_lock_hash = self._sha256(source_lock_path)
+            if source_lock_hash != self.manifest["identity"].get("source_lock_sha256"):
+                raise ValueError("G2 accessibility source lock hash does not match canonical identity")
+            source_lock = json.loads(source_lock_path.read_text(encoding="utf-8"))
+            provenance = self.manifest.get("pbf_provenance", {})
+            if (source_lock.get("scope") != self.manifest.get("scope")
+                    or source_lock.get("polygon_historical_authentication") is not False
+                    or source_lock.get("pbf", {}).get("sha256") != provenance.get("pbf_sha256")
+                    or source_lock.get("coverage_polygon", {}).get("sha256")
+                    != provenance.get("coverage_polygon_sha256")):
+                raise ValueError("G2 accessibility source lock contradicts source provenance")
         if schema == 1:
             identity = {
                 key: self.manifest["policies"][key]
@@ -268,20 +304,32 @@ class AccessibilityIndex:
         self.connection.close()
 
     def _validate_generalized_identity(self) -> None:
-        if self.manifest.get("profile") != GENERALIZED_PROFILE:
-            raise ValueError(f"Unknown generalized accessibility profile: {self.manifest.get('profile')!r}")
+        profile = self.manifest.get("profile")
+        profile_spec = GENERALIZED_PROFILE_REGISTRY.get(profile)
+        if profile_spec is None:
+            raise ValueError(f"Unknown generalized accessibility profile: {profile!r}")
+        if self.manifest.get("scope") != profile_spec["scope"]:
+            raise ValueError(f"Generalized accessibility profile {profile!r} has the wrong scope")
+        if self.manifest.get("crs") != profile_spec["crs"]:
+            raise ValueError(
+                "Generalized accessibility CRS contradict canonical identity: "
+                f"profile {profile!r} requires {profile_spec['crs']}"
+            )
         policies = self.manifest.get("policies")
         if not isinstance(policies, Mapping):
             raise ValueError("Accessibility manifest has no processing policy revisions")
-        for name, expected in GENERALIZED_POLICIES.items():
+        profile_policies = profile_spec["policies"]
+        for name, expected in profile_policies.items():
             if policies.get(name) != expected:
                 raise ValueError(f"Incompatible generalized accessibility policy {name}: expected {expected!r}")
         required = {
             "scope", "profile", "pbf_sha256", "coverage_polygon_sha256", "dem_manifest_sha256",
             "scope_bbox", "assignment_core_sha256", "prepared_domain_sha256",
             "provider_coverage_sha256", "preparation_buffer_m", "radii_m", "output_radius_m",
-            "software", "crs", "assignment_exclusions", *GENERALIZED_POLICIES,
+            "software", "crs", "assignment_exclusions", *profile_policies,
         }
+        if profile != GENERALIZED_PROFILE:
+            required.add("source_lock_sha256")
         identity = self.manifest.get("identity")
         if not isinstance(identity, Mapping) or set(identity) != required:
             raise ValueError("Generalized accessibility manifest identity is incomplete or has extra fields")
@@ -298,7 +346,7 @@ class AccessibilityIndex:
         }
         if any(identity.get(key) != value for key, value in operational.items()):
             raise ValueError("Generalized accessibility operational fields contradict canonical identity")
-        if any(identity.get(key) != policies.get(key) for key in GENERALIZED_POLICIES):
+        if any(identity.get(key) != policies.get(key) for key in profile_policies):
             raise ValueError("Generalized accessibility policy fields contradict canonical identity")
         geometry_fields = {
             "assignment_core_sha256": self.manifest.get("assignment_core_wkb_hex"),
@@ -319,7 +367,13 @@ class AccessibilityIndex:
                 or identity.get("dem_manifest_sha256") != dem.get("manifest_sha256")
                 or identity.get("dem_manifest_sha256") != policies.get("dem_manifest_sha256")):
             raise ValueError("Generalized accessibility source provenance contradicts canonical identity")
-        expected = "can-g1-" + hashlib.sha256(
+        if profile != GENERALIZED_PROFILE and (
+            identity.get("source_lock_sha256") != provenance.get("source_lock_sha256")
+            or not isinstance(identity.get("source_lock_sha256"), str)
+            or len(identity["source_lock_sha256"]) != 64
+        ):
+            raise ValueError("Generalized accessibility source lock contradicts canonical identity")
+        expected = profile_spec["prefix"] + hashlib.sha256(
             (json.dumps(dict(identity), sort_keys=True, ensure_ascii=False, separators=(",", ":")) + "\n").encode("utf-8")
         ).hexdigest()[:16]
         if expected != self.manifest.get("dataset_id"):

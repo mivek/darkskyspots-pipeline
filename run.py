@@ -164,8 +164,10 @@ def run(args) -> int:
     """Execute the 7-step pipeline. Returns 0 on success, 1 on error."""
     accessibility_manifest = getattr(args, "accessibility_manifest", None)
     sampler = None
+    accessibility_sampler = None
     geographic_dataset = None
     accessibility_index = None
+    accessibility_resolver = None
     try:
         region = get_region(args.region)
         logger.info("Region: %s (%s)", region["name"], args.region)
@@ -177,6 +179,7 @@ def run(args) -> int:
         _validate_geonames_inputs(country_codes)
 
         sampler = ElevationSampler(Path(args.dem_manifest_dir) / f"{args.region}.json", args.dem_cache_dir)
+        accessibility_sampler = sampler
         geographic_dataset = GeographicDataset(getattr(args, 'geographic_manifest', 'input/geography/manifest.json'),require_e3=True)
         geographic_dataset.require_region(args.region, region)
         accessibility_enricher = None
@@ -185,6 +188,25 @@ def run(args) -> int:
             from src.accessibility_index import AccessibilityIndex
             accessibility_index = AccessibilityIndex(accessibility_manifest)
             accessibility_enricher = AccessibilityEnricher(accessibility_index, sampler)
+        elif getattr(args, "accessibility_datasets", None):
+            from src.accessibility_resolver import AccessibilityResolver
+            if set(args.accessibility_datasets) == {"great_britain", "ireland_northern_ireland"}:
+                from src.accessibility_scope import GeographicSpecification
+                spec = GeographicSpecification.load(
+                    "config/accessibility.yaml", "great_britain",
+                )
+                from src.accessibility_dem import validate_accessibility_dem_manifest
+                validate_accessibility_dem_manifest(
+                    spec.dem_manifest, args.dem_cache_dir,
+                    "great_britain", "great-britain-g2-v1",
+                    geographic_config="config/accessibility.yaml",
+                )
+                accessibility_sampler = ElevationSampler(spec.dem_manifest, args.dem_cache_dir)
+            accessibility_resolver = AccessibilityResolver(
+                args.accessibility_datasets, accessibility_sampler,
+                geographic_config="config/accessibility.yaml",
+            )
+            accessibility_enricher = accessibility_resolver
 
         input_path = Path(args.input_dir) / args.region / f"{args.year}.tif"
         if not input_path.exists():
@@ -311,17 +333,27 @@ def run(args) -> int:
         named = naming_index.enrich_spots(covered)
         if any(not isinstance(spot.get("name"), str) or not spot["name"].strip() for spot in named):
             raise ValueError("GeoNames naming cascade produced an empty name")
-        if accessibility_index is not None and accessibility_index.manifest.get("schema") == 2:
+        if accessibility_resolver is not None or (
+            accessibility_index is not None and accessibility_index.manifest.get("schema") == 2
+        ):
             assignment_spots = [
                 {**spot, "id": spot.get("id") or spot_id(float(spot["lat"]), float(spot["lon"]))}
                 for spot in named
             ]
-            assignment_counts = accessibility_enricher.audit_assignments(assignment_spots)
+            assignment_counts = (accessibility_resolver.audit_assignments(assignment_spots)
+                                 if accessibility_resolver is not None
+                                 else accessibility_enricher.audit_assignments(assignment_spots))
             logger.info("  Accessibility assignments: %s", assignment_counts)
         enriched = enrich_all(named, elevation_sampler=sampler,
                               accessibility_enricher=accessibility_enricher)
-        if accessibility_index is not None and accessibility_index.manifest.get("schema") == 2:
-            accessibility_counts = accessibility_enricher.audit_assignments(enriched, enriched=True)
+        if accessibility_resolver is not None or (
+            accessibility_index is not None and accessibility_index.manifest.get("schema") == 2
+        ):
+            accessibility_counts = (accessibility_resolver.audit_assignments(enriched, enriched=True)
+                                    if accessibility_resolver is not None
+                                    else accessibility_enricher.audit_assignments(enriched, enriched=True))
+            if accessibility_counts["enriched"] != accessibility_counts["assigned"]:
+                raise ValueError("Accessibility enrichment was partial for assigned spots")
             logger.info("  Accessibility enrichment outcomes: %s", accessibility_counts)
         logger.info("  Elevation sample counts: %s", dict(sampler.counts))
         logger.info("  WBM IO stats: %s", dict(sampler.wbm_io))
@@ -406,6 +438,11 @@ def run(args) -> int:
                     output_dir, accessibility_index.manifest
                 )
                 logger.info("  Wrote accessibility source record %s", source_record)
+            if accessibility_resolver is not None:
+                from src.accessibility_prepare import write_accessibility_source_record
+                for scope, index in accessibility_resolver.indices.items():
+                    source_record = write_accessibility_source_record(output_dir, index.manifest)
+                    logger.info("  Wrote %s accessibility source record %s", scope, source_record)
 
             logger.info(
                 "  Wrote %d populated + %d empty tiles",
@@ -452,6 +489,10 @@ def run(args) -> int:
             sampler.close()
         if accessibility_index is not None:
             accessibility_index.close()
+        if accessibility_resolver is not None:
+            accessibility_resolver.close()
+        if accessibility_sampler is not None and accessibility_sampler is not sampler:
+            accessibility_sampler.close()
         if geographic_dataset is not None:
             geographic_dataset.close()
 
@@ -641,13 +682,29 @@ def run_country_migration(args) -> int:
 
 
 def _validate_accessibility_dispatch(args) -> None:
-    """Validate local-only Canary accessibility before dispatcher side effects."""
-    if not getattr(args, "accessibility_manifest", None):
+    """Validate local-only accessibility modes before dispatcher side effects."""
+    legacy_manifest = getattr(args, "accessibility_manifest", None)
+    datasets = getattr(args, "accessibility_datasets", None)
+    raw_entries = getattr(args, "accessibility_dataset", None)
+    if datasets is None and raw_entries:
+        datasets = {}
+        for entry in raw_entries:
+            if not isinstance(entry, str) or "=" not in entry:
+                raise ValueError("--accessibility-dataset must use SCOPE=MANIFEST")
+            scope, manifest = entry.split("=", 1)
+            if not scope or not manifest:
+                raise ValueError("--accessibility-dataset must use SCOPE=MANIFEST")
+            if scope in datasets:
+                raise ValueError(f"Duplicate --accessibility-dataset scope: {scope}")
+            datasets[scope] = manifest
+    if legacy_manifest and datasets:
+        raise ValueError("--accessibility-manifest and --accessibility-dataset cannot be combined")
+    if not legacy_manifest and not datasets:
+        args.accessibility_datasets = None
         return
+    flag = "--accessibility-manifest" if legacy_manifest else "--accessibility-dataset"
     if not getattr(args, "no_push", False):
-        raise ValueError("--accessibility-manifest requires --no-push; accessibility runs cannot publish")
-    if getattr(args, "region", None) != "canaries":
-        raise ValueError("--accessibility-manifest is supported only for the canaries region")
+        raise ValueError(f"{flag} requires --no-push; accessibility runs cannot publish")
     incompatible_modes = (
         "regenerate_clusters", "list_orphans", "audit_country_tags",
         "migrate_country_tags", "prune_orphan_spots", "prune_orphans",
@@ -655,9 +712,29 @@ def _validate_accessibility_dispatch(args) -> None:
     selected = [mode for mode in incompatible_modes if getattr(args, mode, False)]
     if selected:
         raise ValueError(
-            "--accessibility-manifest supports only a normal canaries run; "
+            f"{flag} supports only a normal local run; "
             f"incompatible mode(s): {', '.join(selected)}"
         )
+    if legacy_manifest:
+        if getattr(args, "region", None) != "canaries":
+            raise ValueError("--accessibility-manifest is supported only for the canaries region")
+        args.accessibility_datasets = None
+        return
+    if not isinstance(datasets, dict) or not datasets:
+        raise ValueError("--accessibility-dataset must provide a non-empty scope mapping")
+    if any(scope not in {"canaries", "great_britain", "ireland_northern_ireland"}
+           or not isinstance(path, (str, Path)) or not str(path)
+           for scope, path in datasets.items()):
+        raise ValueError("--accessibility-dataset contains an unknown scope or empty manifest path")
+    if getattr(args, "region", None) == "uk_ireland":
+        if set(datasets) != {"great_britain", "ireland_northern_ireland"}:
+            raise ValueError("uk_ireland accessibility runs require both G2 scopes")
+    elif getattr(args, "region", None) == "canaries":
+        if set(datasets) != {"canaries"}:
+            raise ValueError("canaries accessibility runs require exactly the canaries scope")
+    else:
+        raise ValueError("--accessibility-dataset is supported only for canaries or uk_ireland")
+    args.accessibility_datasets = {scope: str(path) for scope, path in datasets.items()}
 
 
 def run(args) -> int:

@@ -20,6 +20,8 @@ from shapely.geometry import Point, box
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from src.accessibility import AccessibilityEnricher, PUBLIC_CLASSES, validate_accessibility_payload
+from src.accessibility_baseline import validate_approved_g2_baseline
+from src.accessibility_dem import validate_accessibility_dem_manifest
 from src.accessibility_index import AccessibilityIndex
 from src.accessibility_prepare import (
     validate_accessibility_manifest,
@@ -30,6 +32,7 @@ from src.elevation import ElevationSampler
 from src.geography import load_geography
 from src.resource_metrics import PeakRssSampler
 from src.accessibility_scope import GeographicSpecification
+from src.accessibility_resolver import AccessibilityResolver
 
 
 ISLAND_CENTERS = {
@@ -97,6 +100,50 @@ def _cluster_index_payload(base_index: dict, cluster_paths: dict[str, dict]) -> 
     return result
 
 
+def add_accessibility_to_envelope(envelope: dict, enriched_by_id: dict[str, dict]) -> tuple[dict, bool]:
+    """Add payloads by preserved spot ID and verify envelope/spot order stability."""
+    updated = dict(envelope)
+    original_spots = envelope.get("spots")
+    if not isinstance(original_spots, list):
+        raise ValueError("Spot tile envelope has no spots array")
+    output_spots = []
+    preserved = True
+    for original in original_spots:
+        changed = dict(original)
+        if original.get("id") in enriched_by_id:
+            changed["accessibility"] = enriched_by_id[original["id"]]
+        if {key: value for key, value in changed.items() if key != "accessibility"} != original:
+            preserved = False
+        output_spots.append(changed)
+    updated["spots"] = output_spots
+    preserved = preserved and [spot.get("id") for spot in output_spots] == [
+        spot.get("id") for spot in original_spots
+    ]
+    preserved = preserved and {key: value for key, value in updated.items() if key != "spots"} == {
+        key: value for key, value in envelope.items() if key != "spots"
+    }
+    return updated, preserved
+
+
+def add_accessibility_to_clusters(records: list[dict], enriched_by_id: dict[str, dict]) -> tuple[list[dict], bool]:
+    """Enrich preserved cluster representatives without changing cluster structure."""
+    output = []
+    preserved = True
+    for record in records:
+        item = dict(record)
+        representative = dict(record["rep"])
+        if representative.get("id") in enriched_by_id:
+            representative["accessibility"] = enriched_by_id[representative["id"]]
+        item["rep"] = representative
+        check = dict(item)
+        check_rep = dict(check["rep"])
+        check_rep.pop("accessibility", None)
+        check["rep"] = check_rep
+        preserved = preserved and check == record
+        output.append(item)
+    return output, preserved
+
+
 def _load_pinned_cluster_index(path: Path, expected: dict) -> dict:
     """Load the published index only when its original bytes match the pin."""
     if (not path.is_file() or path.stat().st_size != expected.get("size")
@@ -119,11 +166,292 @@ def _implementation_fingerprint() -> dict:
     return {"algorithm": "sha256(path-nul-file-sha256-newline)", "sha256": digest.hexdigest(), "files": files}
 
 
-def run_audit(*, spots_dir: Path, clusters_dir: Path, accessibility_manifest: Path,
-              dem_manifest: Path, dem_cache_dir: Path, radius_m: int,
+def _run_multi_scope_audit(*, spots_dir: Path, clusters_dir: Path,
+                           accessibility_datasets: dict[str, Path],
+                           baseline_inventory: Path, baseline_inventory_sha256: str,
+                           dem_manifest: Path | None, dem_cache_dir: Path, radius_m: int,
+                           output_dir: Path, geographic_config: Path) -> dict:
+    """Audit a frozen non-Canary inventory through the validated resolver."""
+    spots_dir = spots_dir.resolve()
+    clusters_dir = clusters_dir.resolve()
+    baseline_inventory = baseline_inventory.resolve()
+    output_dir = output_dir.resolve()
+    inventory_bytes = baseline_inventory.read_bytes()
+    actual_inventory_hash = hashlib.sha256(inventory_bytes).hexdigest()
+    if actual_inventory_hash != baseline_inventory_sha256:
+        raise ValueError(f"Frozen baseline inventory SHA-256 mismatch: {actual_inventory_hash}")
+    baseline = json.loads(inventory_bytes)
+    if (not isinstance(baseline, dict) or not isinstance(baseline.get("commit"), str)
+            or not isinstance(baseline.get("files"), dict)):
+        raise ValueError("Explicit frozen baseline inventory is invalid")
+    baseline_root = spots_dir.parent.resolve()
+    authenticated_baseline = validate_approved_g2_baseline(spots_dir, baseline_inventory)
+    if authenticated_baseline["inventory_sha256"] != actual_inventory_hash:
+        raise ValueError("Frozen audit baseline differs from the independently pinned inventory")
+    package_manifest_path = baseline_root / "baseline.json"
+    package_manifest = json.loads(package_manifest_path.read_text(encoding="utf-8"))
+    expected_files = package_manifest["files"]
+    baseline["files"] = expected_files
+
+    baseline_tiles = sorted(spots_dir.glob("*.json"))
+    if not baseline_tiles:
+        raise ValueError(f"No frozen spot tiles found: {spots_dir}")
+    tiles: dict[str, dict] = {}
+    all_spots = []
+    g2_spots = []
+    for tile_path in baseline_tiles:
+        relative = f"spots/{tile_path.name}"
+        inventory = expected_files.get(relative)
+        if inventory is None:
+            raise ValueError(f"Spot tile is absent from frozen inventory: {relative}")
+        if (tile_path.stat().st_size != inventory.get("size")
+                or sha256_file(tile_path) != inventory.get("sha256")):
+            raise ValueError(f"Input spot tile differs from frozen inventory: {relative}")
+        envelope = json.loads(tile_path.read_text(encoding="utf-8"))
+        tile_spots = envelope.get("spots")
+        if not isinstance(tile_spots, list) or len(tile_spots) != inventory.get("expected_spot_records"):
+            raise ValueError(f"Frozen tile inventory count mismatch: {tile_path}")
+        tiles[tile_path.name] = envelope
+        for spot in tile_spots:
+            if not isinstance(spot.get("id"), str):
+                raise ValueError(f"Frozen spot lacks a string ID: {tile_path}")
+            all_spots.append(spot)
+            if str(spot.get("country", "")).upper() in {"GB", "IE"}:
+                g2_spots.append(spot)
+    all_ids = [spot["id"] for spot in all_spots]
+    if len(all_ids) != len(set(all_ids)):
+        raise ValueError("Frozen inventory has duplicate spot IDs")
+    if not g2_spots:
+        raise ValueError("Frozen baseline inventory contains no GB/IE spots")
+
+    published_clusters = {}
+    for level in range(1, 7):
+        relative = f"clusters/L{level}.json"
+        path = clusters_dir / f"L{level}.json"
+        info = expected_files.get(relative)
+        if not path.is_file() or info is None:
+            raise ValueError(f"Frozen cluster file missing from inventory: {relative}")
+        records = json.loads(path.read_text(encoding="utf-8"))
+        if (len(records) != info.get("actual_records")
+                or path.stat().st_size != info.get("size")
+                or sha256_file(path) != info.get("sha256")):
+            raise ValueError(f"Frozen cluster count mismatch: {relative}")
+        published_clusters[level] = records
+    cluster_index_path = clusters_dir / "index.json"
+    index_inventory = expected_files.get("clusters/index.json")
+    if index_inventory is None:
+        raise ValueError("Frozen inventory has no clusters/index.json")
+    published_cluster_index = _load_pinned_cluster_index(cluster_index_path, index_inventory)
+
+    scopes = set(accessibility_datasets)
+    if not scopes <= {"great_britain", "ireland_northern_ireland"} or scopes != {
+        "great_britain", "ireland_northern_ireland",
+    }:
+        raise ValueError("GB/IE audit requires exactly both configured G2 accessibility scopes")
+    specs = {scope: GeographicSpecification.load(geographic_config, scope) for scope in scopes}
+    dem_paths = {Path(spec.dem_manifest).resolve() for spec in specs.values()}
+    if len(dem_paths) != 1:
+        raise ValueError("G2 scopes do not share the configured accessibility DEM manifest")
+    configured_dem = next(iter(dem_paths))
+    if dem_manifest is not None and Path(dem_manifest).resolve() != configured_dem:
+        raise ValueError("Supplied DEM manifest is not the configured G2 accessibility halo manifest")
+
+    # Validate each configured G2 scope against the shared DEM policy before
+    # creating audit directories, opening indexes, or constructing the resolver.
+    for scope, specification in sorted(specs.items()):
+        validate_accessibility_dem_manifest(
+            configured_dem, dem_cache_dir, scope, specification.profile,
+            geographic_config=geographic_config,
+        )
+
+    output_dir.parent.mkdir(parents=True, exist_ok=True)
+    if output_dir.exists():
+        raise FileExistsError(f"Audit output already exists: {output_dir}")
+    start = time.perf_counter()
+    rss = PeakRssSampler().start()
+    stage = None
+    try:
+        with ElevationSampler(configured_dem, dem_cache_dir) as sampler, \
+                AccessibilityResolver(accessibility_datasets, sampler,
+                                      radius_m=radius_m, geographic_config=geographic_config) as resolver:
+            assignment = resolver.audit_assignments(g2_spots)
+            if assignment["assigned"] != len(g2_spots) or assignment["excluded"]:
+                raise ValueError(f"Not all frozen GB/IE spots have an assignment: {assignment}")
+            query_counts = {name: Counter() for name in PUBLIC_CLASSES}
+            coverage_counts, coverage_reasons, elevation_reasons = Counter(), Counter(), Counter()
+            per_scope = Counter()
+            country_counts = Counter(str(spot.get("country", "")).upper() for spot in g2_spots)
+            enriched_by_id = {}
+            payload_sizes = []
+            query_seconds = 0.0
+            unsupported_absence_claims = 0
+            for original in g2_spots:
+                scope = resolver.resolve_scope(original)
+                if scope is None:
+                    raise ValueError(f"G2 spot was excluded from enrichment: {original['id']}")
+                index = resolver.indices[scope]
+                per_scope[scope] += 1
+                query_start = time.perf_counter()
+                detailed = index.query_detailed(float(original["lat"]), float(original["lon"]), radius_m)
+                queries = index.public_from_detailed(
+                    detailed, reference_altitude=original.get("altitude"), elevation_sampler=sampler,
+                )
+                query_seconds += time.perf_counter() - query_start
+                coverage_counts[detailed["coverageStatus"]] += 1
+                if detailed.get("coverageReason"):
+                    coverage_reasons[detailed["coverageReason"]] += 1
+                payload = {"schema": 1, "source": index.source_id, "radiusM": radius_m, **queries}
+                validate_accessibility_payload(payload)
+                for feature_class in PUBLIC_CLASSES:
+                    outcome = payload[feature_class]
+                    query_counts[feature_class][outcome["status"]] += 1
+                    if (outcome.get("status") == "not_found_within_radius"
+                            and (detailed["coverageStatus"] != "complete"
+                                 or not index.manifest.get("class_completeness", {}).get(feature_class, False))):
+                        unsupported_absence_claims += 1
+                    if outcome.get("status") == "found" and outcome.get("elevationUnknownReason"):
+                        elevation_reasons[f"{feature_class}:{outcome['elevationUnknownReason']}"] += 1
+                encoded_size = len(compact_bytes(payload))
+                if encoded_size > 4096:
+                    raise ValueError(f"Accessibility payload exceeds 4 KiB: {original['id']}")
+                payload_sizes.append(encoded_size)
+                enriched_by_id[original["id"]] = payload
+            projection = {}
+            for scope, index in resolver.indices.items():
+                specification = specs[scope]
+                coverage_file = index.manifest["files"]["coverage_polygon"]
+                polygon_path = index.root / coverage_file["path"]
+                polygon = __import__("src.accessibility_prepare", fromlist=["parse_geofabrik_poly"]).parse_geofabrik_poly(polygon_path)
+                projection[scope] = specification.projected_geometries(polygon)[-1]
+
+            stage = Path(tempfile.mkdtemp(prefix=f".{output_dir.name}-", dir=output_dir.parent))
+            (stage / "tiles").mkdir()
+            tile_metrics = {}
+            preserved_fields = True
+            for filename, envelope in tiles.items():
+                updated, tile_preserved = add_accessibility_to_envelope(envelope, enriched_by_id)
+                preserved_fields = preserved_fields and tile_preserved
+                payload = pretty_bytes(updated)
+                (stage / "tiles" / filename).write_bytes(payload)
+                tile_metrics[filename] = {"spots": len(updated["spots"]), "enriched_bytes": len(payload)}
+            if not preserved_fields:
+                raise ValueError("Accessibility changed an original published spot property")
+
+            actual_clusters = aggregate_spot_files(spots_dir)
+            cluster_paths = {}
+            (stage / "clusters").mkdir()
+            for level in range(1, 7):
+                if actual_clusters[level] != published_clusters[level]:
+                    raise ValueError(f"Published cluster structure differs from baseline at L{level}")
+                output_records, clusters_preserved = add_accessibility_to_clusters(
+                    published_clusters[level], enriched_by_id,
+                )
+                if not clusters_preserved:
+                    raise ValueError(f"Accessibility changed a cluster record at L{level}")
+                target = stage / "clusters" / f"L{level}.json"
+                target.write_bytes(pretty_bytes(output_records))
+                cluster_paths[f"L{level}.json"] = {"sha256": sha256_file(target), "size": target.stat().st_size}
+            local_index = _cluster_index_payload(published_cluster_index, cluster_paths)
+            index_target = stage / "clusters" / "index.json"
+            index_target.write_bytes(pretty_bytes(local_index))
+            for index in resolver.indices.values():
+                write_accessibility_source_record(stage / "package", index.manifest)
+            preserved_baseline = {
+                "commit": baseline["commit"], "inventory_sha256": actual_inventory_hash,
+                "file_inventory": expected_files,
+                "g2_spot_ids": [spot["id"] for spot in g2_spots],
+                "g2_country_counts": dict(sorted(country_counts.items())),
+                "clusters": {f"L{level}.json": published_clusters[level] for level in range(1, 7)},
+                "cluster_index": published_cluster_index,
+                "cluster_logic_reproduced_exactly": True,
+            }
+            (stage / "audit").mkdir()
+            (stage / "audit" / "preserved-baseline.json").write_bytes(pretty_bytes(preserved_baseline))
+            peak_rss = rss.stop()
+            summary = {
+                "schema": 2, "review_status": "pending_independent_review",
+                "generated_at_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                "baseline": {"repository": baseline.get("repository"), "commit": baseline["commit"],
+                             "inventory_sha256": actual_inventory_hash,
+                             "spot_count": len(all_spots), "g2_spot_count": len(g2_spots),
+                             "tile_count": len(baseline_tiles)},
+                "accessibility_sources": {scope: index.source_id for scope, index in resolver.indices.items()},
+                "assignment": {**assignment, "by_scope": dict(assignment["by_scope"]),
+                               "resolved_by_scope": dict(per_scope)},
+                "spot_counts_by_country": dict(sorted(country_counts.items())),
+                "query_status_counts": {key: dict(sorted(value.items())) for key, value in query_counts.items()},
+                "search_coverage": {"status_counts": dict(sorted(coverage_counts.items())),
+                                    "unknown_reasons": dict(sorted(coverage_reasons.items()))},
+                "elevation_unknown_reasons": dict(sorted(elevation_reasons.items())),
+                "projection_validation": {scope: {"metric_crs": resolver.indices[scope].crs,
+                                                    "maximum_distortion_fraction": distortion,
+                                                    "accepted_maximum_fraction": 0.005}
+                                          for scope, distortion in projection.items()},
+                "preservation": {"original_spot_fields_and_order_unchanged": preserved_fields,
+                                 "cluster_structures_reproduced": True,
+                                 "cluster_records_checked": sum(len(value) for value in published_clusters.values()),
+                                 "enriched_representatives": sum(
+                                     record["rep"]["id"] in enriched_by_id
+                                     for records in published_clusters.values() for record in records)},
+                "payload_size_bytes": {"max": max(payload_sizes),
+                                       "mean": sum(payload_sizes) / len(payload_sizes),
+                                       "total": sum(payload_sizes), "limit": 4096,
+                                       "tiles": tile_metrics},
+                "resources": {"query_seconds": query_seconds,
+                              "total_audit_seconds": time.perf_counter() - start,
+                              "peak_rss_mib": peak_rss},
+                "pipeline_revision": _git_revision(),
+                "implementation_worktree_fingerprint": _implementation_fingerprint(),
+                "acceptance": {"all_g2_spots_assigned": assignment["assigned"] == len(g2_spots),
+                               "all_g2_spots_enriched": len(enriched_by_id) == assignment["assigned"],
+                               "original_spot_properties_and_order_preserved": preserved_fields,
+                               "cluster_structure_preserved": True,
+                               "all_payloads_within_4_kib": max(payload_sizes) <= 4096,
+                               "projection_within_0_5_percent": all(value <= 0.005 for value in projection.values()),
+                               "unsupported_absence_claims": unsupported_absence_claims,
+                               "independent_review": "pending"},
+                "limitations": ["Full regional G2 enrichment is outside the G2.1a implementation run."],
+            }
+            (stage / "audit.json").write_bytes(pretty_bytes(summary))
+            report = ["# Britain and Ireland accessibility audit", "",
+                      f"- Baseline commit: `{baseline['commit']}`",
+                      f"- G2 spots: {len(g2_spots)}; assignment counts: {json.dumps(dict(per_scope), sort_keys=True)}.",
+                      f"- Payload max: {max(payload_sizes)} bytes; query time: {query_seconds:.2f} s.",
+                      f"- Unsupported absence claims: {unsupported_absence_claims}.",
+                      "- This is a local review artifact and does not authorize publication.", ""]
+            (stage / "audit.md").write_text("\n".join(report), encoding="utf-8")
+        stage.rename(output_dir)
+        return summary
+    except BaseException:
+        rss.stop()
+        if stage is not None:
+            shutil.rmtree(stage, ignore_errors=True)
+        raise
+
+
+def run_audit(*, spots_dir: Path, clusters_dir: Path, accessibility_manifest: Path | None = None,
+              accessibility_datasets: dict[str, Path] | None = None,
+              baseline_inventory: Path | None = None, baseline_inventory_sha256: str | None = None,
+              dem_manifest: Path | None = None, dem_cache_dir: Path, radius_m: int,
               output_dir: Path, test_results_path: Path | None = None,
               tenerife_regression_path: Path | None = None,
               geographic_config: Path = Path("config/accessibility.yaml")) -> dict:
+    if accessibility_datasets is not None:
+        if accessibility_manifest is not None:
+            raise ValueError("Use either --accessibility-manifest or --accessibility-dataset, not both")
+        if baseline_inventory is None or not baseline_inventory_sha256:
+            raise ValueError("Multi-scope audits require an explicit pinned --baseline-inventory")
+        return _run_multi_scope_audit(
+            spots_dir=spots_dir, clusters_dir=clusters_dir,
+            accessibility_datasets=accessibility_datasets,
+            baseline_inventory=baseline_inventory,
+            baseline_inventory_sha256=baseline_inventory_sha256,
+            dem_manifest=dem_manifest, dem_cache_dir=dem_cache_dir,
+            radius_m=radius_m, output_dir=output_dir,
+            geographic_config=geographic_config,
+        )
+    if accessibility_manifest is None or dem_manifest is None:
+        raise ValueError("Legacy Canary audit requires --accessibility-manifest and --dem-manifest")
     spots_dir = spots_dir.resolve()
     clusters_dir = clusters_dir.resolve()
     accessibility_manifest = accessibility_manifest.resolve()
@@ -503,8 +831,12 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--spots-dir", required=True)
     parser.add_argument("--clusters-dir", required=True)
-    parser.add_argument("--accessibility-manifest", required=True)
-    parser.add_argument("--dem-manifest", required=True)
+    source_group = parser.add_mutually_exclusive_group(required=True)
+    source_group.add_argument("--accessibility-manifest")
+    source_group.add_argument("--accessibility-dataset", action="append", metavar="SCOPE=MANIFEST")
+    parser.add_argument("--baseline-inventory", type=Path)
+    parser.add_argument("--baseline-inventory-sha256")
+    parser.add_argument("--dem-manifest")
     parser.add_argument("--dem-cache-dir", default="input/elevation")
     parser.add_argument("--radius-m", required=True, type=int)
     parser.add_argument("--config", default="config/accessibility.yaml")
@@ -512,9 +844,23 @@ def main() -> int:
     parser.add_argument("--test-results", type=Path)
     parser.add_argument("--tenerife-regression", type=Path)
     args = parser.parse_args()
+    datasets = None
+    if args.accessibility_dataset:
+        datasets = {}
+        for entry in args.accessibility_dataset:
+            if "=" not in entry:
+                parser.error("--accessibility-dataset must use SCOPE=MANIFEST")
+            scope, manifest = entry.split("=", 1)
+            if not scope or not manifest or scope in datasets:
+                parser.error(f"Malformed or duplicate accessibility dataset mapping: {entry!r}")
+            datasets[scope] = Path(manifest)
     result = run_audit(
         spots_dir=Path(args.spots_dir), clusters_dir=Path(args.clusters_dir),
-        accessibility_manifest=Path(args.accessibility_manifest), dem_manifest=Path(args.dem_manifest),
+        accessibility_manifest=(Path(args.accessibility_manifest) if args.accessibility_manifest else None),
+        accessibility_datasets=datasets,
+        baseline_inventory=args.baseline_inventory,
+        baseline_inventory_sha256=args.baseline_inventory_sha256,
+        dem_manifest=(Path(args.dem_manifest) if args.dem_manifest else None),
         dem_cache_dir=Path(args.dem_cache_dir), radius_m=args.radius_m, output_dir=Path(args.output_dir),
         test_results_path=args.test_results, tenerife_regression_path=args.tenerife_regression,
         geographic_config=Path(args.config),

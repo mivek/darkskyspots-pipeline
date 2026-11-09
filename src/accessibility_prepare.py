@@ -24,12 +24,15 @@ from shapely.geometry import Point, Polygon, box
 from shapely.ops import unary_union
 
 from .accessibility import PUBLIC_CLASSES, classify_feature, resolve_access_evidence
+from .accessibility_dem import validate_accessibility_dem_manifest
 from .accessibility_index import (
     ACCESS_POLICY_REVISION,
     DISTANCE_POLICY_REVISION,
     ELEVATION_POLICY_REVISION,
     GENERALIZED_POLICIES,
     GENERALIZED_PROFILE,
+    GENERALIZED_PROFILE_REGISTRY,
+    G2_POLICIES,
     PREPARATION_REVISION,
     TO_UTM,
     AccessibilityIndex,
@@ -146,7 +149,7 @@ def accessibility_source_record(manifest: dict[str, Any]) -> dict[str, Any]:
     audit_completeness = manifest.get("audit_completeness", {
         "restriction": "restriction:unlocated_restriction" not in manifest.get("errors_by_class", {}),
     })
-    return {
+    record = {
         "schema": 1,
         "source_id": manifest["dataset_id"],
         "provider": provenance["provider"],
@@ -171,6 +174,13 @@ def accessibility_source_record(manifest: dict[str, Any]) -> dict[str, Any]:
         "license": manifest["license"],
         "coverage_note": manifest["coverage_note"],
     }
+    if manifest.get("schema") == 2 and manifest.get("profile") != GENERALIZED_PROFILE:
+        record.update({
+            "scope": manifest["scope"],
+            "profile": manifest["profile"],
+            "source_lock_sha256": manifest["identity"]["source_lock_sha256"],
+        })
+    return record
 
 
 def write_accessibility_source_record(output_dir: str | Path, manifest: dict[str, Any]) -> Path:
@@ -547,14 +557,14 @@ def prepare_accessibility(
     if not pbf.is_file():
         raise FileNotFoundError(pbf)
     if coverage_polygon is None:
-        coverage_polygon = pbf.parent / "canary-islands.poly"
+        coverage_polygon = pbf.parent / ("canary-islands.poly" if specification is None else
+                                          Path(specification.source["coverage_polygon_path"]).name)
     coverage_polygon = Path(coverage_polygon).resolve()
     if not coverage_polygon.is_file():
         raise FileNotFoundError(f"Retained Geofabrik coverage polygon is required: {coverage_polygon}")
     if output_dir.exists():
         raise FileExistsError(f"Immutable accessibility revision already exists: {output_dir}")
 
-    from .elevation import ElevationSampler
     import pyproj
     import rasterio
     import shapely
@@ -568,11 +578,10 @@ def prepare_accessibility(
         "rasterio": rasterio.__version__,
         "sqlite": sqlite3.sqlite_version,
     }
-    dem_data = json.loads(dem_manifest.read_text(encoding="utf-8"))
-    if dem_data.get("region") != "canaries" or any(tile.get("product") != "GLO-30" or tile.get("version") != "2024_1" for tile in dem_data.get("tiles", [])):
-        raise ValueError("Accessibility pilot requires the existing Canaries GLO-30 2024_1 manifest")
-    with ElevationSampler(dem_manifest, dem_cache_dir):
-        pass
+    dem_data = validate_accessibility_dem_manifest(
+        dem_manifest, dem_cache_dir, scope, profile, geographic_config=geographic_config,
+    )
+    expected_dem_region = dem_data["region"]
 
     polygon = parse_geofabrik_poly(coverage_polygon)
     assignment_core = None
@@ -595,17 +604,78 @@ def prepare_accessibility(
     downloaded_metadata = json.loads(http_path.read_text(encoding="utf-8")) if http_path.exists() else {}
     http_metadata = downloaded_metadata.get("pbf", downloaded_metadata)
     coverage_http_metadata = downloaded_metadata.get("coverage_polygon", {})
-    if not http_metadata.get("retrieved_at_utc") or not coverage_http_metadata.get("retrieved_at_utc"):
-        raise ValueError("PBF and coverage polygon retrieval metadata are required; use tools/fetch_accessibility_source.py")
-    if http_metadata.get("sha256") != sha256_file(pbf) or http_metadata.get("size") != pbf.stat().st_size:
-        raise ValueError("PBF download metadata does not match the retained source")
-    if coverage_http_metadata.get("sha256") != sha256_file(coverage_polygon):
-        raise ValueError("Coverage polygon download metadata does not match the retained source")
-    if specification is not None and (
-        http_metadata.get("url") != source_url
-        or coverage_http_metadata.get("url") != specification.source["coverage_polygon_url"]
-    ):
-        raise ValueError("Source retrieval URLs do not match the pinned geographic specification")
+    source_lock_path = None
+    source_lock_sha256 = None
+    if specification is not None and scope != "canaries":
+        source_lock_path = Path(specification.source["source_lock_path"]).resolve()
+        if not source_lock_path.is_file():
+            raise ValueError(f"Immutable G2 source lock is missing: {source_lock_path}")
+        source_lock_bytes = source_lock_path.read_bytes()
+        source_lock = json.loads(source_lock_bytes)
+        source_lock_sha256 = hashlib.sha256(source_lock_bytes).hexdigest()
+        expected_paths = {
+            "pbf": (pbf, specification.source["source_url"]),
+            "coverage_polygon": (coverage_polygon, specification.source["coverage_polygon_url"]),
+            "checksum_sidecar": (
+                Path(specification.source["checksum_sidecar_path"]).resolve(),
+                specification.source["source_url"] + ".md5",
+            ),
+        }
+        if source_lock.get("schema") != 1 or source_lock.get("scope") != scope:
+            raise ValueError("G2 source lock has an unsupported schema or scope")
+        if source_lock.get("polygon_historical_authentication") is not False:
+            raise ValueError("G2 source lock must state that retained polygons are not authenticated historical snapshots")
+        for name, (path, url) in expected_paths.items():
+            item = source_lock.get(name)
+            if (not isinstance(item, dict) or item.get("url") != url
+                    or item.get("size") != path.stat().st_size
+                    or item.get("sha256") != sha256_file(path)):
+                raise ValueError(f"G2 source lock does not match retained {name} bytes or URL")
+            http = item.get("http_metadata", {})
+            if (http.get("url") != url or http.get("size") != item.get("size")
+                    or http.get("sha256") != item.get("sha256")
+                    or not http.get("retrieved_at_utc")):
+                raise ValueError(f"G2 source lock has inconsistent HTTP metadata for {name}")
+        pbf_lock = source_lock["pbf"]
+        checksum = pbf_lock.get("provider_checksum", {})
+        if checksum.get("algorithm") != "md5" or not isinstance(checksum.get("value"), str):
+            raise ValueError("G2 source lock has no provider MD5 checksum")
+        sidecar = source_lock["checksum_sidecar"]
+        if (checksum.get("sidecar_sha256") != sidecar.get("sha256")
+                or checksum.get("sidecar_url") != sidecar.get("url")):
+            raise ValueError("G2 provider checksum sidecar metadata contradicts the source lock")
+        sidecar_text = expected_paths["checksum_sidecar"][0].read_text(encoding="ascii")
+        if sidecar_text != sidecar.get("text") or checksum["value"].lower() not in sidecar_text.lower():
+            raise ValueError("G2 retained provider checksum sidecar is inconsistent")
+        md5 = hashlib.md5()
+        with pbf.open("rb") as stream:
+            for block in iter(lambda: stream.read(1024 * 1024), b""):
+                md5.update(block)
+        if md5.hexdigest() != checksum["value"].lower():
+            raise ValueError("G2 PBF provider checksum mismatch")
+        if pbf_lock.get("header") != pbf_header:
+            raise ValueError("G2 PBF replication header differs from the locked header")
+        replication_timestamp = pbf_header.get("osmosis_replication_timestamp")
+        if hasattr(replication_timestamp, "timestamp"):
+            replication_timestamp = int(replication_timestamp.timestamp())
+        if isinstance(replication_timestamp, (list, tuple)) and len(replication_timestamp) == 1:
+            replication_timestamp = replication_timestamp[0]
+        if str(replication_timestamp) not in {"1794086496", "2026-11-07T21:21:36Z"}:
+            raise ValueError("G2 PBF is not the approved 2026-11-07 dated snapshot")
+        http_metadata = pbf_lock.get("http_metadata", {})
+        coverage_http_metadata = source_lock["coverage_polygon"].get("http_metadata", {})
+    else:
+        if not http_metadata.get("retrieved_at_utc") or not coverage_http_metadata.get("retrieved_at_utc"):
+            raise ValueError("PBF and coverage polygon retrieval metadata are required; use tools/fetch_accessibility_source.py")
+        if http_metadata.get("sha256") != sha256_file(pbf) or http_metadata.get("size") != pbf.stat().st_size:
+            raise ValueError("PBF download metadata does not match the retained source")
+        if coverage_http_metadata.get("sha256") != sha256_file(coverage_polygon):
+            raise ValueError("Coverage polygon download metadata does not match the retained source")
+        if specification is not None and (
+            http_metadata.get("url") != source_url
+            or coverage_http_metadata.get("url") != specification.source["coverage_polygon_url"]
+        ):
+            raise ValueError("Source retrieval URLs do not match the pinned geographic specification")
     provenance = {
         "provider": "Geofabrik",
         "source_url": source_url,
@@ -621,6 +691,8 @@ def prepare_accessibility(
         "coverage_polygon_retrieved_at_utc": coverage_http_metadata.get("retrieved_at_utc"),
         "source_license": "OpenStreetMap data: ODbL 1.0; © OpenStreetMap contributors.",
     }
+    if source_lock_path is not None:
+        provenance["source_lock_sha256"] = source_lock_sha256
     source_identity = {
         "pbf_sha256": provenance["pbf_sha256"],
         "coverage_polygon_sha256": provenance["coverage_polygon_sha256"],
@@ -632,7 +704,7 @@ def prepare_accessibility(
         "crs": crs,
         "software": software,
         "preparation_revision": (PREPARATION_REVISION if specification is None
-                                  else GENERALIZED_POLICIES["preparation_revision"]),
+                                  else (GENERALIZED_POLICIES if scope == "canaries" else G2_POLICIES)["preparation_revision"]),
         "access_policy_revision": ACCESS_POLICY_REVISION,
         "distance_policy_revision": DISTANCE_POLICY_REVISION,
         "elevation_policy_revision": ELEVATION_POLICY_REVISION,
@@ -640,6 +712,7 @@ def prepare_accessibility(
     if specification is None:
         dataset_id = "tfe-f021a-" + hashlib.sha256(canonical_json_bytes(source_identity)).hexdigest()[:16]
     else:
+        registry = GENERALIZED_PROFILE_REGISTRY[profile]
         source_identity.update({
             "scope": scope,
             "profile": profile,
@@ -648,7 +721,9 @@ def prepare_accessibility(
             "prepared_domain_sha256": hashlib.sha256(to_wkb(domain)).hexdigest(),
             "provider_coverage_sha256": hashlib.sha256(to_wkb(projected)).hexdigest(),
         })
-        dataset_id = "can-g1-" + hashlib.sha256(canonical_json_bytes(source_identity)).hexdigest()[:16]
+        if source_lock_sha256 is not None:
+            source_identity["source_lock_sha256"] = source_lock_sha256
+        dataset_id = registry["prefix"] + hashlib.sha256(canonical_json_bytes(source_identity)).hexdigest()[:16]
     if os.environ.get("TMPDIR"):
         Path(os.environ["TMPDIR"]).mkdir(parents=True, exist_ok=True)
 
@@ -712,7 +787,7 @@ def prepare_accessibility(
             "dem": {
                 "manifest_path": str(dem_manifest),
                 "manifest_sha256": source_identity["dem_manifest_sha256"],
-                "region": "canaries",
+                "region": expected_dem_region,
                 "product": "GLO-30",
                 "version": "2024_1",
             },
@@ -758,6 +833,13 @@ def prepare_accessibility(
                 "accepted_projection_distortion_fraction": 0.005,
             }
             manifest["assignment_exclusions"] = list(specification.assignment_exclusions)
+            if source_lock_path is not None:
+                shutil.copyfile(source_lock_path, stage / "source-lock.json")
+                manifest["files"]["source_lock"] = {
+                    "path": "source-lock.json",
+                    "size": (stage / "source-lock.json").stat().st_size,
+                    "sha256": sha256_file(stage / "source-lock.json"),
+                }
         (stage / "manifest.json").write_bytes(canonical_json_bytes(manifest))
         validate_accessibility_manifest(stage / "manifest.json")
         stage.rename(output_dir)

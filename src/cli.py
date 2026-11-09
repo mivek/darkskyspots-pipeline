@@ -56,8 +56,12 @@ def create_parser() -> argparse.ArgumentParser:
     parser.add_argument("--dem-cache-dir", default="input/elevation", help="Local DEM and water mask cache")
     parser.add_argument("--geographic-manifest", default="input/geography/manifest.json",
                         help="Verified offline geographic evidence and reviewed-water manifest")
-    parser.add_argument("--accessibility-manifest", default=None,
-                        help="Optional prepared accessibility dataset (local Canary runs only)")
+    accessibility = parser.add_mutually_exclusive_group()
+    accessibility.add_argument("--accessibility-manifest", default=None,
+                                help="Optional single prepared accessibility dataset (legacy Canary mode)")
+    accessibility.add_argument("--accessibility-dataset", action="append", default=None,
+                                metavar="SCOPE=MANIFEST",
+                                help="Prepared accessibility dataset; repeat for multi-scope runs")
     parser.add_argument("--geographic-report-dir", default=str(Path(tempfile.gettempdir())/'darksky-geographic-audits'),
                         help="Private final-payload geographic approval reports")
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose logging")
@@ -82,6 +86,33 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
             parser.error("--accessibility-manifest is local-only and requires --no-push")
         if args.region != "canaries" or special_mode:
             parser.error("--accessibility-manifest is supported only for a normal local canaries run")
+    if args.accessibility_dataset:
+        datasets = {}
+        supported = {"canaries", "great_britain", "ireland_northern_ireland"}
+        for entry in args.accessibility_dataset:
+            if not isinstance(entry, str) or "=" not in entry:
+                parser.error("--accessibility-dataset must use SCOPE=MANIFEST")
+            scope, manifest = entry.split("=", 1)
+            if not scope or not manifest or scope not in supported:
+                parser.error(f"Malformed or unknown --accessibility-dataset scope: {entry!r}")
+            if scope in datasets:
+                parser.error(f"Duplicate --accessibility-dataset scope: {scope}")
+            datasets[scope] = manifest
+        if not args.no_push:
+            parser.error("--accessibility-dataset is local-only and requires --no-push")
+        if special_mode:
+            parser.error("--accessibility-dataset supports only a normal local run")
+        if args.region == "uk_ireland":
+            if set(datasets) != {"great_britain", "ireland_northern_ireland"}:
+                parser.error("uk_ireland accessibility runs require both G2 scopes")
+        elif args.region == "canaries":
+            if set(datasets) != {"canaries"}:
+                parser.error("canaries accessibility runs require exactly the canaries scope")
+        else:
+            parser.error("--accessibility-dataset is supported only for canaries or uk_ireland")
+        args.accessibility_datasets = datasets
+    else:
+        args.accessibility_datasets = None
     if args.no_clusters and not args.no_push and not audit_mode:
         parser.error(
             "--no-clusters cannot be used when publishing; remove --no-clusters "

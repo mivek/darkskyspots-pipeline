@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+import re
 from typing import Any
 
 import yaml
@@ -12,6 +13,22 @@ from shapely import segmentize, transform as shapely_transform
 from shapely.geometry import Point
 
 from .regions import build_region_ownership, load_regions
+
+
+SUPPORTED_SCOPE_PROFILES = {
+    "canaries": {"profile": "canary-islands-g1-v1", "crs": "EPSG:32628", "countries": ("ES",),
+                 "dem_region": "canaries", "dem_policy": None},
+    "great_britain": {"profile": "great-britain-g2-v1", "crs": "EPSG:32630", "countries": ("GB",),
+                      "dem_region": "uk_ireland-accessibility-g2",
+                      "dem_policy": "uk_ireland_accessibility_g2"},
+    "ireland_northern_ireland": {
+        "profile": "ireland-northern-ireland-g2-v1",
+        "crs": "EPSG:32629",
+        "countries": ("GB", "IE"),
+        "dem_region": "uk_ireland-accessibility-g2",
+        "dem_policy": "uk_ireland_accessibility_g2",
+    },
+}
 
 
 @dataclass(frozen=True)
@@ -24,8 +41,10 @@ class GeographicSpecification:
     public_search_radius_m: int
     supported_radii_m: tuple[int, ...]
     assignment_exclusions: tuple[str, ...]
+    assignment_countries: tuple[str, ...]
     source: dict[str, Any]
     dem_manifest: str
+    dem_manifest_policy: dict[str, Any] | None
     bbox: tuple[float, float, float, float]
 
     @classmethod
@@ -39,8 +58,9 @@ class GeographicSpecification:
         if not isinstance(raw, dict):
             raise ValueError(f"Accessibility scope is not configured: {scope}")
         profile = raw.get("profile")
-        if profile != "canary-islands-g1-v1":
-            raise ValueError(f"Unknown generalized accessibility profile: {profile!r}")
+        supported = SUPPORTED_SCOPE_PROFILES.get(scope)
+        if supported is None or profile != supported["profile"]:
+            raise ValueError(f"Unknown generalized accessibility profile for {scope}: {profile!r}")
         region_name = raw.get("assignment_region")
         regions = load_regions()
         if region_name not in regions:
@@ -52,6 +72,15 @@ class GeographicSpecification:
             raise ValueError(f"Invalid metric CRS: {crs!r}") from exc
         if not parsed_crs.is_projected:
             raise ValueError("Accessibility metric CRS must be projected")
+        if parsed_crs.to_string() != supported["crs"]:
+            raise ValueError(
+                "Accessibility CRS contradicts the profile's canonical identity: "
+                f"profile {profile!r} requires {supported['crs']}, got {parsed_crs.to_string()}"
+            )
+        assignment_countries = raw.get("assignment_countries", list(supported["countries"]))
+        if (not isinstance(assignment_countries, list)
+                or tuple(str(value).upper() for value in assignment_countries) != supported["countries"]):
+            raise ValueError(f"Profile {profile!r} has an invalid assignment country set")
         buffer_m = raw.get("preparation_buffer_m")
         radius_m = raw.get("public_search_radius_m")
         radii = raw.get("supported_radii_m")
@@ -66,9 +95,54 @@ class GeographicSpecification:
                                                    for key in ("provider", "pbf_path", "source_url",
                                                                "coverage_polygon_path", "coverage_polygon_url")):
             raise ValueError("Accessibility scope has incomplete pinned source configuration")
+        if scope != "canaries" and (
+            not isinstance(source.get("source_lock_path"), str) or not source["source_lock_path"]
+            or not isinstance(source.get("checksum_sidecar_path"), str)
+            or not source["checksum_sidecar_path"]
+        ):
+            raise ValueError("G2 accessibility scope has no immutable source-lock path")
         dem_manifest = raw.get("dem_manifest")
         if not isinstance(dem_manifest, str) or not dem_manifest:
             raise ValueError("Accessibility scope has no DEM/WBM manifest")
+        configured_policy = supported["dem_policy"]
+        policy_name = raw.get("dem_manifest_policy")
+        if policy_name != configured_policy:
+            raise ValueError(
+                f"Accessibility scope {scope} has an unknown or contradictory DEM manifest policy: "
+                f"{policy_name!r}"
+            )
+        policies = data.get("dem_manifest_policies", {})
+        dem_policy = None
+        if configured_policy is not None:
+            dem_policy = policies.get(configured_policy) if isinstance(policies, dict) else None
+            if not isinstance(dem_policy, dict):
+                raise ValueError(f"Accessibility scope {scope} has no configured DEM manifest policy")
+            expected_manifest = f"data/elevation/manifests/{supported['dem_region']}.json"
+            if (dem_manifest != expected_manifest or dem_policy.get("region") != supported["dem_region"]
+                    or dem_policy.get("bbox") != [-11, 49, 2, 56]
+                    or dem_policy.get("base_region") != "uk_ireland"
+                    or dem_policy.get("base_bbox") != [-11, 49, 2, 55]
+                    or dem_policy.get("expected_base_pairs") != 56
+                    or not isinstance(dem_policy.get("known_nonterrestrial_cells"), list)):
+                raise ValueError(f"Accessibility scope {scope} DEM manifest contradicts its validated profile")
+            if (dem_policy.get("manifest") != dem_manifest
+                    or dem_policy.get("product") != "GLO-30"
+                    or dem_policy.get("version") != "2024_1"
+                    or not isinstance(dem_policy.get("base_manifest"), str)
+                    or not isinstance(dem_policy.get("base_manifest_sha256"), str)
+                    or not re.fullmatch(r"[0-9a-f]{64}", dem_policy["base_manifest_sha256"])
+                    or not isinstance(dem_policy.get("required_additional_cells"), list)):
+                raise ValueError(f"Accessibility scope {scope} has an invalid G2 DEM manifest policy")
+            cells = dem_policy["required_additional_cells"]
+            if (not cells or any(not isinstance(cell, list) or len(cell) != 2
+                                 or any(type(value) is not int for value in cell) for cell in cells)
+                    or len({tuple(cell) for cell in cells}) != len(cells)):
+                raise ValueError(f"Accessibility scope {scope} has invalid additional DEM cells")
+            dem_policy = dict(dem_policy)
+            base_manifest = Path(dem_policy["base_manifest"])
+            if not base_manifest.is_absolute():
+                base_manifest = config_path.parent.parent / base_manifest
+            dem_policy["base_manifest_path"] = str(base_manifest.resolve())
         bbox = tuple(float(value) for value in regions[region_name]["bbox"])
         exclusions = raw.get("assignment_exclusions", [])
         if not isinstance(exclusions, list) or any(not isinstance(value, str) or not value for value in exclusions):
@@ -76,26 +150,31 @@ class GeographicSpecification:
         if len(set(exclusions)) != len(exclusions):
             raise ValueError("Accessibility assignment exclusions contain duplicates")
         return cls(scope, profile, region_name, crs, buffer_m, radius_m,
-                   tuple(radii), tuple(exclusions), dict(source), dem_manifest, bbox)
+                   tuple(radii), tuple(exclusions), tuple(assignment_countries),
+                   dict(source), dem_manifest, dict(dem_policy) if dem_policy is not None else None, bbox)
 
-    def assignment_core(self):
-        """Build country ownership clipped to its existing publication bbox."""
+    def assignment_core(self, provider_coverage=None):
+        """Build canonical profile ownership, clipping G2 cores to provider coverage."""
         regions = load_regions()
         region = regions[self.assignment_region]
         ownership = build_region_ownership(region)
         geometries = [geometry for code, geometry in ownership.countries.items()
-                      if code in {str(value).upper() for value in region["osm_country_code"]}]
+                      if code in self.assignment_countries]
         if not geometries:
             raise ValueError(f"No assignment ownership geometry for scope {self.name}")
         from shapely.ops import unary_union
         core = unary_union(geometries)
+        # G1's canonical assignment geometry predates provider clipping. Keep
+        # its exact WKB construction; clipping is part of the G2 profiles only.
+        if provider_coverage is not None and self.profile != "canary-islands-g1-v1":
+            core = core.intersection(provider_coverage)
         if core.is_empty or not core.is_valid:
             raise ValueError(f"Invalid assignment core for scope {self.name}")
         return core
 
     def projected_geometries(self, provider_coverage):
-        """Return densified assignment core, buffered domain, and provider coverage."""
-        core = self.assignment_core()
+        """Return projected assignment core, buffered domain, and provider coverage."""
+        core = self.assignment_core(provider_coverage)
         # Densify geographic edges before projecting so long Natural Earth
         # segments follow their geographic path rather than a chord in metres.
         dense_core = segmentize(core, 0.02)
