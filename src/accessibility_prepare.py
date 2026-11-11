@@ -461,6 +461,8 @@ def _extract_osm(pbf: Path, db_path: Path, node_cache: Path, domain, transformer
         area_filter.enable_for(osmium.osm.RELATION)
         processor = osmium.FileProcessor(str(pbf))
         processor.with_locations(f"sparse_file_array,{node_cache}").with_areas(area_filter)
+        # Location caching and area assembly still receive untagged members.
+        processor.with_filter(osmium.filter.EmptyTagFilter())
         handler.location_storage = processor.node_location_storage
         for obj in processor:
             if obj.is_node():

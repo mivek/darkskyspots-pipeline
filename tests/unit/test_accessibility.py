@@ -168,6 +168,38 @@ def _synthetic_osm() -> str:
     </osm>'''
 
 
+def test_untagged_member_filter_preserves_extraction(tmp_path, monkeypatch):
+    osmium = pytest.importorskip("osmium")
+    from src.accessibility_prepare import _domain_geometry, _extract_osm
+
+    source = tmp_path / "synthetic.osm"
+    source.write_text(_synthetic_osm().replace(
+        '</osm>', '<node id="999" lat="28.25" lon="-16.65"><tag k="barrier" v="gate"/></node></osm>'
+    ))
+    results = []
+    original = osmium.FileProcessor.with_filter
+    for filtered in (False, True):
+        with monkeypatch.context() as context:
+            if not filtered:
+                context.setattr(osmium.FileProcessor, "with_filter", lambda self, filt: self)
+            else:
+                context.setattr(osmium.FileProcessor, "with_filter", original)
+            database = tmp_path / f"{filtered}.sqlite"
+            stats = _extract_osm(source, database, tmp_path / f"{filtered}.cache", _domain_geometry())
+        with sqlite3.connect(database) as connection:
+            features = connection.execute(
+                "SELECT osm_type, osm_id, feature_class, inventory_state, tags_json, access_json, "
+                "geometry_wkb, quality_json FROM features ORDER BY osm_type, osm_id, feature_class"
+            ).fetchall()
+            errors = connection.execute(
+                "SELECT feature_class, error_kind, object_type, object_id, detail FROM build_errors "
+                "ORDER BY feature_class, error_kind, object_type, object_id"
+            ).fetchall()
+        results.append((stats, features, errors))
+    assert results[0] == results[1]
+    assert any(row[2] == "barrier" for row in results[1][1])
+
+
 def test_synthetic_osm_streams_lines_areas_access_and_restrictions(tmp_path, monkeypatch):
     pytest.importorskip("osmium")
     from src.accessibility_prepare import _domain_geometry, _extract_osm
