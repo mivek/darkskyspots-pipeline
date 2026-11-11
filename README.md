@@ -259,7 +259,7 @@ The input must be:
 
 ## Environment
 
-- **Python 3.10+** required (tested on 3.12).
+- **Python 3.11+** required (tested on 3.12).
 - **SSH key** loaded (`ssh-add -l`) for the publish step (uses `git push` over SSH). Use `--no-push` to skip.
 - **`TMPDIR`** controls temp file location (ALR slices, git clones). Override if disk space is limited.
 

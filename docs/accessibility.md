@@ -271,3 +271,23 @@ derivative database/data offer and preparation recipe with any later
 distribution. The local pilot is not permission to distribute or publish its
 data. Preserve the existing Copernicus derived-product and liability notices
 for DEM-derived fields. See [geographic licensing](geographic-licensing.md).
+
+## Direct regional preparation
+
+Accessibility indexes are prepared directly with `tools/prepare_accessibility.py`.
+Custom supervisors, guardians, heartbeat protocols and resource-admission gates
+are not required. Historical qualification reports describe past executions;
+they are not current execution requirements.
+
+Use the configured scope, retained pinned PBF and coverage polygon, and approved
+DEM/WBM manifest. Set `TMPDIR` explicitly to a directory on the intended disk
+(ext4 for the approved Great Britain run), and select a fresh output directory.
+Preparation rejects insufficient provider coverage, including the configured
+buffer. It validates staged SQLite and manifest contents before renaming the
+completed directory; an existing output directory is never reused.
+
+Catchable Python memory failures and filesystem/SQLite disk-full errors return
+nonzero with a resource error message. Other failures retain diagnostics.
+Linux OOM-killer termination cannot be caught as Python `MemoryError`; it may
+leave staging or temporary cache files, but does not publish an incomplete index.
+No custom supervision is needed to execute the preparation CLI.

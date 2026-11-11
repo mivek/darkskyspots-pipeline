@@ -21,6 +21,7 @@ from typing import Any
 from pyproj import Transformer
 from shapely import from_wkb, to_wkb, transform as shapely_transform
 from shapely.geometry import Point, Polygon, box
+from shapely.errors import GEOSException
 from shapely.ops import unary_union
 
 from .accessibility import PUBLIC_CLASSES, classify_feature, resolve_access_evidence
@@ -352,11 +353,24 @@ def _extract_osm(pbf: Path, db_path: Path, node_cache: Path, domain, transformer
             if feature_class is None or state not in {"active", "audit_only"}:
                 return
             try:
+                # The factory drops repeated coordinates and otherwise raises an
+                # untyped RuntimeError for degenerate lines. Check that source
+                # condition explicitly instead of catching arbitrary runtime errors.
+                first_location = None
+                distinct_locations = False
+                for node in obj.nodes:
+                    location = (node.location.lon, node.location.lat)
+                    if first_location is None:
+                        first_location = location
+                    elif location != first_location:
+                        distinct_locations = True
+                if not distinct_locations:
+                    raise ValueError("way has fewer than two distinct locations")
                 geometry = from_wkb(bytes.fromhex(factory.create_linestring(obj)))
                 geometry = shapely_transform(geometry, transformer.transform, interleaved=False)
                 if geometry.is_empty or len(obj.nodes) < 2:
                     raise ValueError("way has no usable line geometry")
-            except Exception as exc:
+            except (osmium.InvalidLocationError, ValueError, GEOSException) as exc:
                 error_class = feature_class if feature_class in class_complete else "unsupported"
                 self._record_error(error_class, "missing_node_or_geometry", obj, exc)
                 return
@@ -405,31 +419,35 @@ def _extract_osm(pbf: Path, db_path: Path, node_cache: Path, domain, transformer
             if tags.get("amenity") != "parking":
                 return
             try:
+                if obj.num_rings()[0] == 0:
+                    raise ValueError("parking area has no outer ring")
                 geometry = from_wkb(bytes.fromhex(factory.create_multipolygon(obj)))
                 geometry = shapely_transform(geometry, transformer.transform, interleaved=False)
-                osm_type = "way" if obj.from_way() else "relation"
-                area_class, _area_state = classify_feature(tags, osm_type, geometry.geom_type)
-                if area_class != "parking":
-                    return
-                osm_id = obj.orig_id()
-                if osm_type == "way":
-                    assembled_parking_ways.add(str(osm_id))
-                else:
-                    assembled_parking_relations.add(str(osm_id))
-                inserted = _insert_feature(
-                    connection, osm_type=osm_type, osm_id=osm_id,
-                    version=getattr(obj, "version", None), timestamp=_object_timestamp(obj),
-                    feature_class="parking", inventory_state="active", tags=tags,
-                    geometry=geometry, geometry_valid=geometry.is_valid,
-                    quality_extra={"assembly": "area_processor", "geometry_complete": True},
-                ) if geometry.intersects(domain) else False
-                if inserted:
-                    counters[("parking", "active")] += 1
-                    if not geometry.is_valid:
-                        class_complete["parking"] = False
-                        self._record_error("parking", "invalid_geometry", obj, "assembled parking area")
-            except Exception as exc:
+                intersects_domain = geometry.intersects(domain)
+            except (osmium.InvalidLocationError, ValueError, GEOSException) as exc:
                 self._record_error("parking", "area_assembly_error", obj, exc)
+                return
+            osm_type = "way" if obj.from_way() else "relation"
+            area_class, _area_state = classify_feature(tags, osm_type, geometry.geom_type)
+            if area_class != "parking":
+                return
+            osm_id = obj.orig_id()
+            inserted = _insert_feature(
+                connection, osm_type=osm_type, osm_id=osm_id,
+                version=getattr(obj, "version", None), timestamp=_object_timestamp(obj),
+                feature_class="parking", inventory_state="active", tags=tags,
+                geometry=geometry, geometry_valid=geometry.is_valid,
+                quality_extra={"assembly": "area_processor", "geometry_complete": True},
+            ) if intersects_domain else False
+            if osm_type == "way":
+                assembled_parking_ways.add(str(osm_id))
+            else:
+                assembled_parking_relations.add(str(osm_id))
+            if inserted:
+                counters[("parking", "active")] += 1
+                if not geometry.is_valid:
+                    class_complete["parking"] = False
+                    self._record_error("parking", "invalid_geometry", obj, "assembled parking area")
 
     handler = Extractor()
     try:
@@ -596,6 +614,8 @@ def prepare_accessibility(
             raise ValueError("Geofabrik coverage polygon does not cover the complete Tenerife preparation domain")
     else:
         assignment_core, domain, projected, transformer, _inverse, max_distortion = specification.projected_geometries(polygon)
+        if not projected.covers(domain):
+            raise ValueError(f"Accessibility scope {scope} provider polygon does not cover its complete preparation domain including buffer")
         configured_coverage = Path(specification.source["coverage_polygon_path"]).resolve()
         if coverage_polygon != configured_coverage:
             raise ValueError(f"Coverage polygon path does not match configured pinned source: {configured_coverage}")
