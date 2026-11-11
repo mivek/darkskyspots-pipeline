@@ -252,6 +252,10 @@ def _insert_feature(connection: sqlite3.Connection, *, osm_type: str, osm_id: in
         "foot": resolve_access_evidence(tags, "foot", feature_class),
         "motorcar": resolve_access_evidence(tags, "motorcar", feature_class),
     }
+    previous = connection.execute(
+        "SELECT id FROM features WHERE osm_type=? AND osm_id=? AND feature_class=?",
+        (osm_type, str(osm_id), feature_class),
+    ).fetchone()
     cursor = connection.execute(
         """INSERT OR REPLACE INTO features
         (osm_type,osm_id,version,timestamp,feature_class,inventory_state,geometry_type,
@@ -262,13 +266,15 @@ def _insert_feature(connection: sqlite3.Connection, *, osm_type: str, osm_id: in
          json.dumps(access, sort_keys=True, ensure_ascii=False), zlib.compress(to_wkb(geometry), level=6),
          bounds[0], bounds[1], bounds[2], bounds[3], json.dumps(quality, sort_keys=True)),
     )
-    row = connection.execute(
-        "SELECT id FROM features WHERE osm_type=? AND osm_id=? AND feature_class=?",
-        (osm_type, str(osm_id), feature_class),
-    ).fetchone()
-    connection.execute("DELETE FROM feature_rtree WHERE id=?", (row[0],))
+    # REPLACE can assign a different row ID; discard the old spatial entry as
+    # well as any entry already using the newly assigned ID.
+    if previous:
+        connection.execute("DELETE FROM feature_rtree WHERE id IN (?,?)",
+                           (previous[0], cursor.lastrowid))
+    else:
+        connection.execute("DELETE FROM feature_rtree WHERE id=?", (cursor.lastrowid,))
     connection.execute("INSERT INTO feature_rtree VALUES (?,?,?,?,?)",
-                       (row[0], bounds[0], bounds[2], bounds[1], bounds[3]))
+                       (cursor.lastrowid, bounds[0], bounds[2], bounds[1], bounds[3]))
     return True
 
 
