@@ -33,6 +33,7 @@ from src.geography import load_geography
 from src.resource_metrics import PeakRssSampler
 from src.accessibility_scope import GeographicSpecification
 from src.accessibility_resolver import AccessibilityResolver
+from tools.compare_accessibility_pilots import _field_differences
 
 
 ISLAND_CENTERS = {
@@ -112,7 +113,7 @@ def add_accessibility_to_envelope(envelope: dict, enriched_by_id: dict[str, dict
         changed = dict(original)
         if original.get("id") in enriched_by_id:
             changed["accessibility"] = enriched_by_id[original["id"]]
-        if {key: value for key, value in changed.items() if key != "accessibility"} != original:
+        if {key: value for key, value in changed.items() if key != "accessibility"} != {key: value for key, value in original.items() if key != "accessibility"}:
             preserved = False
         output_spots.append(changed)
     updated["spots"] = output_spots
@@ -166,12 +167,99 @@ def _implementation_fingerprint() -> dict:
     return {"algorithm": "sha256(path-nul-file-sha256-newline)", "sha256": digest.hexdigest(), "files": files}
 
 
+
+def _validate_local_tiles(stage, tiles, enriched, records, references):
+    selected = {name: env for name, env in tiles.items()
+                if any(spot["id"] in enriched for spot in env["spots"])}
+    seen = set()
+    for name, original in selected.items():
+        actual = json.loads((stage / "tiles" / name).read_text(encoding="utf-8"))
+        expected, _ = add_accessibility_to_envelope(original, enriched)
+        if list(_field_differences(expected, actual)):
+            raise ValueError(f"Serialized tile preservation failed: {name}")
+        for spot in actual["spots"]:
+            if spot["id"] in seen or spot["id"] not in enriched:
+                raise ValueError(f"Unexpected or duplicate spot in selected tiles: {spot['id']}")
+            seen.add(spot["id"])
+            validate_accessibility_payload(spot["accessibility"])
+            if len(compact_bytes(spot["accessibility"])) > 4096:
+                raise ValueError("Serialized accessibility payload exceeds 4 KiB")
+    if seen != set(enriched):
+        raise ValueError("Serialized tile IDs differ from enriched IDs")
+    comparisons = {}
+    for scope, directory in references.items():
+        rows = {}
+        with (directory / "queries.jsonl").open(encoding="utf-8") as stream:
+            for line in stream:
+                row = json.loads(line)
+                key = (row["spot_id"], row["query"]["radiusM"])
+                if key in rows:
+                    raise ValueError(f"Duplicate reference query: {key}")
+                rows[key] = row["query"]
+        candidate = {(r["spot_id"], r["query"]["radiusM"]): r for r in records if r["scope"] == scope}
+        if rows.keys() != candidate.keys():
+            raise ValueError(f"Reference query IDs differ for {scope}")
+        for key, query in rows.items():
+            old, new = copy.deepcopy(query), copy.deepcopy(candidate[key]["query"])
+            old.get("metrics", {}).pop("querySeconds", None)
+            new.get("metrics", {}).pop("querySeconds", None)
+            differences = list(_field_differences(old, new))
+            if differences:
+                raise ValueError(f"Reference query differs for {scope} {key}: {differences[0][0]}")
+        endpoints = {}
+        with (directory / "actual-endpoints.jsonl").open(encoding="utf-8") as stream:
+            for line in stream:
+                row = json.loads(line)
+                if row["role"] != "selected":
+                    continue
+                key = (row["spot_id"], row["feature_class"], row["osm"])
+                if key in endpoints:
+                    raise ValueError(f"Duplicate selected endpoint: {key}")
+                endpoints[key] = [row["elevation_delta_m"], row["elevation_delta_reason"]]
+        actual_endpoints = {}
+        for record in candidate.values():
+            for cls in PUBLIC_CLASSES:
+                outcome = enriched[record["spot_id"]][cls]
+                if outcome["status"] == "found":
+                    actual_endpoints[(record["spot_id"], cls, outcome["osm"])] = [outcome["elevationDeltaM"], outcome.get("elevationUnknownReason")]
+        if list(_field_differences(endpoints, actual_endpoints)):
+            raise ValueError(f"Selected endpoint evidence differs for {scope}")
+        comparisons[scope] = {"queries_matched": len(rows), "selected_endpoints_matched": len(endpoints)}
+    return comparisons
+
+def _enrichment_assignment_summary(assignment, per_scope, enriched_by_id):
+    """Report assignment checks alongside successfully validated payload counts."""
+    by_scope = {scope: {**counts, "enriched": per_scope.get(scope, 0)}
+                for scope, counts in assignment["by_scope"].items()}
+    return {**assignment, "enriched": len(enriched_by_id), "by_scope": by_scope,
+            "resolved_by_scope": dict(per_scope)}
+
+
 def _run_multi_scope_audit(*, spots_dir: Path, clusters_dir: Path,
                            accessibility_datasets: dict[str, Path],
                            baseline_inventory: Path, baseline_inventory_sha256: str,
                            dem_manifest: Path | None, dem_cache_dir: Path, radius_m: int,
-                           output_dir: Path, geographic_config: Path) -> dict:
+                           output_dir: Path, geographic_config: Path, tiles_only: bool = False,
+                           reference_audits: dict[str, Path] | None = None) -> dict:
     """Audit a frozen non-Canary inventory through the validated resolver."""
+    reference_audits = reference_audits or {}
+    output_dir = output_dir.resolve()
+    if output_dir.exists():
+        raise FileExistsError(f"Audit output already exists: {output_dir}")
+    protected = [Path(spots_dir).resolve().parent, spots_dir, clusters_dir, baseline_inventory, dem_cache_dir, geographic_config,
+                 *(Path(path).parent for path in accessibility_datasets.values()), *reference_audits.values()]
+    if dem_manifest is not None:
+        protected.append(dem_manifest)
+    for path in protected:
+        path = Path(path).resolve()
+        if output_dir == path or output_dir in path.parents or path in output_dir.parents:
+            raise ValueError(f"Output overlaps protected input: {path}")
+    if set(reference_audits) - set(accessibility_datasets):
+        raise ValueError("Reference audit supplied for unconfigured scope")
+    for directory in reference_audits.values():
+        for name in ("queries.jsonl", "actual-endpoints.jsonl"):
+            if not (directory / name).is_file():
+                raise ValueError(f"Missing reference evidence: {directory / name}")
     spots_dir = spots_dir.resolve()
     clusters_dir = clusters_dir.resolve()
     baseline_inventory = baseline_inventory.resolve()
@@ -269,8 +357,9 @@ def _run_multi_scope_audit(*, spots_dir: Path, clusters_dir: Path,
         raise FileExistsError(f"Audit output already exists: {output_dir}")
     start = time.perf_counter()
     rss = PeakRssSampler().start()
-    stage = None
+    stage = Path(tempfile.mkdtemp(prefix=f".{output_dir.name}-", dir=output_dir.parent))
     try:
+        (stage / "audit").mkdir()
         with ElevationSampler(configured_dem, dem_cache_dir) as sampler, \
                 AccessibilityResolver(accessibility_datasets, sampler,
                                       radius_m=radius_m, geographic_config=geographic_config) as resolver:
@@ -282,6 +371,7 @@ def _run_multi_scope_audit(*, spots_dir: Path, clusters_dir: Path,
             per_scope = Counter()
             country_counts = Counter(str(spot.get("country", "")).upper() for spot in g2_spots)
             enriched_by_id = {}
+            detailed_records = []
             payload_sizes = []
             query_seconds = 0.0
             unsupported_absence_claims = 0
@@ -290,12 +380,15 @@ def _run_multi_scope_audit(*, spots_dir: Path, clusters_dir: Path,
                 if scope is None:
                     raise ValueError(f"G2 spot was excluded from enrichment: {original['id']}")
                 index = resolver.indices[scope]
-                per_scope[scope] += 1
                 query_start = time.perf_counter()
                 detailed = index.query_detailed(float(original["lat"]), float(original["lon"]), radius_m)
                 queries = index.public_from_detailed(
                     detailed, reference_altitude=original.get("altitude"), elevation_sampler=sampler,
                 )
+                record = {"spot_id": original["id"], "scope": scope, "query": detailed}
+                detailed_records.append(record)
+                with (stage / "audit" / "queries.jsonl").open("a", encoding="utf-8") as stream:
+                    stream.write(json.dumps(record, ensure_ascii=False, allow_nan=False) + "\n")
                 query_seconds += time.perf_counter() - query_start
                 coverage_counts[detailed["coverageStatus"]] += 1
                 if detailed.get("coverageReason"):
@@ -316,6 +409,7 @@ def _run_multi_scope_audit(*, spots_dir: Path, clusters_dir: Path,
                     raise ValueError(f"Accessibility payload exceeds 4 KiB: {original['id']}")
                 payload_sizes.append(encoded_size)
                 enriched_by_id[original["id"]] = payload
+                per_scope[scope] += 1
             projection = {}
             for scope, index in resolver.indices.items():
                 specification = specs[scope]
@@ -324,11 +418,12 @@ def _run_multi_scope_audit(*, spots_dir: Path, clusters_dir: Path,
                 polygon = __import__("src.accessibility_prepare", fromlist=["parse_geofabrik_poly"]).parse_geofabrik_poly(polygon_path)
                 projection[scope] = specification.projected_geometries(polygon)[-1]
 
-            stage = Path(tempfile.mkdtemp(prefix=f".{output_dir.name}-", dir=output_dir.parent))
             (stage / "tiles").mkdir()
             tile_metrics = {}
             preserved_fields = True
             for filename, envelope in tiles.items():
+                if tiles_only and not any(spot["id"] in enriched_by_id for spot in envelope["spots"]):
+                    continue
                 updated, tile_preserved = add_accessibility_to_envelope(envelope, enriched_by_id)
                 preserved_fields = preserved_fields and tile_preserved
                 payload = pretty_bytes(updated)
@@ -337,23 +432,24 @@ def _run_multi_scope_audit(*, spots_dir: Path, clusters_dir: Path,
             if not preserved_fields:
                 raise ValueError("Accessibility changed an original published spot property")
 
-            actual_clusters = aggregate_spot_files(spots_dir)
-            cluster_paths = {}
-            (stage / "clusters").mkdir()
-            for level in range(1, 7):
-                if actual_clusters[level] != published_clusters[level]:
-                    raise ValueError(f"Published cluster structure differs from baseline at L{level}")
-                output_records, clusters_preserved = add_accessibility_to_clusters(
-                    published_clusters[level], enriched_by_id,
-                )
-                if not clusters_preserved:
-                    raise ValueError(f"Accessibility changed a cluster record at L{level}")
-                target = stage / "clusters" / f"L{level}.json"
-                target.write_bytes(pretty_bytes(output_records))
-                cluster_paths[f"L{level}.json"] = {"sha256": sha256_file(target), "size": target.stat().st_size}
-            local_index = _cluster_index_payload(published_cluster_index, cluster_paths)
-            index_target = stage / "clusters" / "index.json"
-            index_target.write_bytes(pretty_bytes(local_index))
+            if not tiles_only:
+                actual_clusters = aggregate_spot_files(spots_dir)
+                cluster_paths = {}
+                (stage / "clusters").mkdir()
+                for level in range(1, 7):
+                    if actual_clusters[level] != published_clusters[level]:
+                        raise ValueError(f"Published cluster structure differs from baseline at L{level}")
+                    output_records, clusters_preserved = add_accessibility_to_clusters(
+                        published_clusters[level], enriched_by_id,
+                    )
+                    if not clusters_preserved:
+                        raise ValueError(f"Accessibility changed a cluster record at L{level}")
+                    target = stage / "clusters" / f"L{level}.json"
+                    target.write_bytes(pretty_bytes(output_records))
+                    cluster_paths[f"L{level}.json"] = {"sha256": sha256_file(target), "size": target.stat().st_size}
+                local_index = _cluster_index_payload(published_cluster_index, cluster_paths)
+                index_target = stage / "clusters" / "index.json"
+                index_target.write_bytes(pretty_bytes(local_index))
             for index in resolver.indices.values():
                 write_accessibility_source_record(stage / "package", index.manifest)
             preserved_baseline = {
@@ -363,9 +459,11 @@ def _run_multi_scope_audit(*, spots_dir: Path, clusters_dir: Path,
                 "g2_country_counts": dict(sorted(country_counts.items())),
                 "clusters": {f"L{level}.json": published_clusters[level] for level in range(1, 7)},
                 "cluster_index": published_cluster_index,
-                "cluster_logic_reproduced_exactly": True,
+                "cluster_logic_reproduced_exactly": None if tiles_only else True,
             }
-            (stage / "audit").mkdir()
+            comparisons = _validate_local_tiles(stage, tiles, enriched_by_id, detailed_records, reference_audits) if tiles_only or reference_audits else {}
+            if unsupported_absence_claims:
+                raise ValueError("Unsupported absence claims detected")
             (stage / "audit" / "preserved-baseline.json").write_bytes(pretty_bytes(preserved_baseline))
             peak_rss = rss.stop()
             summary = {
@@ -375,9 +473,14 @@ def _run_multi_scope_audit(*, spots_dir: Path, clusters_dir: Path,
                              "inventory_sha256": actual_inventory_hash,
                              "spot_count": len(all_spots), "g2_spot_count": len(g2_spots),
                              "tile_count": len(baseline_tiles)},
+                "reference_comparisons": comparisons,
+                "manifest_identities": {scope: {"sha256": sha256_file(accessibility_datasets[scope]),
+                    "class_completeness": index.manifest.get("class_completeness"),
+                    "restriction_audit_completeness": index.manifest.get("audit_completeness", {}).get("restriction")}
+                    for scope, index in resolver.indices.items()},
+                "dem_manifest_sha256": sha256_file(configured_dem),
                 "accessibility_sources": {scope: index.source_id for scope, index in resolver.indices.items()},
-                "assignment": {**assignment, "by_scope": dict(assignment["by_scope"]),
-                               "resolved_by_scope": dict(per_scope)},
+                "assignment": _enrichment_assignment_summary(assignment, per_scope, enriched_by_id),
                 "spot_counts_by_country": dict(sorted(country_counts.items())),
                 "query_status_counts": {key: dict(sorted(value.items())) for key, value in query_counts.items()},
                 "search_coverage": {"status_counts": dict(sorted(coverage_counts.items())),
@@ -388,9 +491,10 @@ def _run_multi_scope_audit(*, spots_dir: Path, clusters_dir: Path,
                                                     "accepted_maximum_fraction": 0.005}
                                           for scope, distortion in projection.items()},
                 "preservation": {"original_spot_fields_and_order_unchanged": preserved_fields,
-                                 "cluster_structures_reproduced": True,
-                                 "cluster_records_checked": sum(len(value) for value in published_clusters.values()),
-                                 "enriched_representatives": sum(
+                                 "baseline_clusters_authenticated": True,
+                                 "cluster_structures_reproduced": None if tiles_only else True,
+                                 "cluster_records_checked": None if tiles_only else sum(len(value) for value in published_clusters.values()),
+                                 "enriched_representatives": None if tiles_only else sum(
                                      record["rep"]["id"] in enriched_by_id
                                      for records in published_clusters.values() for record in records)},
                 "payload_size_bytes": {"max": max(payload_sizes),
@@ -405,12 +509,12 @@ def _run_multi_scope_audit(*, spots_dir: Path, clusters_dir: Path,
                 "acceptance": {"all_g2_spots_assigned": assignment["assigned"] == len(g2_spots),
                                "all_g2_spots_enriched": len(enriched_by_id) == assignment["assigned"],
                                "original_spot_properties_and_order_preserved": preserved_fields,
-                               "cluster_structure_preserved": True,
+                               "cluster_structure_preserved": None if tiles_only else True,
                                "all_payloads_within_4_kib": max(payload_sizes) <= 4096,
                                "projection_within_0_5_percent": all(value <= 0.005 for value in projection.values()),
                                "unsupported_absence_claims": unsupported_absence_claims,
                                "independent_review": "pending"},
-                "limitations": ["Full regional G2 enrichment is outside the G2.1a implementation run."],
+                "limitations": ["Local review artifact; publication is not authorized."],
             }
             (stage / "audit.json").write_bytes(pretty_bytes(summary))
             report = ["# Britain and Ireland accessibility audit", "",
@@ -425,7 +529,7 @@ def _run_multi_scope_audit(*, spots_dir: Path, clusters_dir: Path,
     except BaseException:
         rss.stop()
         if stage is not None:
-            shutil.rmtree(stage, ignore_errors=True)
+            (stage / "failure.txt").write_text(__import__("traceback").format_exc(), encoding="utf-8")
         raise
 
 
@@ -435,7 +539,8 @@ def run_audit(*, spots_dir: Path, clusters_dir: Path, accessibility_manifest: Pa
               dem_manifest: Path | None = None, dem_cache_dir: Path, radius_m: int,
               output_dir: Path, test_results_path: Path | None = None,
               tenerife_regression_path: Path | None = None,
-              geographic_config: Path = Path("config/accessibility.yaml")) -> dict:
+              geographic_config: Path = Path("config/accessibility.yaml"),
+              tiles_only: bool = False, reference_audits: dict[str, Path] | None = None) -> dict:
     if accessibility_datasets is not None:
         if accessibility_manifest is not None:
             raise ValueError("Use either --accessibility-manifest or --accessibility-dataset, not both")
@@ -448,8 +553,10 @@ def run_audit(*, spots_dir: Path, clusters_dir: Path, accessibility_manifest: Pa
             baseline_inventory_sha256=baseline_inventory_sha256,
             dem_manifest=dem_manifest, dem_cache_dir=dem_cache_dir,
             radius_m=radius_m, output_dir=output_dir,
-            geographic_config=geographic_config,
+            geographic_config=geographic_config, tiles_only=tiles_only, reference_audits=reference_audits,
         )
+    if tiles_only or reference_audits:
+        raise ValueError("Tile-only and reference audits require multi-scope datasets")
     if accessibility_manifest is None or dem_manifest is None:
         raise ValueError("Legacy Canary audit requires --accessibility-manifest and --dem-manifest")
     spots_dir = spots_dir.resolve()
@@ -829,6 +936,8 @@ def _git_revision() -> str | None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--tiles-only", action="store_true")
+    parser.add_argument("--reference-audit", action="append", default=[], metavar="SCOPE=DIRECTORY")
     parser.add_argument("--spots-dir", required=True)
     parser.add_argument("--clusters-dir", required=True)
     source_group = parser.add_mutually_exclusive_group(required=True)
@@ -854,6 +963,14 @@ def main() -> int:
             if not scope or not manifest or scope in datasets:
                 parser.error(f"Malformed or duplicate accessibility dataset mapping: {entry!r}")
             datasets[scope] = Path(manifest)
+    references = {}
+    for entry in args.reference_audit:
+        if "=" not in entry:
+            parser.error("--reference-audit must use SCOPE=DIRECTORY")
+        scope, directory = entry.split("=", 1)
+        if not scope or not directory or scope in references:
+            parser.error(f"Malformed or duplicate reference mapping: {entry!r}")
+        references[scope] = Path(directory)
     result = run_audit(
         spots_dir=Path(args.spots_dir), clusters_dir=Path(args.clusters_dir),
         accessibility_manifest=(Path(args.accessibility_manifest) if args.accessibility_manifest else None),
@@ -863,7 +980,7 @@ def main() -> int:
         dem_manifest=(Path(args.dem_manifest) if args.dem_manifest else None),
         dem_cache_dir=Path(args.dem_cache_dir), radius_m=args.radius_m, output_dir=Path(args.output_dir),
         test_results_path=args.test_results, tenerife_regression_path=args.tenerife_regression,
-        geographic_config=Path(args.config),
+        geographic_config=Path(args.config), tiles_only=args.tiles_only, reference_audits=references,
     )
     print(json.dumps(result, ensure_ascii=False, indent=2))
     return 0
