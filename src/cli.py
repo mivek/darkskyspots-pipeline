@@ -18,7 +18,7 @@ def create_parser() -> argparse.ArgumentParser:
     modes.add_argument(
         "--regenerate-clusters",
         action="store_true",
-        help="Regenerate published global cluster files without raster processing",
+        help="Regenerate local clusters as a retained generation, or published global clusters",
     )
     modes.add_argument(
         "--list-orphans",
@@ -50,7 +50,7 @@ def create_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--debug-raster", action="store_true", help="Sauvegarde les rasters intermédiaires darkness et bortle en GeoTIFF dans le dossier de sortie")
     parser.add_argument("--input-dir", type=str, default="./input", help="Directory with input GeoTIFFs")
-    parser.add_argument("--output-dir", type=str, default="./output", help="Directory for output JSONs")
+    parser.add_argument("--output-dir", type=str, default="./output", help="Logical root for retained local output generations")
     parser.add_argument("--budget-mb", type=float, default=500.0, help="RAM budget for input loading (MB)")
     parser.add_argument("--dem-manifest-dir", default="data/elevation/manifests", help="Regional DEM manifests")
     parser.add_argument("--dem-cache-dir", default="input/elevation", help="Local DEM and water mask cache")

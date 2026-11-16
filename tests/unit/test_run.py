@@ -8,6 +8,8 @@ from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest
+from src.tile_export import write_tile_file as real_write_tile_file
+from src.clusters import write_cluster_files as real_write_cluster_files
 
 
 @pytest.fixture(autouse=True)
@@ -242,6 +244,57 @@ def test_normal_generation_passes_mandatory_wbm_qualification(tmp_path):
     assert collaborators[3].call_args.kwargs['crs'] == qualification.crs
 
 
+@pytest.mark.parametrize("writer_failure", [False, True])
+def test_local_dispatcher_does_not_export_clusters_outside_activated_package(tmp_path, writer_failure):
+    """The dispatcher delegates local clusters to the atomic candidate producer once."""
+    import run as pipeline
+    from rasterio.transform import from_bounds
+    from src.local_generation import resolve_complete
+    _write_input(tmp_path)
+    args = _make_args(tmp_path)
+    spot = dict(_spot("dispatcher-spot", 48.2, 2.2), country="FR")
+    class Sampler:
+        counts = {}
+        wbm_io = {}
+        def __init__(self, *_args, **_kwargs): pass
+        def wbm_classes(self, lats, _lons): return np.zeros(len(lats), dtype=np.int16)
+        def close(self): pass
+    class Geography:
+        def __init__(self, *_args, **_kwargs): pass
+        def require_region(self, *_args): pass
+        def close(self): pass
+    class Naming:
+        def enrich_spots(self, spots): return spots
+    with ExitStack() as stack:
+        for step in _mock_raster_steps(from_bounds(-5, 41, 10, 51, 2, 2)):
+            stack.enter_context(step)
+        stack.enter_context(patch("run.ElevationSampler", Sampler))
+        stack.enter_context(patch("run.GeographicDataset", Geography))
+        stack.enter_context(patch("run._load_geonames_index", return_value=Naming()))
+        stack.enter_context(patch("run.enumerate_tiles_in_bbox", return_value=["N048E002"]))
+        stack.enter_context(patch("run.classify_spots_into_tiles", return_value={"N048E002": [spot]}))
+        stack.enter_context(patch("run.write_tile_file", wraps=real_write_tile_file))
+        clusters = stack.enter_context(patch("run.write_cluster_files", wraps=real_write_cluster_files))
+        if writer_failure:
+            clusters.side_effect = OSError("candidate cluster write failed")
+        assert pipeline.run(args) == (1 if writer_failure else 0)
+    if writer_failure:
+        assert clusters.call_count == 1
+        assert not (tmp_path / "output" / "current.json").exists()
+        assert not (tmp_path / "output" / "clusters-local").exists()
+        return
+    assert clusters.call_count == 1
+    candidate_spots, candidate_clusters = clusters.call_args.args[:2]
+    active = resolve_complete(tmp_path / "output")
+    candidate_spots = Path(candidate_spots)
+    candidate_clusters = Path(candidate_clusters)
+    assert "attempts" in candidate_spots.parts and candidate_spots.name == "spots"
+    assert candidate_spots.parent.name == "package"
+    assert candidate_clusters == candidate_spots.parent / "clusters-local"
+    assert json.loads((active.path / "clusters-local" / "L1.json").read_text())[0]["rep"]["id"] == "dispatcher-spot"
+    assert not (tmp_path / "output" / "clusters-local").exists()
+
+
 def test_corrupt_terrain_stops_before_alr_without_legacy_fallback(tmp_path, monkeypatch, caplog):
     import run as pipeline
     _write_input(tmp_path)
@@ -400,7 +453,7 @@ def test_run_calls_steps_in_order(tmp_path, mock_region):
         patch("run.enrich_all", side_effect=tracker("enrich_all", [])), \
         patch("run.classify_spots_into_tiles", side_effect=tracker("classify_spots_into_tiles", {})), \
         patch("run.compute_new_version", side_effect=tracker("compute_new_version", ("2025.1", True))), \
-        patch("run.write_tile_file", side_effect=tracker("write_tile_file", "/tmp/dummy.json")), \
+        patch("run.write_tile_file", side_effect=lambda *a, **kw: (tracker("write_tile_file", None)(*a, **kw), real_write_tile_file(*a, **kw))[1]), \
         patch("run.clone_data_repo"), \
         patch("run.copy_spots_to_repo", side_effect=tracker("copy_spots_to_repo", None)), \
         patch("run.commit_and_push", side_effect=tracker("commit_and_push", None)):
@@ -445,8 +498,10 @@ def test_run_merges_current_country_and_preserves_other_countries(tmp_path):
         "france": {"bbox": [-6, 41, 8, 51], "osm_country_code": ["FR"]},
         "neighbour": {"bbox": [0, 51, 1, 52], "osm_country_code": ["GB"]},
     }
-    old_owned = {"version": "2025.1", "tile": "N050E001", "spots": [{"id": "old", "country": "FR", "lat": 48.5, "lon": 2.5}]}
-    old_non_owned = {"version": "2025.1", "tile": "N051E000", "spots": [{"id": "keep", "country": "GB", "lat": 51.5, "lon": 0.0}]}
+    old_spot = dict(_spot("old", 48.5, 2.5), country="FR")
+    keep_spot = dict(_spot("keep", 51.5, 0.0), country="GB")
+    old_owned = {"version": "2025.1", "tile": "N050E001", "spots": [old_spot]}
+    old_non_owned = {"version": "2025.1", "tile": "N051E000", "spots": [keep_spot]}
 
     def clone_with_existing_tiles(_url, _branch, target_dir):
         spots_dir = Path(target_dir) / "spots"
@@ -473,12 +528,12 @@ def test_run_merges_current_country_and_preserves_other_countries(tmp_path):
         patch("run.ensure_coverage", return_value=[]), \
         patch("run.attach_near_town", return_value=[]), \
         patch("run.enrich_all", return_value=[]), \
-        patch("run.classify_spots_into_tiles", return_value={"N050E001": [{"id": "new", "country": "FR", "lat": 48.5, "lon": 2.5}]}), \
+        patch("run.classify_spots_into_tiles", return_value={"N050E001": [dict(_spot("new", 48.5, 2.5), country="FR")]}), \
         patch("run.enumerate_tiles_in_bbox", return_value=["N050E001", "N050E002"]), \
         patch("run.clone_data_repo", side_effect=clone_with_existing_tiles), \
         patch("run.compute_new_version", return_value=("2025.2", True)) as mock_version, \
-        patch("run.write_tile_file"), \
-        patch("run.write_cluster_files"), \
+        patch("run.write_tile_file", wraps=real_write_tile_file), \
+        patch("run.write_cluster_files", wraps=real_write_cluster_files), \
         patch("run.copy_spots_to_repo") as mock_copy, \
         patch("run.commit_and_push"):
         assert run(args) == 0
@@ -486,7 +541,7 @@ def test_run_merges_current_country_and_preserves_other_countries(tmp_path):
     old_arg, new_arg, year_arg = mock_version.call_args.args
     assert old_arg == {"N050E001": old_owned, "N051E000": old_non_owned}
     assert set(new_arg) == {"N050E001", "N050E002", "N051E000"}
-    assert new_arg["N050E001"]["spots"] == [{"id": "new", "country": "FR", "lat": 48.5, "lon": 2.5}]
+    assert new_arg["N050E001"]["spots"] == [dict(_spot("new", 48.5, 2.5), country="FR")]
     assert new_arg["N050E002"]["spots"] == []
     assert new_arg["N051E000"] == old_non_owned
     assert year_arg == 2025
@@ -530,7 +585,8 @@ def test_run_skips_step_7_when_no_push(mock_load_places, tmp_path, mock_region):
     mock_clusters.assert_not_called()
 
     # Verify tile files were written locally
-    spots_dir = tmp_path / "output" / "spots"
+    from src.local_generation import resolve_complete
+    spots_dir = resolve_complete(tmp_path / "output").path / "spots"
     tile_files = list(spots_dir.glob("*.json"))
     assert len(tile_files) > 0, "Expected tile files to be written even with --no-push"
 
@@ -620,7 +676,7 @@ def test_multi_country_runtime_uses_one_filtered_index_and_only_configured_spots
         tile_export = stack.enter_context(
             patch("run.classify_spots_into_tiles", return_value={})
         )
-        stack.enter_context(patch("run.write_tile_file"))
+        stack.enter_context(patch("run.write_tile_file", wraps=real_write_tile_file))
         stack.enter_context(patch("run.clone_data_repo", side_effect=clone))
         stack.enter_context(
             patch(
@@ -769,7 +825,7 @@ def test_nominal_bbox_filter_blocks_halo_candidates_from_all_publish_steps(
         stack.enter_context(
             patch("run.classify_spots_into_tiles", side_effect=capture_tiles)
         )
-        stack.enter_context(patch("run.write_tile_file"))
+        stack.enter_context(patch("run.write_tile_file", wraps=real_write_tile_file))
         with caplog.at_level("INFO", logger="pipeline"):
             assert run(args) == 0
 
@@ -814,7 +870,7 @@ def test_run_keeps_unassigned_spots_before_tile_classification(tmp_path, mock_re
         patch("run.enrich_all", return_value=[sea_spot, inland_spot]), \
         patch("run.classify_spots_into_tiles", side_effect=capture_classify_input), \
         patch("run.compute_new_version", return_value=("2025.1", True)), \
-        patch("run.write_tile_file"), \
+        patch("run.write_tile_file", wraps=real_write_tile_file), \
         patch("run.clone_data_repo"), \
         patch("run.copy_spots_to_repo"), \
         patch("run.commit_and_push"):
@@ -916,6 +972,81 @@ def test_publishing_audits_the_clone_before_raster_work(tmp_path):
         assert run(args) == 1
 
     assert events == ["clone", "audit"]
+    from src.local_generation import writer_lock
+    with writer_lock(Path(args.output_dir)):
+        pass
+
+
+def test_competing_published_run_fails_at_output_lock_before_preflight(tmp_path):
+    import subprocess
+    import sys
+    from src.local_generation import initialize, writer_lock
+    _write_input(tmp_path)
+    output = tmp_path / "output"
+    initialize(output, "france", 2025)
+    script = r'''
+from argparse import Namespace
+import sys, run
+run.load_regions = lambda: {}
+run.get_region = lambda _name: {"bbox": []}
+run.clone_data_repo = lambda *_args: print("CLONE", flush=True)
+run._audit_before_write = lambda *_args: print("AUDIT", flush=True) or True
+run._legacy_run = lambda _args: 0
+args = Namespace(region="france", year=2025, no_push=False,
+ regenerate_clusters=False, list_orphans=False, audit_country_tags=False,
+ migrate_country_tags=False, prune_orphan_spots=False,
+ data_repo_url="fixture", data_repo_branch="main", input_dir=sys.argv[2],
+ output_dir=sys.argv[1])
+print("STATUS", run.run(args), flush=True)
+'''
+    with writer_lock(output):
+        child = subprocess.run(
+            [sys.executable, "-c", script, str(output), str(tmp_path / "input")],
+            cwd=Path(__file__).resolve().parents[2], capture_output=True,
+            text=True, timeout=10,
+        )
+    assert "STATUS 1" in child.stdout
+    assert "CLONE" not in child.stdout
+    assert "AUDIT" not in child.stdout
+    with writer_lock(output):
+        pass
+
+
+def test_published_competing_invocation_is_rejected_before_clone_and_audit(tmp_path):
+    import subprocess
+    import sys
+    from src.local_generation import initialize, writer_lock
+
+    output = tmp_path / "output"
+    initialize(output, "france", 2025)
+    _write_input(tmp_path)
+    script = r'''
+from argparse import Namespace
+import run
+run.load_regions = lambda: {}
+run.get_region = lambda _name: {"bbox": []}
+run.clone_data_repo = lambda *_args: print("CLONE_CALLED", flush=True)
+run._audit_before_write = lambda *_args: print("AUDIT_CALLED", flush=True) or True
+run._legacy_run = lambda _args: 0
+args = Namespace(region="france", year=2025, no_push=False,
+    regenerate_clusters=False, list_orphans=False, audit_country_tags=False,
+    migrate_country_tags=False, prune_orphan_spots=False,
+    data_repo_url="unused", data_repo_branch="main", input_dir=sys.argv[2],
+    output_dir=sys.argv[1])
+print("STATUS", run.run(args), flush=True)
+'''.replace("import run\n", "import run\nimport sys\n")
+    with writer_lock(output):
+        child = subprocess.run(
+            [sys.executable, "-c", script, str(output), str(tmp_path / "input")],
+            cwd=Path(__file__).resolve().parents[2], capture_output=True, text=True,
+            timeout=10,
+        )
+        assert "STATUS 1" in child.stdout
+        assert "CLONE_CALLED" not in child.stdout
+        assert "AUDIT_CALLED" not in child.stdout
+    # The failed contender did not damage or unlink the persistent lock.
+    with writer_lock(output):
+        pass
 
 
 @pytest.mark.parametrize("problem_key", [
@@ -937,6 +1068,170 @@ def test_audit_modes_reject_new_country_anomaly_categories(tmp_path, problem_key
     with patch("run.audit_country_spots", return_value=audit):
         assert _audit_before_write(tmp_path / "spots", {}) is False
         args = MagicMock(data_repo_url=None, output_dir=str(tmp_path))
+        assert run_list_orphans(args) == 1
+
+
+def test_local_country_audit_pins_explicit_generation_and_fails_on_missing_tile(tmp_path):
+    from types import SimpleNamespace
+    from run import run_list_orphans
+    from src.local_generation import initialize, new_attempt
+    from src.tile_export import write_tile_file
+    from src.local_generation import promote
+    output = tmp_path / "output"
+    initialize(output, "france", 2025)
+    attempt_id, attempt = new_attempt(output, "france", 2025)
+    tile_spot = _spot("audited", 48.2, 2.2)
+    write_tile_file("N048E002", [tile_spot], str(attempt / "package"),
+                    "2025.1", "fixture", "A")
+    generation = promote(output, attempt_id, region="france", year=2025,
+                         context={"fixture": "A"}, intended_tiles=["N048E002"])
+    args = SimpleNamespace(data_repo_url=None, output_dir=str(generation.path))
+    with patch("run.audit_country_spots", return_value={"valid": 1}) as audit:
+        assert run_list_orphans(args) == 0
+        assert audit.call_args.args[0] == generation.path / "spots"
+    (generation.path / "spots" / "N048E002.json").unlink()
+    with patch("run.audit_country_spots", return_value={"valid": 0}) as audit:
+        assert run_list_orphans(args) == 1
+        audit.assert_not_called()
+
+
+def test_local_country_audit_keeps_historical_empty_directory_behavior(tmp_path):
+    from types import SimpleNamespace
+    from run import run_list_orphans
+    historical = tmp_path / "historical"
+    (historical / "spots").mkdir(parents=True)
+    args = SimpleNamespace(data_repo_url=None, output_dir=str(historical))
+    with patch("run.audit_country_spots", return_value={"valid": 0}) as audit:
+        assert run_list_orphans(args) == 0
+    assert audit.call_args.args[0] == historical / "spots"
+
+
+def test_local_country_audit_canonicalizes_external_aliases_and_uses_real_auditor(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+    from shapely.geometry import box
+    from src.local_generation import initialize, new_attempt, promote
+    from src.publish import audit_country_spots as real_audit_country_spots
+    from src.tile_export import write_tile_file
+    from run import run_list_orphans
+
+    class FixtureGeography:
+        countries = {"FR": box(-5, 40, 10, 52)}
+
+        @staticmethod
+        def country_candidates(point):
+            return ["FR"] if FixtureGeography.countries["FR"].covers(point) else []
+
+    regions = {"fixture": {"bbox": [-5, 40, 10, 52], "osm_country_code": ["FR"]}}
+    geography = FixtureGeography()
+    monkeypatch.setattr("run.load_regions", lambda: regions)
+    monkeypatch.setattr(
+        "run.audit_country_spots",
+        lambda spots_dir, _regions: real_audit_country_spots(
+            spots_dir, regions, geography=geography
+        ),
+    )
+
+    def managed_package(label):
+        root = tmp_path / f"managed-{label}"
+        initialize(root, "france", 2025)
+        attempt_id, attempt = new_attempt(root, "france", 2025)
+        write_tile_file(
+            "N048E002", [_spot(f"{label}-spot", 48.2, 2.2) | {"country": "FR"}],
+            str(attempt / "package"), "2025.1", "fixture", label,
+        )
+        ref = promote(root, attempt_id, region="france", year=2025,
+                      context={"fixture": label}, intended_tiles=["N048E002"])
+        return root, ref
+
+    aliases = tmp_path / "outside-aliases"
+    aliases.mkdir()
+
+    # Both the canonical package and an external symlink alias are audited by
+    # the real country auditor, using a deterministic fixture geometry.
+    root, valid = managed_package("valid")
+    valid_alias = aliases / "valid-package"
+    valid_alias.symlink_to(valid.path, target_is_directory=True)
+    for path in (valid.path, valid_alias):
+        args = SimpleNamespace(data_repo_url=None, output_dir=str(path))
+        assert run_list_orphans(args) == 0
+
+    # Recorded-tile loss is caught for both spellings before the auditor can
+    # turn the missing content into a successful empty audit.
+    (valid.path / "spots" / "N048E002.json").unlink()
+    for path in (valid.path, valid_alias):
+        args = SimpleNamespace(data_repo_url=None, output_dir=str(path))
+        assert run_list_orphans(args) == 1
+
+    # Managed history and unfinished candidates are unsupported read paths,
+    # including when their lexical path begins outside the managed root.
+    history_alias = aliases / "history"
+    history_alias.symlink_to(root / "generations", target_is_directory=True)
+    for path in (root / "generations", history_alias):
+        args = SimpleNamespace(data_repo_url=None, output_dir=str(path))
+        assert run_list_orphans(args) == 1
+
+    attempt_id, attempt = new_attempt(root, "france", 2025)
+    unfinished = attempt / "package"
+    write_tile_file(
+        "N048E002", [_spot("unfinished-spot", 48.2, 2.2) | {"country": "FR"}],
+        str(unfinished), "2025.1", "fixture", "unfinished",
+    )
+    unfinished_alias = aliases / "unfinished-package"
+    unfinished_alias.symlink_to(unfinished, target_is_directory=True)
+    for path in (unfinished, unfinished_alias):
+        args = SimpleNamespace(data_repo_url=None, output_dir=str(path))
+        assert run_list_orphans(args) == 1
+
+    # A true historical path remains read-only and auditable, including via
+    # an external alias; it is not rejected merely for being a symlink.
+    historical = tmp_path / "historical" / "spots"
+    historical.mkdir(parents=True)
+    write_tile_file("N048E002", [_spot("historic", 48.2, 2.2) | {"country": "FR"}],
+                    str(historical.parent), "2025.1", "fixture", "historic")
+    historical_alias = aliases / "historical"
+    historical_alias.symlink_to(historical.parent, target_is_directory=True)
+    for path in (historical.parent, historical_alias):
+        args = SimpleNamespace(data_repo_url=None, output_dir=str(path))
+        assert run_list_orphans(args) == 0
+
+
+def test_local_country_audit_rejects_external_alias_to_managed_history(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+    from shapely.geometry import box
+    from src.local_generation import initialize, new_attempt, promote
+    from src.publish import audit_country_spots as real_audit_country_spots
+    from src.tile_export import write_tile_file
+    from run import run_list_orphans
+
+    class FixtureGeography:
+        countries = {"FR": box(-5, 40, 10, 52)}
+
+        @staticmethod
+        def country_candidates(point):
+            return ["FR"] if FixtureGeography.countries["FR"].covers(point) else []
+
+    regions = {"fixture": {"bbox": [-5, 40, 10, 52], "osm_country_code": ["FR"]}}
+    geography = FixtureGeography()
+    monkeypatch.setattr("run.load_regions", lambda: regions)
+    monkeypatch.setattr(
+        "run.audit_country_spots",
+        lambda spots_dir, _regions: real_audit_country_spots(
+            spots_dir, regions, geography=geography
+        ),
+    )
+    root = tmp_path / "managed"
+    initialize(root, "france", 2025)
+    attempt_id, attempt = new_attempt(root, "france", 2025)
+    write_tile_file("N048E002", [_spot("history-parent", 48.2, 2.2) | {"country": "FR"}],
+                    str(attempt / "package"), "2025.1", "fixture", "A")
+    promote(root, attempt_id, region="france", year=2025,
+            context={"fixture": "A"}, intended_tiles=["N048E002"])
+    alias_parent = tmp_path / "external-aliases"
+    alias_parent.mkdir()
+    history_alias = alias_parent / "generations"
+    history_alias.symlink_to(root / "generations", target_is_directory=True)
+    for path in (root / "generations", history_alias):
+        args = SimpleNamespace(data_repo_url=None, output_dir=str(path))
         assert run_list_orphans(args) == 1
 
 
@@ -1210,34 +1505,23 @@ def test_run_uses_bbox_only_to_enumerate_working_tiles(tmp_path):
             patch("run.enumerate_tiles_in_bbox", return_value=["N048E002"])
         )
         stack.enter_context(patch("run.classify_spots_into_tiles", return_value={}))
-        stack.enter_context(patch("run.write_tile_file"))
+        stack.enter_context(patch("run.write_tile_file", wraps=real_write_tile_file))
         assert run(args) == 0
     enumerate_tiles.assert_called_once()
 
 
 def test_no_push_clusters_include_all_staged_country_tiles(tmp_path):
-    """Local cluster artifacts consume the complete staged spot repository."""
-    from rasterio.transform import from_bounds
+    """Historical output is preserved and refused instead of inherited."""
     from run import run
 
-    _write_input(tmp_path)
     spots_dir = tmp_path / "output" / "spots"
-    _write_envelope(spots_dir, "N048E002", [_spot("inside", 48.2, 2.2)])
-    _write_envelope(spots_dir, "N051E000", [_spot("outside", 51.2, 0.2)])
-    transform = from_bounds(-5, 41, 10, 51, 2, 2)
-
+    _write_envelope(spots_dir, "N048E002", [_spot("legacy", 48.2, 2.2)])
+    before = (spots_dir / "N048E002.json").read_bytes()
+    _write_input(tmp_path)
     args = _make_args(tmp_path)
-    with ExitStack() as stack:
-        for mocked_step in _mock_raster_steps(transform):
-            stack.enter_context(mocked_step)
-        stack.enter_context(patch("run.classify_spots_into_tiles", return_value={}))
-        stack.enter_context(patch("run.write_tile_file"))
-        assert run(args) == 0
-
-    clusters = json.loads((tmp_path / "output" / "clusters-local" / "L1.json").read_text())
-    representative_ids = {cluster["rep"]["id"] for cluster in clusters}
-    assert "inside" in representative_ids
-    assert "outside" in representative_ids
+    assert run(args) == 1
+    assert (spots_dir / "N048E002.json").read_bytes() == before
+    assert not (tmp_path / "output" / "current.json").exists()
 
 
 def test_published_regeneration_audits_country_tags_before_commit(tmp_path):
@@ -1269,14 +1553,15 @@ def test_published_regeneration_audits_country_tags_before_commit(tmp_path):
     assert committed == {"called": True}
 
 
-def test_no_push_writer_failure_returns_error_status(tmp_path):
-    """Local cluster-write errors stay within the integer-status contract."""
+def test_local_dispatcher_returns_legacy_pipeline_failure_status(tmp_path):
+    """The local dispatcher propagates the atomic producer's failure status."""
     from run import run
 
     args = _make_args(tmp_path)
-    with patch("run._legacy_run", return_value=0), \
-         patch("run.write_cluster_files", side_effect=OSError("disk full")):
+    with patch("run._legacy_run", return_value=1), \
+         patch("run.write_cluster_files") as clusters:
         assert run(args) == 1
+    clusters.assert_not_called()
 
 
 def test_local_regeneration_requires_existing_staged_spots(tmp_path, caplog):
@@ -1288,5 +1573,4 @@ def test_local_regeneration_requires_existing_staged_spots(tmp_path, caplog):
     with patch("run.write_cluster_files") as writer:
         assert run_regenerate_clusters(args) == 1
     writer.assert_not_called()
-    assert "output/spots" in caplog.text
-    assert "does not exist" in caplog.text
+    assert "fresh dedicated --output-dir" in caplog.text

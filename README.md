@@ -7,6 +7,24 @@ Local Python batch pipeline that transforms VIIRS radiance GeoTIFFs into per-til
 **Output:** per-tile JSON files (`spots/<tileId>.json`) pushed to a separate data repo.  
 **Frequency:** ~1×/year (annual VIIRS composite). Not a server, not an API — a single `python run.py` invocation.
 
+## Local output generations
+
+Each `--output-dir` is bound to one region and year. Use a fresh, dedicated
+directory for the first run; historical output directories are read-only and
+are not imported automatically. Completed packages are retained under
+`generations/`, and `current.json` selects the active package. Failed attempts
+remain under `attempts/` for diagnosis. Resolve and validate the active package
+with:
+
+```bash
+python tools/local_generation.py resolve --output-dir output
+```
+
+Local cluster regeneration requires a managed output and creates a derivative
+generation while retaining the parent. Locks and atomic pointer replacement
+protect against process interruption on local POSIX filesystems. This does not
+provide power-loss durability; no automatic resume or pruning is performed.
+
 ## Quick start
 
 Normal generation additionally requires a verified local geographic package.

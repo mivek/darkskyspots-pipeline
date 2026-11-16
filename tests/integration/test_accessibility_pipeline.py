@@ -1,6 +1,7 @@
 """Controlled pipeline integration for two-scope accessibility enrichment."""
 
 from collections import Counter
+import json
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock
@@ -9,6 +10,8 @@ from unittest.mock import patch
 import numpy as np
 
 from src.cli import parse_args
+from src.tile_export import write_tile_file as real_write_tile_file
+from src.accessibility import PUBLIC_CLASSES
 
 
 def test_uk_ireland_pipeline_routes_accessibility_and_closes_both_samplers(tmp_path, monkeypatch):
@@ -127,7 +130,10 @@ def test_uk_ireland_pipeline_routes_accessibility_and_closes_both_samplers(tmp_p
 
         def enrich_spot(self, spot):
             source = "ie-source" if float(spot["lon"]) < -5.5 else "gb-source"
-            return dict(spot, accessibility={"schema": 1, "source": source, "radiusM": 1000})
+            evidence = {"schema": 1, "source": source, "radiusM": 1000}
+            evidence.update({name: {"status": "not_found_within_radius"}
+                             for name in PUBLIC_CLASSES})
+            return dict(spot, accessibility=evidence)
 
         def close(self):
             self.closed = True
@@ -151,14 +157,22 @@ def test_uk_ireland_pipeline_routes_accessibility_and_closes_both_samplers(tmp_p
         "src.accessibility_dem.validate_accessibility_dem_manifest", dem_validation,
     )
     source_records = []
+    def write_source_record(directory, manifest):
+        directory = Path(directory)
+        source_id = manifest["dataset_id"]
+        source = directory / "accessibility" / "sources" / f"{source_id}.json"
+        source.parent.mkdir(parents=True, exist_ok=True)
+        source.write_text(json.dumps({"schema": 1, "source_id": source_id}))
+        source_records.append((directory, source_id))
+        return source
     monkeypatch.setattr(
         "src.accessibility_prepare.write_accessibility_source_record",
-        lambda directory, manifest: source_records.append((Path(directory), manifest["dataset_id"])),
+        write_source_record,
     )
     monkeypatch.setattr(pipeline, "classify_spots_into_tiles", lambda spots, _size: {"N054W006": spots})
     monkeypatch.setattr(pipeline, "compute_new_version", lambda *_args: ("2025.1", True))
     monkeypatch.setattr(pipeline, "merge_tile_envelopes", lambda _old, new, _ownership: new)
-    monkeypatch.setattr(pipeline, "write_tile_file", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(pipeline, "write_tile_file", real_write_tile_file)
 
     assert pipeline.run(args) == 0
     dem_validation.assert_called_once_with(
@@ -177,3 +191,5 @@ def test_uk_ireland_pipeline_routes_accessibility_and_closes_both_samplers(tmp_p
     assert resolvers[0].elevation_sampler is samplers[1]
     assert resolvers[0].audit_calls == [(2, False), (2, True)]
     assert {source for _directory, source in source_records} == {"gb-source", "ie-source"}
+    assert all("attempts" in directory.parts and "package" in directory.parts
+               for directory, _source in source_records)

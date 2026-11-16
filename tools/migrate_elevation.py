@@ -54,6 +54,8 @@ def _migrate_staged(repo, manifest_dir, cache_dir, year=None):
 def migrate(repo, manifest_dir, cache_dir, year=None, *, geographic_dataset=None,
             geographic_report_dir=None):
     """Preserve the destination until migration/clusters pass final validation."""
+    from src.local_generation import reject_managed_destination
+    reject_managed_destination(repo)
     from src.geographic_publication import guarded_apply
     return guarded_apply(
         repo, lambda stage: _migrate_staged(stage, manifest_dir, cache_dir, year),

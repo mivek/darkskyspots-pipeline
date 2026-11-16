@@ -1085,6 +1085,8 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    from src.local_generation import resolve_spots_dir
+    args.spots_dir = str(resolve_spots_dir(args.spots_dir))
     report = run_measurement(args)
     Path(args.out_json).parent.mkdir(parents=True, exist_ok=True)
     Path(args.out_json).write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")

@@ -6,8 +6,11 @@ Usage:
     python run.py --year 2025 --region france --data-repo-url git@github.com:user/data-repo.git
 """
 import json
+import hashlib
 import logging
+import shutil
 import sys
+import subprocess
 import tempfile
 import time
 from contextlib import nullcontext
@@ -44,7 +47,7 @@ from src.publish import (
     audit_country_spots,
     migrate_country_tags,
 )
-from src.clusters import write_cluster_files
+from src.clusters import LEVELS, write_cluster_files
 from src.regions import build_region_ownerships, get_region, load_regions
 from src.geography import classify_candidates, validate_country_codes
 from src.selection import CandidateQualifier
@@ -97,6 +100,15 @@ def _generated_date() -> str:
     seconds, nanoseconds = divmod(generated_ns, 1_000_000_000)
     timestamp = datetime.fromtimestamp(seconds, timezone.utc)
     return f"{timestamp:%Y-%m-%dT%H:%M:%S}.{nanoseconds:09d}Z"
+
+
+def _producer_revision() -> str:
+    try:
+        result = subprocess.run(["git", "rev-parse", "HEAD"], cwd=Path(__file__).parent,
+                                capture_output=True, text=True, check=True)
+        return result.stdout.strip()
+    except (OSError, subprocess.CalledProcessError):
+        return "unknown"
 
 
 def _region_country_codes(region: dict) -> list[str]:
@@ -168,6 +180,10 @@ def run(args) -> int:
     geographic_dataset = None
     accessibility_index = None
     accessibility_resolver = None
+    generation_lock = None
+    publication_tmp = None
+    owns_publication_clone = False
+    active_generation = None
     try:
         region = get_region(args.region)
         logger.info("Region: %s (%s)", region["name"], args.region)
@@ -213,8 +229,26 @@ def run(args) -> int:
             logger.error("Input not found: %s", input_path)
             return 1
 
-        output_dir = Path(args.output_dir)
-        output_dir.mkdir(parents=True, exist_ok=True)
+        logical_output_dir = Path(args.output_dir)
+        from src.local_generation import initialize, new_attempt, writer_lock
+        generation_lock = writer_lock(logical_output_dir)
+        generation_lock.__enter__()
+        initialize(logical_output_dir, args.region, args.year)
+        attempt_id, attempt_dir = new_attempt(logical_output_dir, args.region, args.year)
+        output_dir = attempt_dir / "package"
+        debug_dir = logical_output_dir / "debug" / attempt_id
+
+        # Keep the audited publication snapshot alive before any raster work.
+        # This is only for published execution; local runs never touch a repo.
+        global _PUBLISHED_CLONE, _PUBLISHED_OLD_ENVELOPES
+        if not getattr(args, "no_push", False) and _PUBLISHED_CLONE is None:
+            publication_tmp = tempfile.TemporaryDirectory()
+            _PUBLISHED_CLONE = Path(publication_tmp.name)
+            owns_publication_clone = True
+            clone_data_repo(args.data_repo_url, args.data_repo_branch, str(_PUBLISHED_CLONE))
+            if not _audit_before_write(_PUBLISHED_CLONE / "spots", load_regions()):
+                raise ValueError("Publication country-audit preflight failed")
+            _PUBLISHED_OLD_ENVELOPES = _load_envelopes(_PUBLISHED_CLONE / "spots")
 
         # Bboxes remain raster/GeoNames envelopes only.  They do not confer
         # ownership of any tile; country clipping decides what is publishable.
@@ -236,8 +270,9 @@ def run(args) -> int:
         bortle = alr_to_bortle(alr_data)
 
         if getattr(args, "debug_raster", False):
-            darkness_path = output_dir / f"debug_darkness_{args.region}_{args.year}.tif"
-            bortle_path = output_dir / f"debug_bortle_{args.region}_{args.year}.tif"
+            debug_dir.mkdir(parents=True, exist_ok=True)
+            darkness_path = debug_dir / f"debug_darkness_{args.region}_{args.year}.tif"
+            bortle_path = debug_dir / f"debug_bortle_{args.region}_{args.year}.tif"
             profile = {
                 "driver": "GTiff",
                 "height": darkness.shape[0],
@@ -251,7 +286,7 @@ def run(args) -> int:
                 dst.write(darkness.astype("float32"), 1)
             with rasterio.open(bortle_path, "w", **profile) as dst:
                 dst.write(bortle.astype("float32"), 1)
-            logger.info("Debug rasters written to %s", output_dir)
+            logger.info("Debug rasters written to %s", debug_dir)
 
         # Step 2: Mesh scan (darkest pixel per cell)
         logger.info("Step 2: Mesh scan (darkest pixel per cell)")
@@ -424,6 +459,8 @@ def run(args) -> int:
             )
             logger.info("  Version: %s (changed=%s)", version, changed)
 
+            (output_dir / "spots").mkdir(parents=True, exist_ok=True)
+
             for env in new_envelopes.values():
                 env["version"] = version
 
@@ -443,6 +480,27 @@ def run(args) -> int:
                 for scope, index in accessibility_resolver.indices.items():
                     source_record = write_accessibility_source_record(output_dir, index.manifest)
                     logger.info("  Wrote %s accessibility source record %s", scope, source_record)
+
+            if not getattr(args, "no_clusters", False):
+                write_cluster_files(output_dir / "spots", output_dir / "clusters-local",
+                                    data_year=args.year, generated=_generated_date(), levels=LEVELS)
+            from src.local_generation import promote
+            cluster_parameters = ([{"level": level.level, "cell_deg": level.cell_deg,
+                                   "width_km": list(level.width_km)} for level in LEVELS]
+                                  if not getattr(args, "no_clusters", False) else None)
+            active_generation = promote(
+                logical_output_dir, attempt_id, region=args.region, year=args.year,
+                context={"producer": "run.py", "bbox": list(region["bbox"]),
+                         "tile_size_deg": TILE_SIZE_DEG, "source": source,
+                         "version": version, "generated": generated,
+                         "producer_revision": _producer_revision(),
+                         "cluster_parameters": cluster_parameters},
+                intended_tiles=sorted(set(tiles_dict) | set(all_tile_ids)),
+                clusters=not getattr(args, "no_clusters", False),
+                cluster_parameters=cluster_parameters,
+            )
+            logger.info("Activated local generation %s at %s", active_generation.generation_id,
+                        active_generation.path)
 
             logger.info(
                 "  Wrote %d populated + %d empty tiles",
@@ -465,7 +523,7 @@ def run(args) -> int:
                         data_year=args.year,
                         generated=_generated_date(),
                     )
-                _ensure_clone_is_not_output(data_repo_dir, output_dir)
+                _ensure_clone_is_not_output(data_repo_dir, logical_output_dir)
                 commit_msg = f"data: update {args.region} spots v{version} ({args.year})"
                 commit_and_push(str(data_repo_dir), commit_msg,
                                 geographic_dataset=geographic_dataset,
@@ -482,9 +540,18 @@ def run(args) -> int:
         logger.info("Pipeline complete.")
         return 0
     except Exception:
-        logger.exception("Error: pipeline failed")
+        if active_generation is not None:
+            logger.exception("Remote publication failed after local generation %s was activated and remains usable", active_generation.generation_id)
+        else:
+            logger.exception("Pipeline failed before local generation activation")
         return 1
     finally:
+        if generation_lock is not None:
+            generation_lock.__exit__(None, None, None)
+        if owns_publication_clone:
+            _PUBLISHED_CLONE = None
+            _PUBLISHED_OLD_ENVELOPES = {}
+            publication_tmp.cleanup()
         if sampler is not None:
             sampler.close()
         if accessibility_index is not None:
@@ -585,7 +652,18 @@ def run_list_orphans(args) -> int:
                 clone_data_repo(args.data_repo_url, args.data_repo_branch, str(clone_dir))
                 audit = audit_country_spots(clone_dir / "spots", regions)
         else:
-            audit = audit_country_spots(Path(args.output_dir) / "spots", regions)
+            # Classify and consume one canonical target.  A lexical alias may
+            # sit outside a managed root while resolving into a finalized
+            # package, history directory, or unfinished candidate.
+            local_root = Path(args.output_dir).resolve()
+            from src.local_generation import resolve_spots_dir
+            managed = next((path for path in (local_root, *local_root.parents)
+                            if (path / "identity.json").is_file()), None)
+            if managed is not None:
+                spots_dir = resolve_spots_dir(local_root)
+            else:
+                spots_dir = local_root if local_root.name == "spots" else local_root / "spots"
+            audit = audit_country_spots(spots_dir, regions)
         print(json.dumps(audit, indent=2, ensure_ascii=False))
         return 0 if not _audit_has_problems(audit) else 1
     except Exception:
@@ -595,21 +673,11 @@ def run_list_orphans(args) -> int:
 
 def run_regenerate_clusters(args) -> int:
     try:
-        regions = load_regions()
         output_dir = Path(args.output_dir)
         if args.no_push:
-            if not args.no_clusters:
-                spots_dir = output_dir / "spots"
-                if not spots_dir.is_dir():
-                    logger.error("Local cluster regeneration requires output/spots; it does not exist: %s", spots_dir)
-                    return 1
-                write_cluster_files(
-                    spots_dir,
-                    output_dir / "clusters-local",
-                    data_year=args.year,
-                    generated=_generated_date(),
-                )
+            _regenerate_local_clusters(args, output_dir)
             return 0
+        regions = load_regions()
         with tempfile.TemporaryDirectory() as clone_ctx:
             clone_dir = Path(clone_ctx)
             clone_data_repo(args.data_repo_url, args.data_repo_branch, str(clone_dir))
@@ -628,6 +696,52 @@ def run_regenerate_clusters(args) -> int:
         return 1
 
 
+def _regenerate_local_clusters(args, output_dir: Path) -> None:
+    from src.local_generation import writer_lock, resolve_complete, new_attempt, promote
+    if args.no_clusters:
+        logger.info("Local cluster regeneration skipped (--no-clusters); no generation created")
+        return
+    with writer_lock(output_dir):
+        identity_path = output_dir / "identity.json"
+        if not identity_path.exists():
+            raise ValueError(f"Local cluster regeneration requires a managed generation; use a fresh dedicated --output-dir: {output_dir}")
+        identity = json.loads(identity_path.read_text(encoding="utf-8"))
+        supplied_region = getattr(args, "region", None)
+        if supplied_region and supplied_region != identity.get("region"):
+            raise ValueError("Supplied --region does not match managed output identity")
+        if identity.get("year") != args.year:
+            raise ValueError("--year does not match managed output identity")
+        region_name = identity["region"]
+        parent = resolve_complete(output_dir)
+        attempt_id, attempt = new_attempt(output_dir, region_name, args.year, parent=parent.generation_id)
+        package = attempt / "package"
+        for child in parent.path.iterdir():
+            if child.name in {"generation.json", "validation.json", "clusters-local"}:
+                continue
+            target = package / child.name
+            if child.is_dir():
+                shutil.copytree(child, target)
+            else:
+                shutil.copy2(child, target)
+        cluster_generated = _generated_date()
+        write_cluster_files(package / "spots", package / "clusters-local",
+                            data_year=args.year, generated=cluster_generated, levels=LEVELS)
+        cluster_parameters = [{"level": level.level, "cell_deg": level.cell_deg,
+                               "width_km": list(level.width_km)} for level in LEVELS]
+        promote(output_dir, attempt_id, region=region_name, year=args.year,
+                context={"spot_context": parent.manifest.get("context", {}),
+                         "cluster_operation": {
+                             "operation": "cluster-regeneration",
+                             "parent": parent.generation_id,
+                             "parent_manifest_sha256": hashlib.sha256((parent.path / "generation.json").read_bytes()).hexdigest(),
+                             "generated": cluster_generated,
+                             "producer_revision": _producer_revision(),
+                             "levels": cluster_parameters,
+                         }},
+                intended_tiles=parent.manifest.get("intended_tiles", []), clusters=True,
+                cluster_parameters=cluster_parameters, parent=parent)
+
+
 def run_country_migration(args) -> int:
     """Explicitly authorized historical country-tag migration.
 
@@ -637,6 +751,8 @@ def run_country_migration(args) -> int:
     try:
         regions = load_regions()
         if args.no_push:
+            from src.local_generation import reject_managed_destination
+            reject_managed_destination(args.output_dir)
             spots_dir = Path(args.output_dir) / "spots"
             if not spots_dir.is_dir():
                 logger.error("No local spots directory: %s", spots_dir)
@@ -750,17 +866,7 @@ def run(args) -> int:
         return run_country_migration(args)
     if args.no_push:
         try:
-            result = _legacy_run(args)
-            if result or args.no_clusters:
-                return result
-            output_dir = Path(args.output_dir)
-            write_cluster_files(
-                output_dir / "spots",
-                output_dir / "clusters-local",
-                data_year=args.year,
-                generated=_generated_date(),
-            )
-            return 0
+            return _legacy_run(args)
         except Exception:
             logger.exception("Local pipeline failed")
             return 1
@@ -773,19 +879,23 @@ def run(args) -> int:
             logger.error("Input not found: %s", input_path)
             return 1
         global _PUBLISHED_CLONE, _PUBLISHED_OLD_ENVELOPES
-        with tempfile.TemporaryDirectory() as clone_ctx:
-            clone_dir = Path(clone_ctx)
-            clone_data_repo(args.data_repo_url, args.data_repo_branch, str(clone_dir))
-            # This audit must stay before _legacy_run: it gates all raster work.
-            if not _audit_before_write(clone_dir / "spots", regions):
-                return 1
-            _PUBLISHED_CLONE = clone_dir
-            _PUBLISHED_OLD_ENVELOPES = _load_envelopes(clone_dir / "spots")
-            try:
-                return _legacy_run(args)
-            finally:
-                _PUBLISHED_CLONE = None
-                _PUBLISHED_OLD_ENVELOPES = {}
+        from src.local_generation import initialize, writer_lock
+        logical_output_dir = Path(args.output_dir)
+        with writer_lock(logical_output_dir):
+            initialize(logical_output_dir, args.region, args.year)
+            with tempfile.TemporaryDirectory() as clone_ctx:
+                clone_dir = Path(clone_ctx)
+                clone_data_repo(args.data_repo_url, args.data_repo_branch, str(clone_dir))
+                # This audit must stay before _legacy_run: it gates all raster work.
+                if not _audit_before_write(clone_dir / "spots", regions):
+                    return 1
+                _PUBLISHED_CLONE = clone_dir
+                _PUBLISHED_OLD_ENVELOPES = _load_envelopes(clone_dir / "spots")
+                try:
+                    return _legacy_run(args)
+                finally:
+                    _PUBLISHED_CLONE = None
+                    _PUBLISHED_OLD_ENVELOPES = {}
     except Exception:
         logger.exception("Pipeline failed")
         return 1

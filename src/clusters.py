@@ -149,11 +149,13 @@ def _cluster(cluster_id: str, accumulator: dict) -> dict:
 def aggregate_spot_files(
     spots_dir: str | Path,
     allowed_tile_ids: Collection[str] | None = None,
+    *,
+    levels: Collection[LevelSpec] = LEVELS,
 ) -> dict[int, list[dict]]:
     """Aggregate all spots, retaining only constant-size state per occupied cell."""
     allowed = set(allowed_tile_ids) if allowed_tile_ids is not None else None
     accumulators: dict[int, dict[tuple[int, int], dict]] = {
-        spec.level: {} for spec in LEVELS
+        spec.level: {} for spec in levels
     }
 
     for tile_path in sorted(Path(spots_dir).glob("*.json")):
@@ -171,7 +173,7 @@ def aggregate_spot_files(
             normalized_spot, lat, lon = _normalize_spot(
                 source_spot, tile_path, spot_index
             )
-            for spec in LEVELS:
+            for spec in levels:
                 cell = (
                     math.floor(lon / spec.cell_deg),
                     math.floor(lat / spec.cell_deg),
@@ -186,7 +188,7 @@ def aggregate_spot_files(
                     _consider(accumulator, normalized_spot, lat, lon)
 
     result: dict[int, list[dict]] = {}
-    for spec in LEVELS:
+    for spec in levels:
         result[spec.level] = sorted(
             (
                 _cluster(f"L{spec.level}_{ix}_{iy}", accumulator)
@@ -213,6 +215,7 @@ def write_cluster_files(
     data_year: int,
     generated: str,
     allowed_tile_ids: Collection[str] | None = None,
+    levels: Collection[LevelSpec] = LEVELS,
 ) -> dict[int, Path]:
     """Write all levels and their deterministic manifest.
 
@@ -222,11 +225,12 @@ def write_cluster_files(
     """
     output_dir = Path(clusters_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
-    clusters = aggregate_spot_files(spots_dir, allowed_tile_ids)
+    levels = tuple(levels)
+    clusters = aggregate_spot_files(spots_dir, allowed_tile_ids, levels=levels)
     paths: dict[int, Path] = {}
     manifest_levels = []
 
-    for spec in LEVELS:
+    for spec in levels:
         path = output_dir / f"L{spec.level}.json"
         payload = _json_bytes(clusters[spec.level])
         path.write_bytes(payload)

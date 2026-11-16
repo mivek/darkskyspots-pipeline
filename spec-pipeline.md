@@ -317,3 +317,13 @@ The current pipeline code does not make OSM or Overpass requests.
   regenerates clusters before committing. `--prune-orphan-spots` additionally
   deletes unresolved, unconfigured, or outside-region historical spots and is
   not implicit in an audit or ordinary publication.
+# Local output generation boundary
+
+Local regional outputs use a persistent identity, retained attempts and
+generations, and an atomic `current.json` pointer. Readers resolve the pointer
+once and validate the generation manifest and payload hashes. Application
+immutability plus same-filesystem replacement and advisory locking protect
+against process interruption on local POSIX filesystems; they do not guarantee
+power-loss durability. Failed artifacts are retained, and the system does not
+resume or prune them automatically. Historical output directories are not
+imported: use a fresh dedicated output directory.

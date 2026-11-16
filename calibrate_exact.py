@@ -618,6 +618,9 @@ def main() -> int:
         help="natural-sky SQM anchor used by the ALR↔SQM conversion (default: 22.0)",
     )
     args = parser.parse_args()
+    if args.spots_dir:
+        from src.local_generation import resolve_spots_dir
+        args.spots_dir = str(resolve_spots_dir(args.spots_dir))
     if not math.isfinite(args.natural_sqm):
         parser.error("--natural-sqm must be finite")
     if (args.spots_dir or args.foreign_samples) and not args.sky_brightness:
