@@ -11,6 +11,10 @@ permissions:
 
 jobs:
   test:
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13", "3.14", "3.15"]
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
@@ -19,13 +23,47 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v7.0.0
         with:
-          # The project is tested on the 3.12 series; keep the CI runtime
-          # stable while 3.14 compatibility is validated separately.
-          python-version: "3.12"
+          # setup-python resolves each maintained series to its latest patch.
+          python-version: ${{ matrix.python-version }}
+          check-latest: true
           cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-accessibility.txt
 
       - name: Install dependencies
-        run: python -m pip install -r requirements.txt
+        run: python -m pip install -r requirements.txt -r requirements-accessibility.txt
+
+      - name: Check installed dependencies
+        run: python -m pip check
 
       - name: Run tests
-        run: pytest
+        run: python -m pytest -W error::PendingDeprecationWarning
+
+  minimum-affine:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7.0.1
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v7.0.0
+        with:
+          python-version: "3.11"
+          check-latest: true
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-accessibility.txt
+
+      - name: Constrain Affine to its declared minimum
+        run: echo "affine==3.0.0" > "$RUNNER_TEMP/constraints.txt"
+
+      - name: Install dependencies
+        run: python -m pip install -c "$RUNNER_TEMP/constraints.txt" -r requirements.txt -r requirements-accessibility.txt
+
+      - name: Check installed dependencies
+        run: python -m pip check
+
+      - name: Run tests
+        run: python -m pytest -W error::PendingDeprecationWarning

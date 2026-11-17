@@ -770,7 +770,7 @@ def raster_finite_extent(raster_path: str | Path, bbox: Sequence[float] | None =
         corners = []
         for row in (row_min, row_max + 1):
             for col in (col_min, col_max + 1):
-                x, y = dataset.transform * (col, row)
+                x, y = dataset.transform @ (col, row)
                 corners.append((x, y))
         xs, ys = zip(*corners)
         if dataset.crs is not None and str(dataset.crs).upper() not in {"EPSG:4326", "OGC:CRS84"}:

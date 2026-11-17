@@ -171,7 +171,7 @@ class ElevationSampler:
             if ds.crs!=rasterio.crs.CRS.from_epsg(4326) or ds.transform.b or ds.transform.d:
                 raise ValueError('WBM support requires the native unrotated WGS84 Copernicus grid')
             row,col=ds.index(lon,lat)
-            x0,y0=ds.transform*(col,row);x1,y1=ds.transform*(col+1,row+1)
+            x0,y0=ds.transform @ (col,row);x1,y1=ds.transform @ (col+1,row+1)
             result.append((min(x0,x1),min(y0,y1),max(x0,x1),max(y0,y1)))
         return result
 

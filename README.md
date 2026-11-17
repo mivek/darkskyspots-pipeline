@@ -277,7 +277,7 @@ The input must be:
 
 ## Environment
 
-- **Python 3.11+** required (tested on 3.12).
+- **Python 3.11+** required. CI tests the latest patch releases of maintained stable Python 3.11–3.15 (policy verified 2026-11-17); prerelease and development versions are excluded.
 - **SSH key** loaded (`ssh-add -l`) for the publish step (uses `git push` over SSH). Use `--no-push` to skip.
 - **`TMPDIR`** controls temp file location (ALR slices, git clones). Override if disk space is limited.
 
