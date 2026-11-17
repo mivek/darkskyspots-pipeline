@@ -75,12 +75,3 @@ The same validator runs before G2 geographic index preparation, before halo
 qualification sampling, and before runtime G2 sampler construction. A failure
 therefore cannot produce a qualification result or enter geographic
 preparation/enrichment.
-
-## Production status
-
-The eight actual N55 DEM/WBM pairs are not present in the retained input cache.
-The full G2 accessibility manifest, endpoint qualification, and regional
-preparation remain blocked until those production pairs are acquired and pass
-these checks. Controlled tests use sparse synthetic DGED-layout rasters only;
-they are not written to production paths or used to replace the missing source
-data.

@@ -49,7 +49,6 @@ FINGERPRINT_PATHS = (
     "src/regions.py", "tests/unit/test_accessibility_generalized.py", "tools/audit_accessibility.py",
     "tools/compare_accessibility_pilots.py", "tools/fetch_accessibility_baseline.py",
     "tools/pilot_accessibility.py", "tools/prepare_accessibility.py", "tools/run_accessibility_g1_tests.py",
-    "docs/plans/2026-11-08-f02-1a-g1-canary-islands-generalization.md",
 )
 
 

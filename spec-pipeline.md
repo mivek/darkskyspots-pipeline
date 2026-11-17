@@ -183,8 +183,10 @@ preparation instructions](docs/accessibility.md).
 Spots are assigned to one-degree latitude/longitude tiles using the canonical
 zero-padded ID. For example, `(42.7283, 1.6492)` becomes `N042E001`.
 
-Local output writes an envelope to `output/spots/<tile>.json` for every tile in
-the nominal region bbox, including empty tiles:
+Local output writes an envelope to
+`output/generations/<generation-id>/spots/<tile>.json` for every tile in the
+nominal region bbox, including empty tiles. `output/current.json` identifies
+the active generation:
 
 ```json
 {
@@ -306,22 +308,28 @@ The current pipeline code does not make OSM or Overpass requests.
 
 ## Other Runtime Modes
 
-- `--no-push` runs the raster-to-tile stages without cloning, copying to a
-  remote repository, committing, or pushing. Unless `--no-clusters` is also
-  set, it writes clusters to `output/clusters-local/` from local `output/spots/`.
+- `--no-push` runs the raster-to-tile stages without cloning, committing, or
+  pushing. Unless `--no-clusters` is set, it stores spots and local clusters in
+  a managed generation under `output/generations/`.
 - `--regenerate-clusters` regenerates clusters from a complete published clone
-  in remote mode, after the same country audit, or from local `output/spots/`
-  into `output/clusters-local/` with `--no-push`.
+  in remote mode, after the same country audit. With `--no-push`, it reads the
+  active managed generation and promotes a derivative generation containing
+  `clusters-local/`; it does not import historical unmanaged directories.
 - `--audit-country-tags` is read-only. `--migrate-country-tags` applies an
   explicitly requested country reclassification; remote migration also
   regenerates clusters before committing. `--prune-orphan-spots` additionally
   deletes unresolved, unconfigured, or outside-region historical spots and is
-  not implicit in an audit or ordinary publication.
+  not implicit in an audit or ordinary publication. The no-push audit and
+  explicit migration tools retain support for legacy unmanaged
+  `output/spots/` trees; these are not inputs to managed local cluster
+  regeneration.
 # Local output generation boundary
 
-Local regional outputs use a persistent identity, retained attempts and
-generations, and an atomic `current.json` pointer. Readers resolve the pointer
-once and validate the generation manifest and payload hashes. Application
+Local regional outputs use `output/identity.json`, retained `attempts/` and
+`generations/`, and an atomic `output/current.json` pointer. A completed package
+stores its spots and local clusters beneath
+`output/generations/<generation-id>/`. Readers resolve the pointer once and
+validate the generation manifest and payload hashes. Application
 immutability plus same-filesystem replacement and advisory locking protect
 against process interruption on local POSIX filesystems; they do not guarantee
 power-loss durability. Failed artifacts are retained, and the system does not
