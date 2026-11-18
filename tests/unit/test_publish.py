@@ -894,6 +894,21 @@ def test_compute_new_version_spot_changed():
     assert out == ("2026.2", True)
 
 
+def test_compute_new_version_bumps_for_optional_accessibility_change():
+    from src.publish import compute_new_version
+
+    old = {"version": "2026.1", "spots": [{"id": "a", "darkness": 0.9}]}
+    new = {"version": "2026.1", "spots": [{
+        "id": "a", "darkness": 0.9,
+        "accessibility": {"schema": 1, "source": "source-a"},
+    }]}
+    assert compute_new_version(
+        old_envelopes={"N042E001": old},
+        new_envelopes={"N042E001": new},
+        year=2026,
+    ) == ("2026.2", True)
+
+
 def test_compute_new_version_tile_added():
     """New tile id -> same-year bump."""
     from src.publish import compute_new_version

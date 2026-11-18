@@ -1,0 +1,2 @@
+# Preparation-only dependency. Normal pipeline/runtime enrichment never imports it.
+osmium==4.3.2

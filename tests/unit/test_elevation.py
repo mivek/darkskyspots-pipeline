@@ -34,6 +34,33 @@ def test_land_and_water_and_nodata(tmp_path):
             sampler.sample(.5, 1.5)
 
 
+def test_detailed_sampling_preserves_native_dem_and_reason_codes(tmp_path):
+    with make_sampler(tmp_path, [[-12, 0], [100, -9999]], [[0, 0], [1, 3]]) as sampler:
+        land = sampler.sample_detailed(.75, .25)
+        assert land['elevationM'] == -12.0
+        assert land['reason'] is None
+        assert land['waterClass'] == 0
+        assert land['cell']['row'] == 0 and land['cell']['col'] == 0
+        assert sampler.sample_detailed(.25, .25)['reason'] == 'water_ocean'
+        assert sampler.sample_detailed(.25, .75)['reason'] == 'water_river'
+        assert sampler.sample_detailed(.75, 1.5)['reason'] == 'out_of_coverage'
+
+
+def test_detailed_sampling_preserves_fractional_dem_and_reason_codes(tmp_path):
+    with make_sampler(tmp_path, [[-12, 0], [100, -9999]], [[0, 0], [1, 3]]) as sampler:
+        land = sampler.sample_detailed(.75, .25)
+        assert land['elevationM'] == -12.0
+        assert land['reason'] is None
+        assert land['waterClass'] == 0
+        assert land['cell']['row'] == 0 and land['cell']['col'] == 0
+        ocean = sampler.sample_detailed(.25, .25)
+        assert ocean['reason'] == 'water_ocean'
+        river = sampler.sample_detailed(.25, .75)
+        assert river['reason'] == 'water_river'
+        outside = sampler.sample_detailed(.75, 1.5)
+        assert outside['reason'] == 'out_of_coverage'
+
+
 def test_water_classes_are_counted_separately(tmp_path):
     with make_sampler(tmp_path, [[1, 1], [1, 1]], [[1, 2], [3, 0]]) as sampler:
         assert sampler.sample(.75, .25) is None

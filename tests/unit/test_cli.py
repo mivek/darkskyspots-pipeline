@@ -154,6 +154,80 @@ def test_parser_regeneration_requires_year_and_url():
     assert args.regenerate_clusters is True
 
 
+def test_accessibility_manifest_is_local_canaries_only():
+    from src.cli import parse_args
+
+    args = parse_args([
+        "--year", "2025", "--region", "canaries", "--no-push",
+        "--accessibility-manifest", "input/accessibility/datasets/tenerife/manifest.json",
+    ])
+    assert args.accessibility_manifest.endswith("manifest.json")
+    with pytest.raises(SystemExit):
+        parse_args([
+            "--year", "2025", "--region", "france", "--no-push",
+            "--accessibility-manifest", "input/accessibility/manifest.json",
+        ])
+
+
+def test_accessibility_manifest_rejects_publishing_mode():
+    from src.cli import parse_args
+
+    with pytest.raises(SystemExit):
+        parse_args([
+            "--year", "2025", "--region", "canaries", "--data-repo-url", "git@x",
+            "--accessibility-manifest", "input/accessibility/manifest.json",
+        ])
+
+
+def test_accessibility_dataset_requires_both_uk_ireland_scopes():
+    from src.cli import parse_args
+
+    with pytest.raises(SystemExit):
+        parse_args([
+            "--year", "2025", "--region", "uk_ireland", "--no-push",
+            "--accessibility-dataset", "great_britain=gb.json",
+        ])
+
+
+def test_accessibility_dataset_parses_complete_local_mapping():
+    from src.cli import parse_args
+
+    args = parse_args([
+        "--year", "2025", "--region", "uk_ireland", "--no-push",
+        "--accessibility-dataset", "great_britain=gb.json",
+        "--accessibility-dataset", "ireland_northern_ireland=ie.json",
+    ])
+    assert args.accessibility_datasets == {
+        "great_britain": "gb.json", "ireland_northern_ireland": "ie.json",
+    }
+
+
+@pytest.mark.parametrize("entries", [
+    ["great_britain=gb.json", "great_britain=other.json", "ireland_northern_ireland=ie.json"],
+    ["great_britain=gb.json", "ireland_northern_ireland="],
+    ["unknown=manifest.json"],
+])
+def test_accessibility_dataset_rejects_duplicate_malformed_and_unknown_scopes(entries):
+    from src.cli import parse_args
+
+    argv = ["--year", "2025", "--region", "uk_ireland", "--no-push"]
+    for entry in entries:
+        argv.extend(["--accessibility-dataset", entry])
+    with pytest.raises(SystemExit):
+        parse_args(argv)
+
+
+def test_accessibility_dataset_rejects_publication():
+    from src.cli import parse_args
+
+    with pytest.raises(SystemExit):
+        parse_args([
+            "--year", "2025", "--region", "uk_ireland", "--data-repo-url", "data.git",
+            "--accessibility-dataset", "great_britain=gb.json",
+            "--accessibility-dataset", "ireland_northern_ireland=ie.json",
+        ])
+
+
 def test_parser_rejects_audit_migration_combination():
     from src.cli import parse_args
     with pytest.raises(SystemExit):

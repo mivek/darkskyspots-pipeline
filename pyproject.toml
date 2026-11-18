@@ -2,8 +2,13 @@
 name = "darkskyspots-pipeline"
 version = "1.4.0"
 description = "VIIRS radiance → per-tile dark-sky spot JSON pipeline"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 readme = "README.md"
+
+[tool.pytest.ini_options]
+markers = [
+    "retained_artifacts: verifies approved local artifacts and requires the retained datasets",
+]
 
 [tool.semantic_release]
 version_toml = ["pyproject.toml:project.version"]

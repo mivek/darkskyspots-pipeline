@@ -132,8 +132,8 @@ class WorldCover:
                     ds = self.ds(tile)
                     inv = ~ds.transform
                     shift = lon - int(longitude(lon))
-                    x0, y0 = inv * (max(west, lon) - shift, min(north, lat + 3))
-                    x1, y1 = inv * (min(east, lon + 3) - shift, max(south, lat))
+                    x0, y0 = inv @ (max(west, lon) - shift, min(north, lat + 3))
+                    x1, y1 = inv @ (min(east, lon + 3) - shift, max(south, lat))
                     c0 = max(0, int(math.floor(_snap(x0))))
                     r0 = max(0, int(math.floor(_snap(y0))))
                     c1 = min(ds.width, int(math.ceil(_snap(x1))))

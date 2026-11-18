@@ -6,8 +6,9 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import numpy as np
+import pytest
 from rasterio.transform import from_bounds
-from src.clusters import write_cluster_files
+from src.clusters import LEVELS as CLUSTER_LEVELS, write_cluster_files
 
 
 class _CodeOwnership:
@@ -32,10 +33,16 @@ def _write_envelope(directory, tile_id, spots):
     (directory / f"{tile_id}.json").write_text(json.dumps({"version": "2025.1", "source": "test", "generated": "2026-08-03T00:00:00Z", "tile": tile_id, "spots": spots}))
 
 
-def test_published_clusters_read_spots_after_current_region_copy(tmp_path):
+@pytest.mark.parametrize(("fail_commit", "fail_preflight"), [
+    (False, False), (True, False), (False, True),
+])
+def test_published_clusters_read_spots_after_current_region_copy(
+    tmp_path, caplog, fail_commit, fail_preflight,
+):
     """The cluster input contains a tile written by the current raster run."""
     from src.cli import parse_args
     from run import run
+    from src.clusters import write_cluster_files as real_write_cluster_files
 
     input_dir = tmp_path / "input" / "france"
     input_dir.mkdir(parents=True)
@@ -48,11 +55,15 @@ def test_published_clusters_read_spots_after_current_region_copy(tmp_path):
     cluster_calls = []
 
     def clone(_url, _branch, target_dir):
+        if fail_preflight:
+            raise RuntimeError("injected clone failure")
         _write_envelope(Path(target_dir) / "spots", "N048E002", [_spot("old", 48.2, 2.2)])
 
-    def clusters(spots_dir, clusters_dir, *, data_year, generated, allowed_tile_ids=None):
+    def clusters(spots_dir, clusters_dir, *, data_year, generated, allowed_tile_ids=None,
+                 levels=None):
         cluster_calls.append((spots_dir, clusters_dir, data_year, generated, allowed_tile_ids))
-        assert Path(clusters_dir) == Path(spots_dir).parent / "clusters"
+        expected_name = "clusters-local" if Path(clusters_dir).name == "clusters-local" else "clusters"
+        assert Path(clusters_dir) == Path(spots_dir).parent / expected_name
         assert data_year == 2025
         assert re.fullmatch(
             r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{9}Z",
@@ -62,7 +73,10 @@ def test_published_clusters_read_spots_after_current_region_copy(tmp_path):
         for path in Path(spots_dir).glob("*.json"):
             seen_ids.extend(spot["id"] for spot in json.loads(path.read_text())["spots"])
         assert (Path(spots_dir) / "N048E003.json").exists()
-        return {}
+        return real_write_cluster_files(spots_dir, clusters_dir, data_year=data_year,
+                                        generated=generated,
+                                        allowed_tile_ids=allowed_tile_ids,
+                                        levels=levels or CLUSTER_LEVELS)
 
     with ExitStack() as stack:
         stack.enter_context(patch("run.ElevationSampler"))
@@ -74,7 +88,7 @@ def test_published_clusters_read_spots_after_current_region_copy(tmp_path):
             "missing": [], "invalid": [], "unconfigured": [], "mismatched": [],
             "ambiguous": [], "valid": 1,
         }))
-        stack.enter_context(patch("run.slice_and_compute", return_value=slice_result))
+        raster = stack.enter_context(patch("run.slice_and_compute", return_value=slice_result))
         stack.enter_context(patch("run.alr_to_darkness", return_value=np.full((2, 2), 0.5)))
         stack.enter_context(patch("run.alr_to_bortle", return_value=np.full((2, 2), 3, dtype=int)))
         stack.enter_context(patch("run.mesh_darkest", return_value=[]))
@@ -86,11 +100,26 @@ def test_published_clusters_read_spots_after_current_region_copy(tmp_path):
         stack.enter_context(patch("run.classify_spots_into_tiles", return_value={"N048E003": [generated]}))
         stack.enter_context(patch("run.enumerate_tiles_in_bbox", return_value=["N048E003"]))
         stack.enter_context(patch("run.write_cluster_files", side_effect=clusters))
-        stack.enter_context(patch("run.commit_and_push"))
-        assert run(args) == 0
+        commit = stack.enter_context(patch("run.commit_and_push"))
+        if fail_commit:
+            commit.side_effect = RuntimeError("injected publication failure")
+        result = run(args)
+        assert result == (1 if fail_commit or fail_preflight else 0)
+
+    if fail_preflight:
+        raster.assert_not_called()
+        assert not (tmp_path / "output" / "current.json").exists()
+        return
 
     assert "new" in seen_ids
-    assert len(cluster_calls) == 1
+    assert len(cluster_calls) == 2
+    assert Path(cluster_calls[0][1]).name == "clusters-local"
+    assert Path(cluster_calls[1][1]).name == "clusters"
+    from src.local_generation import resolve_complete
+    active = resolve_complete(tmp_path / "output")
+    assert (active.path / "spots/N048E003.json").is_file()
+    if fail_commit:
+        assert "activated and remains usable" in caplog.text
 
 
 def test_a_then_b_scoped_publication_preserves_a_tiles(tmp_path):

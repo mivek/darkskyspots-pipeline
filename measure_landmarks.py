@@ -770,7 +770,7 @@ def raster_finite_extent(raster_path: str | Path, bbox: Sequence[float] | None =
         corners = []
         for row in (row_min, row_max + 1):
             for col in (col_min, col_max + 1):
-                x, y = dataset.transform * (col, row)
+                x, y = dataset.transform @ (col, row)
                 corners.append((x, y))
         xs, ys = zip(*corners)
         if dataset.crs is not None and str(dataset.crs).upper() not in {"EPSG:4326", "OGC:CRS84"}:
@@ -888,11 +888,12 @@ def _archive_metadata(geonames_dir: Path, country_codes: Sequence[str]) -> dict:
 
 
 def _legacy_markdown_report(report: dict, *, country_code: str, bbox: Sequence[float], archives: dict) -> str:
+    archive_summary = ", ".join(f"`{code}` {archive['sha256'][:12]}" for code, archive in sorted(archives.items()))
     lines = ["# Mesure de la cascade de nommage GeoNames", "",
              f"- Pays : `{country_code}`",
              f"- Bbox région : `{list(map(float, bbox))}` ; import élargi à 40 km",
              f"- Spots mesurés : **{report['spot_count']}** (référence indicative : {report['expected_spots']})",
-             f"- Archives : {', '.join(f'`{c}` {v['sha256'][:12]}' for c, v in sorted(archives.items()))}", ""]
+             f"- Archives : {archive_summary}", ""]
     if report.get("spot_count_warning"):
         lines += [f"> **Avertissement :** {report['spot_count_warning']}", ""]
     lines += ["## Distribution", "", "| Tier | Spots |", "|---|---:|"]
@@ -1085,6 +1086,8 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    from src.local_generation import resolve_spots_dir
+    args.spots_dir = str(resolve_spots_dir(args.spots_dir))
     report = run_measurement(args)
     Path(args.out_json).parent.mkdir(parents=True, exist_ok=True)
     Path(args.out_json).write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")

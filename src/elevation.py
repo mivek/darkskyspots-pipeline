@@ -171,7 +171,7 @@ class ElevationSampler:
             if ds.crs!=rasterio.crs.CRS.from_epsg(4326) or ds.transform.b or ds.transform.d:
                 raise ValueError('WBM support requires the native unrotated WGS84 Copernicus grid')
             row,col=ds.index(lon,lat)
-            x0,y0=ds.transform*(col,row);x1,y1=ds.transform*(col+1,row+1)
+            x0,y0=ds.transform @ (col,row);x1,y1=ds.transform @ (col+1,row+1)
             result.append((min(x0,x1),min(y0,y1),max(x0,x1),max(y0,y1)))
         return result
 
@@ -209,3 +209,63 @@ class ElevationSampler:
             return None
         self.counts['land'] += 1
         return int(round(elevation))
+
+    def sample_detailed(self, lat, lon):
+        """Return the native DEM value, water mask and exact sample-cell evidence.
+
+        ``sample()`` retains its established integer rounding and return values;
+        accessibility elevation deltas use this detailed unrounded result.
+        Missing/corrupt declared rasters still raise during sampler construction
+        or on technical read failures.
+        """
+        lat, lon = float(lat), float(lon)
+        if not math.isfinite(lat) or not math.isfinite(lon) or not (
+            -90 <= lat < 90 and -180 <= lon < 180
+        ):
+            raise ValueError(f'Invalid coordinate: {lat}, {lon}')
+        key = (math.floor(lat), math.floor(lon))
+        if key not in self.tiles:
+            return {
+                'elevationM': None,
+                'reason': 'out_of_coverage',
+                'tile': list(key),
+                'coordinate': [lon, lat],
+                'cell': None,
+            }
+        dem, wbm = self.tiles[key]
+        if dem is None:
+            raise ValueError('Water-only audit reader cannot sample elevation')
+        row, col = wbm.index(lon, lat)
+        cell = {'row': int(row), 'col': int(col), 'tile': list(key)}
+        try:
+            water = self._read(wbm, lon, lat)
+        except ValueError as exc:
+            if 'Coordinate outside raster' in str(exc):
+                return {'elevationM': None, 'reason': 'out_of_coverage',
+                        'tile': list(key), 'coordinate': [lon, lat], 'cell': cell}
+            raise
+        if water is None:
+            self.counts['nodata'] += 1
+            return {'elevationM': None, 'reason': 'wbm_nodata', 'waterClass': None,
+                    'tile': list(key), 'coordinate': [lon, lat], 'cell': cell}
+        if water not in (0, 1, 2, 3):
+            raise ValueError(f'Invalid WBM value at {lat}, {lon}: {water}')
+        if water != 0:
+            self.counts[WATER_CLASSES[int(water)]] += 1
+            return {'elevationM': None, 'reason': f'water_{WATER_CLASSES[int(water)]}',
+                    'waterClass': int(water), 'tile': list(key),
+                    'coordinate': [lon, lat], 'cell': cell}
+        try:
+            elevation = self._read(dem, lon, lat)
+        except ValueError as exc:
+            if 'Coordinate outside raster' in str(exc):
+                return {'elevationM': None, 'reason': 'out_of_coverage',
+                        'waterClass': 0, 'tile': list(key), 'coordinate': [lon, lat], 'cell': cell}
+            raise
+        if elevation is None:
+            self.counts['nodata'] += 1
+            return {'elevationM': None, 'reason': 'dem_nodata', 'waterClass': 0,
+                    'tile': list(key), 'coordinate': [lon, lat], 'cell': cell}
+        self.counts['land'] += 1
+        return {'elevationM': float(elevation), 'reason': None, 'waterClass': 0,
+                'tile': list(key), 'coordinate': [lon, lat], 'cell': cell}

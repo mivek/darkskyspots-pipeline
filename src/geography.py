@@ -217,10 +217,10 @@ def _candidate_pixel_polygon(candidate: dict, transform, crs):
         from rasterio.warp import transform as reproject_coords
         row, col = int(candidate["row"]), int(candidate["col"])
         corners = [
-            transform * (col, row),
-            transform * (col + 1, row),
-            transform * (col + 1, row + 1),
-            transform * (col, row + 1),
+            transform @ (col, row),
+            transform @ (col + 1, row),
+            transform @ (col + 1, row + 1),
+            transform @ (col, row + 1),
         ]
         xs, ys = zip(*corners)
         lon, lat = reproject_coords(crs, "EPSG:4326", list(xs), list(ys))

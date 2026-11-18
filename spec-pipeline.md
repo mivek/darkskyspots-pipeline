@@ -167,13 +167,26 @@ rasters, and removes the transient raster `row` and `col` fields. Water and
 NoData yield `null`; valid land elevations, including zero and negative values,
 are rounded to metres. No network service is called during enrichment.
 
+An optional `--accessibility-manifest` hook is available only for a normal local
+`canaries` run with `--no-push`. It runs after the existing final enrichment,
+uses a separately prepared immutable Tenerife OSM index, and attaches the
+optional schema-1 `accessibility` object only to coordinates in the supported
+Tenerife core bbox. It does not change selection, IDs, altitude, naming, country
+ownership or any existing spot values. Queries use straight-line EPSG:32628
+distances, preserve unknown access and elevation states, and require complete
+search-disk coverage before reporting an empty result. Pyosmium is used only by
+the explicit offline preparation tool. See [the accessibility contract and
+preparation instructions](docs/accessibility.md).
+
 ### 9. Tile assignment and versioning
 
 Spots are assigned to one-degree latitude/longitude tiles using the canonical
 zero-padded ID. For example, `(42.7283, 1.6492)` becomes `N042E001`.
 
-Local output writes an envelope to `output/spots/<tile>.json` for every tile in
-the nominal region bbox, including empty tiles:
+Local output writes an envelope to
+`output/generations/<generation-id>/spots/<tile>.json` for every tile in the
+nominal region bbox, including empty tiles. `output/current.json` identifies
+the active generation:
 
 ```json
 {
@@ -226,9 +239,10 @@ Each occupied cell becomes a cluster containing:
 - a representative spot selected by highest darkness, then lowest string ID
   on an exact darkness tie.
 
-The representative projects these fields from the source spot:
+The representative projects these required fields from the source spot:
 `id`, `lat`, `lon`, `darkness`, `bortle`, `near`, `name`, `nameDistanceKm`,
-and `altitude`. Every level is written, including an empty `L<n>.json` when
+and `altitude`. When present, the optional schema-1 `accessibility` object is
+validated and copied to the representative. Every level is written, including an empty `L<n>.json` when
 that level has no occupied cells. Cluster generation rejects a source tile
 spot that lacks any of those nine fields or has an invalid `name` or
 `nameDistanceKm` value.
@@ -294,14 +308,30 @@ The current pipeline code does not make OSM or Overpass requests.
 
 ## Other Runtime Modes
 
-- `--no-push` runs the raster-to-tile stages without cloning, copying to a
-  remote repository, committing, or pushing. Unless `--no-clusters` is also
-  set, it writes clusters to `output/clusters-local/` from local `output/spots/`.
+- `--no-push` runs the raster-to-tile stages without cloning, committing, or
+  pushing. Unless `--no-clusters` is set, it stores spots and local clusters in
+  a managed generation under `output/generations/`.
 - `--regenerate-clusters` regenerates clusters from a complete published clone
-  in remote mode, after the same country audit, or from local `output/spots/`
-  into `output/clusters-local/` with `--no-push`.
+  in remote mode, after the same country audit. With `--no-push`, it reads the
+  active managed generation and promotes a derivative generation containing
+  `clusters-local/`; it does not import historical unmanaged directories.
 - `--audit-country-tags` is read-only. `--migrate-country-tags` applies an
   explicitly requested country reclassification; remote migration also
   regenerates clusters before committing. `--prune-orphan-spots` additionally
   deletes unresolved, unconfigured, or outside-region historical spots and is
-  not implicit in an audit or ordinary publication.
+  not implicit in an audit or ordinary publication. The no-push audit and
+  explicit migration tools retain support for legacy unmanaged
+  `output/spots/` trees; these are not inputs to managed local cluster
+  regeneration.
+# Local output generation boundary
+
+Local regional outputs use `output/identity.json`, retained `attempts/` and
+`generations/`, and an atomic `output/current.json` pointer. A completed package
+stores its spots and local clusters beneath
+`output/generations/<generation-id>/`. Readers resolve the pointer once and
+validate the generation manifest and payload hashes. Application
+immutability plus same-filesystem replacement and advisory locking protect
+against process interruption on local POSIX filesystems; they do not guarantee
+power-loss durability. Failed artifacts are retained, and the system does not
+resume or prune them automatically. Historical output directories are not
+imported: use a fresh dedicated output directory.

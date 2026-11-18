@@ -1,11 +1,30 @@
 # darkskyspots-pipeline
 
-Local Python batch pipeline that transforms VIIRS radiance GeoTIFFs into per-tile JSON spot files for the [Dark Sky](../app-dark-sky) mobile app.
+Local Python batch pipeline that transforms VIIRS radiance GeoTIFFs into per-tile JSON spot files consumed by the Dark Sky mobile app.
 
 **Input:** VIIRS radiance GeoTIFF (NASA Black Marble / lightpollutionmap raw) + OSM data.  
 **Processing:** ALR (All-sky Light pollution Ratio) via the [`nightskyquality`](https://github.com/mivek/nightskyquality) package.  
 **Output:** per-tile JSON files (`spots/<tileId>.json`) pushed to a separate data repo.  
 **Frequency:** ~1×/year (annual VIIRS composite). Not a server, not an API — a single `python run.py` invocation.
+
+## Local output generations
+
+Each `--output-dir` is a managed root bound to one region and year. Use a fresh,
+dedicated directory for the first run; historical output directories are not
+imported automatically. The active package is stored at
+`generations/<generation-id>/`; `current.json` selects it. Spots are under the
+active package's `spots/`, and locally regenerated clusters are under its
+`clusters-local/`. Failed attempts remain under `attempts/` for diagnosis.
+Resolve and validate the active package with:
+
+```bash
+python tools/local_generation.py resolve --output-dir output
+```
+
+Local cluster regeneration requires a managed output and creates a derivative
+generation while retaining the parent. Locks and atomic pointer replacement
+protect against process interruption on local POSIX filesystems. This does not
+provide power-loss durability; no automatic resume or pruning is performed.
 
 ## Quick start
 
@@ -83,7 +102,21 @@ python run.py \
     --data-repo-branch main
 ```
 
-Output appears in `/output/spots/`. Publication also generates global clusters after copying the current region into the cloned data repository. Add `--no-push` to keep the run local.
+With `--no-push`, output is stored in the active managed generation under
+`output/generations/<generation-id>/` (spots in `spots/`, optional local
+clusters in `clusters-local/`). Publication generates global clusters after
+copying the current region into the cloned data repository.
+
+## Tenerife accessibility evidence pilot
+
+An offline, optional pilot adds factual nearby road, track, pedestrian path and
+parking evidence to existing Tenerife spots. It does not generate spots, routes,
+connectivity conclusions, access scores, parking availability or recommendations.
+The real PBF, prepared index and pilot outputs stay under ignored `input/` and
+`output/` directories. Pyosmium is preparation-only and pinned separately from
+normal runtime requirements. See [the accessibility documentation](docs/accessibility.md)
+for supported profiles and the public data contract. Pilot output is not
+publication approval.
 
 ### England, Wales and Ireland
 
@@ -120,14 +153,15 @@ and a comparison over the shared area before regeneration or publication.
 | `--region` | Mode-dependent | — | Required for a normal run; not used by cluster regeneration or country-tag audits. |
 | `--data-repo-url` | Mode-dependent | — | Required for published runs and published cluster regeneration; optional for local and audit modes. |
 | `--data-repo-branch` | No | `main` | Branch to push to in the data repo. |
-| `--no-push` | No | `false` | Skip step 7 (publish). Output stays in `/output/spots/`. |
+| `--no-push` | No | `false` | Skip step 7 (publish). Output remains in the active managed generation under `--output-dir`. |
+| `--accessibility-manifest` | No | — | Optional Tenerife accessibility evidence; accepted only on a normal local `canaries` run with `--no-push`. |
 | `--no-clusters` | No | `false` | Skip local cluster generation. Rejected for published runs; use only with `--no-push`. |
-| `--regenerate-clusters` | No | `false` | Published mode: clone/audit the complete repository, write clusters/, then commit/push; requires --year and --data-repo-url. With --no-push: read output/spots/, write clusters-local/, and perform no clone, audit, commit, or push; requires only --year. |
-| `--audit-country-tags` | No | `false` | Strictly read-only audit of country tags and geographic region ownership, with a projected migration and prune summary. `--list-orphans` is a deprecated alias. |
-| `--migrate-country-tags` | No | `false` | Explicitly reclassify historical spots with Natural Earth geometry. Does not delete unresolved spots. |
-| `--prune-orphan-spots` | No | `false` | Explicitly delete unresolved, unconfigured, or outside-region historical spots; use with `--migrate-country-tags`. |
+| `--regenerate-clusters` | No | `false` | Published mode clones/audits the complete repository and writes `clusters/` before publication. With `--no-push`, requires a managed output root and promotes a cluster generation from its active package; historical directories are not imported. |
+| `--audit-country-tags` | No | `false` | Read-only audit of country tags and ownership; supports legacy `--output-dir/spots/` trees and managed outputs. `--list-orphans` is a deprecated alias. |
+| `--migrate-country-tags` | No | `false` | Explicitly reclassify spots with Natural Earth geometry. The no-push legacy workflow accepts an unmanaged historical `--output-dir/spots/` tree; managed generations are rejected by this mutator. |
+| `--prune-orphan-spots` | No | `false` | Explicitly delete unresolved, unconfigured, or outside-region historical spots; use with `--migrate-country-tags` in the supported legacy workflow. |
 | `--input-dir` | No | `./input` | Directory containing per-region subdirectories with GeoTIFFs. |
-| `--output-dir` | No | `./output` | Directory for output JSON files (subdir `spots/` is created). |
+| `--output-dir` | No | `./output` | Managed output root for region/year identity, attempts, generations, and the active-generation pointer. |
 | `--budget-mb` | No | `500.0` | RAM budget for loading the input GeoTIFF (MB). If exceeded, the input is processed in slices. |
 | `--verbose`, `-v` | No | `false` | Verbose logging. |
 
@@ -140,8 +174,8 @@ The three input flags are mode-dependent, not globally required:
 - A normal published run requires --year, --region, and --data-repo-url.
 - A normal local run with --no-push requires --year and --region; --data-repo-url is optional and is not contacted.
 - Published --regenerate-clusters requires --year and --data-repo-url, but does not require --region.
-- Local --regenerate-clusters --no-push requires only --year and reads output/spots/; it needs neither --region nor --data-repo-url.
-- --audit-country-tags and --list-orphans require neither --year nor --region. With an optional --data-repo-url they inspect a cloned published repository; without it they inspect local output/spots/.
+- Local --regenerate-clusters --no-push requires only --year and reads the active package in a managed output root; it needs neither --region nor --data-repo-url.
+- --audit-country-tags and --list-orphans require neither --year nor --region. With an optional --data-repo-url they inspect a cloned published repository; without it they inspect local output. Legacy unmanaged `output/spots/` trees remain supported for country audit and explicit migration, but are not imported into managed generations.
 
 `--audit-country-tags` and `--list-orphans` are strictly read-only. The former
 `--prune-orphans` spelling is rejected; migration and deletion require the two
@@ -165,9 +199,9 @@ replace the spots owned by the current region's geographic extent; generate
 clusters from the complete clone; commit and push once. An audit failure stops
 publication until an explicit migration has been reviewed.
 
-Clusters must be regenerated only after repository spot tiles are complete. In published mode, --regenerate-clusters clones and audits the repository, writes clusters/ from the complete clone, then commits and pushes. In --no-push mode, --regenerate-clusters reads output/spots/ and writes clusters-local/; it performs no clone, audit, commit, or push and requires only --year.
+Clusters must be regenerated only after repository spot tiles are complete. In published mode, --regenerate-clusters clones and audits the repository, writes clusters/ from the complete clone, then commits and pushes. In --no-push mode, --regenerate-clusters reads spots from the active managed generation and promotes a derivative generation containing clusters-local/; it performs no clone, audit, commit, or push and requires only --year. Historical unmanaged output directories are not cluster-regeneration inputs.
 
-Normal --no-push also never clones or pushes: it leaves output/spots/ and, unless --no-clusters, writes the local output/clusters-local/ artifact.
+Normal --no-push also never clones or pushes: it writes a managed generation under output/generations/ and, unless --no-clusters, includes local clusters in that package.
 
 Any published change under `spots/` must include a regenerated
 `clusters/index.json` in the same commit. The manifest's `generated` value is
@@ -207,11 +241,12 @@ country polygons clipped by region bboxes. A reduced bbox leaves old spots
 outside it untouched by publication; the audit blocks until they are assigned
 to another region or explicitly pruned.
 
-Spot schema compatibility is strict for cluster generation: every spot must contain `id`, `lat`, `lon`, `darkness`, `bortle`, `near`, `name`, `nameDistanceKm`, and `altitude`. A missing field is reported with its tile and spot index and aborts generation; it must not be silently ignored. Removing a field from the spot schema is therefore a data migration that must be handled before regenerating clusters. Extra source fields, including `country` and the GeoNames provenance fields, are ignored in the embedded cluster representative, whose contract is the nine fields above.
+Spot schema compatibility is strict for cluster generation: every spot must contain `id`, `lat`, `lon`, `darkness`, `bortle`, `near`, `name`, `nameDistanceKm`, and `altitude`. A missing field is reported with its tile and spot index and aborts generation; it must not be silently ignored. Removing a field from the spot schema is therefore a data migration that must be handled before regenerating clusters. Extra source fields, including `country` and GeoNames provenance, are ignored in the representative; validated optional accessibility evidence is copied when present.
 
 Published tile spots additionally carry mandatory producer field `country`
 (ISO alpha-2). The app may treat it as optional while reading historical
-caches; cluster representatives project only the nine fields listed above.
+caches; cluster representatives project the nine required fields and copy
+validated optional accessibility evidence when present.
 Country is assigned from the Natural Earth clip, not from a region
 name, so splitting or regrouping regions does not orphan published spots.
 
@@ -246,9 +281,40 @@ The input must be:
 
 ## Environment
 
-- **Python 3.10+** required (tested on 3.12).
+- **Python 3.11+** required. CI tests the latest patch releases of maintained stable Python 3.11–3.15 (policy verified 2026-11-17); prerelease and development versions are excluded.
 - **SSH key** loaded (`ssh-add -l`) for the publish step (uses `git push` over SSH). Use `--no-push` to skip.
 - **`TMPDIR`** controls temp file location (ALR slices, git clones). Override if disk space is limited.
+
+## Tests
+
+Install both requirement files, then run the portable suite from a clean checkout.
+It uses tracked inputs and test-owned fixtures.
+
+```bash
+python -m pip install -r requirements.txt -r requirements-accessibility.txt
+python -m pytest -m "not retained_artifacts" -W error::PendingDeprecationWarning
+```
+
+On Python 3.11, the requirements pin Affine 3.0.0 for warning-strict tests with
+Rasterio 1.4.4. Rasterio still uses deprecated Affine multiplication internally,
+which emits `PendingDeprecationWarning` with Affine 3.0.1. Python 3.12 and later
+allow Affine 3.0 or newer. Reassess the pin when Python 3.11 resolves a different
+Rasterio release, and relax it only when a newer Affine passes the warning-strict
+suite on Python 3.11.
+
+Run the retained-artifact checks separately to verify the original provider
+polygons, Tenerife and Canary indexes, Canary and UK/Ireland DEM manifests and
+cache, and the approved G2 baseline package with its trusted inventory. These
+checks expect the retained files at the paths in `config/accessibility.yaml`,
+`input/accessibility/`, `data/elevation/manifests/`, and `input/elevation/`.
+Some checks skip when their primary datasets are absent. Partial installations
+or missing dependent assets can fail, and corrupt or inconsistent artifacts
+remain failures. A successful retained-evidence run requires the complete set
+of prerequisites.
+
+```bash
+python -m pytest -m retained_artifacts -rs -W error::PendingDeprecationWarning
+```
 
 ## Troubleshooting
 

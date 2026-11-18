@@ -11,6 +11,7 @@ sys.path.insert(0, str(ROOT))
 from src.e3_migration import frozen_region, assemble_snapshot
 from src.geographic_data import GeographicDataset
 from src.geographic_publication import GeographicApprovalError
+from src.local_generation import resolve_complete
 from src.regions import load_regions
 
 
@@ -98,7 +99,7 @@ def main():
                 )
                 regional[name] = {
                     path.stem: json.loads(path.read_text())
-                    for path in (target / "spots").glob("*.json")
+                    for path in (resolve_complete(target).path / "spots").glob("*.json")
                 }
         try:
             report = assemble_snapshot(

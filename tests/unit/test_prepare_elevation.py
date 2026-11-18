@@ -10,7 +10,65 @@ from rasterio.io import MemoryFile
 from rasterio.transform import from_origin
 
 from src.elevation import ElevationSampler
-from tools.prepare_elevation import prepare
+from tools.prepare_elevation import (
+    _sample_accessibility_halo,
+    accessibility_halo_filenames,
+    prepare,
+)
+
+
+def test_g2_accessibility_halo_reports_exact_row_55_pairs():
+    names = accessibility_halo_filenames()
+    assert len(names) == 16
+    assert names[0] == 'Copernicus_DSM_10_N55_00_W009_00_DEM.tif'
+    assert names[1] == 'Copernicus_DSM_10_N55_00_W009_00_WBM.tif'
+    assert names[-2] == 'Copernicus_DSM_10_N55_00_W002_00_DEM.tif'
+    assert names[-1] == 'Copernicus_DSM_10_N55_00_W002_00_WBM.tif'
+
+
+def test_accessibility_halo_validation_checks_published_points_and_search_boundary(tmp_path):
+    cache = tmp_path / 'cache'
+    cache.mkdir()
+    dem_path = cache / 'dem.tif'
+    wbm_path = cache / 'wbm.tif'
+    for path, dtype, value, nodata in (
+        (dem_path, 'int16', 100, -9999),
+        (wbm_path, 'uint8', 0, 255),
+    ):
+        with rasterio.open(
+            path, 'w', driver='GTiff', width=100, height=100, count=1,
+            dtype=dtype, crs='EPSG:4326', transform=from_origin(-7, 53, .01, .01),
+            nodata=nodata,
+        ) as dataset:
+            dataset.write(np.full((100, 100), value, dtype=dtype), 1)
+    from src.elevation import sha256
+    manifest = {
+        'schema': 1, 'region': 'uk_ireland-accessibility-g2', 'bbox': [-11, 49, 2, 56],
+        'tiles': [{
+            'lat': 52, 'lon': -7, 'product': 'GLO-30', 'version': '2024_1',
+            'dem': {'path': 'dem.tif', 'size': dem_path.stat().st_size, 'sha256': sha256(dem_path)},
+            'wbm': {'path': 'wbm.tif', 'size': wbm_path.stat().st_size, 'sha256': sha256(wbm_path)},
+        }],
+    }
+    manifest_path = tmp_path / 'accessibility-dem.json'
+    manifest_path.write_text(json.dumps(manifest), encoding='utf-8')
+    spots_dir = tmp_path / 'baseline' / 'spots'
+    spots_dir.mkdir(parents=True)
+    (spots_dir / 'N052W007.json').write_text(json.dumps({
+        'spots': [{'id': 'control', 'country': 'GB', 'lat': 52.5, 'lon': -6.5, 'altitude': 100}],
+    }), encoding='utf-8')
+
+    # This unit isolates the sampler behavior. Public qualification authenticates
+    # a full approved package before reaching this internal sampling function.
+    result = _sample_accessibility_halo(manifest_path, cache, {
+        'g2_spots': [{'id': 'control', 'country': 'GB', 'lat': 52.5, 'lon': -6.5, 'altitude': 100}],
+        'inventory_sha256': 'approved-test-inventory',
+    }, 'config/accessibility.yaml')
+    assert result['published_spot_samples'] == 1
+    assert result['valid_published_spot_samples'] == 1
+    assert result['max_abs_difference_from_preserved_altitude_m'] == 0
+    assert result['endpoint_samples'] == 24
+    assert result['endpoint_status_counts'] == {'land': 24}
 
 
 def raster(value):

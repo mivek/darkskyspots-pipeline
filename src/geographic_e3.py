@@ -225,8 +225,8 @@ def local_context(dataset, extent, region, *, water_exclusion=False):
                 continue
             w, s, e, n = crop.bounds
             inv = ~ds.transform
-            c0, r0 = inv * (w, n)
-            c1, r1 = inv * (e, s)
+            c0, r0 = inv @ (w, n)
+            c1, r1 = inv @ (e, s)
             c0 = max(0, math.floor(c0) - 1)
             r0 = max(0, math.floor(r0) - 1)
             c1 = min(ds.width, math.ceil(c1) + 1)
@@ -283,8 +283,8 @@ def local_context(dataset, extent, region, *, water_exclusion=False):
                     continue
                 w, s, e, n = crop.bounds
                 inv = ~ds.transform
-                c0, r0 = inv * (w, n)
-                c1, r1 = inv * (e, s)
+                c0, r0 = inv @ (w, n)
+                c1, r1 = inv @ (e, s)
                 c0 = max(0, math.floor(c0) - 1)
                 r0 = max(0, math.floor(r0) - 1)
                 c1 = min(ds.width, math.ceil(c1) + 1)

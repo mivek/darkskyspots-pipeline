@@ -18,6 +18,7 @@ from measure_landmarks import (
     GeoName,
     GeoNamesIndex,
     NearestIndex,
+    _legacy_markdown_report,
     analyse,
     analyse_multi_country,
     audit_named_islands,
@@ -229,6 +230,23 @@ def test_sample_contains_separate_runtime_and_audit_fields_and_markdown():
     assert row["audit_distance_km"] == 2.0
     markdown = markdown_report(report)
     assert "Runtime name" in markdown and "Audit name" in markdown
+
+
+def test_legacy_markdown_sorts_archive_codes_and_truncates_sha256():
+    report = {
+        "spot_count": 0,
+        "expected_spots": 0,
+        "distance_bins": dict.fromkeys(
+            ("under_5_km", "5_to_25_km", "25_to_40_km", "fallback_adm2", "fallback_adm1"), 0,
+        ),
+        "winner_by_code": {},
+        "samples": [],
+    }
+    markdown = _legacy_markdown_report(
+        report, country_code="GB", bbox=(-11, 49, 2, 55),
+        archives={"IE": {"sha256": "fedcba9876543210" * 4}, "GB": {"sha256": "0123456789abcdef" * 4}},
+    )
+    assert markdown.splitlines()[5] == "- Archives : `GB` 0123456789ab, `IE` fedcba987654"
 
 
 def test_markdown_report_renders_all_v2_samples_with_escaped_pipes_and_utf8():

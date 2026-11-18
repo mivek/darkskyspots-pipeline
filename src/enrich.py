@@ -27,7 +27,8 @@ def enrich_spot(spot: dict, elevation_sampler=None) -> dict:
     return enriched
 
 
-def enrich_all(spots: list[dict], naming_index=None, elevation_sampler=None) -> list[dict]:
+def enrich_all(spots: list[dict], naming_index=None, elevation_sampler=None,
+               accessibility_enricher=None) -> list[dict]:
     """Enrich a batch, optionally attaching GeoNames names first.
 
     The optional index keeps this helper convenient for callers that already
@@ -36,7 +37,10 @@ def enrich_all(spots: list[dict], naming_index=None, elevation_sampler=None) -> 
     neither path mutates the caller's list.
     """
     named = naming_index.enrich_spots(spots) if naming_index is not None else spots
-    return [enrich_spot(s, elevation_sampler) for s in named]
+    enriched = [enrich_spot(s, elevation_sampler) for s in named]
+    if accessibility_enricher is not None:
+        enriched = [accessibility_enricher.enrich_spot(spot) for spot in enriched]
+    return enriched
 
 
 def spot_id(lat: float, lon: float) -> str:
