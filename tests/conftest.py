@@ -1,4 +1,6 @@
 """Shared pytest fixtures for the darkskyspots pipeline test suite."""
+import hashlib
+import json
 from pathlib import Path
 
 import numpy as np
@@ -77,3 +79,51 @@ def mock_region() -> dict:
         "osm_country_code": "FR",
         "name": "France",
     }
+
+
+@pytest.fixture
+def synthetic_baseline(tmp_path, monkeypatch):
+    import src.accessibility_baseline as auth
+
+    root = tmp_path / "baseline"
+    spots, clusters = root / "spots", root / "clusters"
+    spots.mkdir(parents=True)
+    clusters.mkdir()
+    envelopes = {
+        "selected.json": {"version": 1, "tile": "selected", "spots": [
+            {"id": "a", "country": "GB", "lat": 51.0, "lon": -1.0, "name": "Original"},
+            {"id": "c", "country": "IE", "lat": 53.0, "lon": -8.0, "name": "Second"},
+        ]},
+        "other.json": {"version": 1, "tile": "other", "spots": [
+            {"id": "b", "country": "FR", "lat": 45.0, "lon": 2.0},
+        ]},
+    }
+    for name, value in envelopes.items():
+        (spots / name).write_text(json.dumps(value), encoding="utf-8")
+    for level in range(1, 7):
+        (clusters / f"L{level}.json").write_text("[]", encoding="utf-8")
+    (clusters / "index.json").write_text("{}", encoding="utf-8")
+
+    entries = {}
+    package = {}
+    for path in sorted(root.rglob("*.json")):
+        relative = path.relative_to(root).as_posix()
+        data = path.read_bytes()
+        info = {"size": len(data), "sha256": hashlib.sha256(data).hexdigest()}
+        entries[relative] = dict(info)
+        if relative.startswith("spots/"):
+            info["expected_spot_records"] = len(envelopes[path.name]["spots"])
+        elif relative != "clusters/index.json":
+            info["actual_records"] = 0
+        package[relative] = info
+
+    source = {"repository": auth.APPROVED_BASELINE_REPOSITORY, "commit": auth.APPROVED_BASELINE_COMMIT}
+    inventory = tmp_path / "inventory.json"
+    inventory.write_text(json.dumps({**source, "files": entries}), encoding="utf-8")
+    pin = hashlib.sha256(inventory.read_bytes()).hexdigest()
+    monkeypatch.setattr(auth, "APPROVED_G2_INVENTORY_SHA256", pin)
+    monkeypatch.setattr(auth, "APPROVED_G2_SPOT_COUNT", 2)
+    (root / "baseline.json").write_text(json.dumps({
+        **source, "inventory_sha256": pin, "g2_spot_records": 2, "files": package,
+    }), encoding="utf-8")
+    return root, inventory, pin, envelopes

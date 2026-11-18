@@ -28,6 +28,7 @@ G2_BASELINE = ROOT / "input/accessibility/baselines/312bc366ccef674a232bde2f0a3a
 G2_INVENTORY = ROOT / "input/accessibility/baselines/312bc366ccef674a232bde2f0a3a42067d083d19-g2-full-inventory.json"
 
 
+@pytest.mark.retained_artifacts
 def test_real_tenerife_and_g1_profiles_retain_dem_requirements_and_identities():
     from src.accessibility_index import AccessibilityIndex
     from src.elevation import ElevationSampler
@@ -55,6 +56,7 @@ def test_real_tenerife_and_g1_profiles_retain_dem_requirements_and_identities():
                 index.close()
 
 
+@pytest.mark.retained_artifacts
 def test_real_g1_manifest_loads_through_both_canary_interfaces_and_keeps_core_bytes(monkeypatch):
     from shapely import to_wkb
 
@@ -172,21 +174,21 @@ def _dged_cell_rasters(cache: Path, lat: int, lon: int) -> tuple[dict, dict]:
 
 
 @pytest.fixture
-def g2_dem_fixture(tmp_path):
+def g2_dem_fixture(tmp_path, request):
     config = yaml.safe_load((ROOT / "config/accessibility.yaml").read_text(encoding="utf-8"))
     policy = config["dem_manifest_policies"]["uk_ireland_accessibility_g2"]
     cache = tmp_path / "cache"
     dem_info, wbm_info = _tiny_rasters(cache)
-    source_base = json.loads((ROOT / policy["base_manifest"]).read_text(encoding="utf-8"))
-    cells = [(tile["lat"], tile["lon"]) for tile in source_base["tiles"]]
-    assert len(cells) == policy["expected_base_pairs"] == 56
-
+    # Synthetic base inventory chosen independently of the retained manifest.
+    cells = [(lat, lon) for lat in range(49, 55) for lon in range(-9, 0)] + [(50, 0), (51, 0)]
     additional = [tuple(cell) for cell in policy["required_additional_cells"]]
-    additional_rasters = {cell: _dged_cell_rasters(cache, *cell) for cell in additional}
+    assert len(cells) == policy["expected_base_pairs"] == 56
+    assert len(additional) == 8
+    geographic_base = getattr(request, "param", False)
 
     def tile(lat, lon):
-        if (lat, lon) in additional_rasters:
-            dem_item, wbm_item = additional_rasters[(lat, lon)]
+        if geographic_base or (lat, lon) in additional:
+            dem_item, wbm_item = _dged_cell_rasters(cache, lat, lon)
         else:
             dem_item, wbm_item = dem_info, wbm_info
         return {
@@ -208,48 +210,23 @@ def g2_dem_fixture(tmp_path):
     manifest = {
         "schema": 1, "region": policy["region"], "bbox": policy["bbox"],
         "base_manifest": base_path.name, "base_manifest_sha256": policy["base_manifest_sha256"],
-        "tiles": [tile(*cell) for cell in cells + additional],
+        "tiles": base["tiles"] + [tile(*cell) for cell in additional],
     }
     manifest_path = tmp_path / "uk_ireland-accessibility-g2.json"
     manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
     return {"config": config_path, "cache": cache, "manifest": manifest_path,
-            "base": base, "policy": policy, "tile": tile, "additional": additional}
+            "base": base, "base_manifest": base_path, "additional": additional}
 
 
-def _upgrade_fixture_to_64_geographic_dged_cells(fixture):
-    """Give the controlled success fixture native DGED grids in all 64 cells."""
-    base = fixture["base"]
-    base_cells = {(tile["lat"], tile["lon"]): tile for tile in base["tiles"]}
-    for cell, tile in base_cells.items():
-        tile["dem"], tile["wbm"] = _dged_cell_rasters(fixture["cache"], *cell)
-
-    base_path = Path(fixture["policy"]["base_manifest"])
-    base_bytes = (json.dumps(base, sort_keys=True) + "\n").encode()
-    base_path.write_bytes(base_bytes)
-    base_hash = hashlib.sha256(base_bytes).hexdigest()
-    fixture["policy"]["base_manifest_sha256"] = base_hash
-    config = yaml.safe_load(fixture["config"].read_text(encoding="utf-8"))
-    config["dem_manifest_policies"]["uk_ireland_accessibility_g2"]["base_manifest_sha256"] = base_hash
-    fixture["config"].write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
-
-    manifest = json.loads(fixture["manifest"].read_text())
-    manifest["base_manifest_sha256"] = base_hash
-    for tile in manifest["tiles"]:
-        cell = tile["lat"], tile["lon"]
-        if cell in base_cells:
-            tile["dem"] = dict(base_cells[cell]["dem"])
-            tile["wbm"] = dict(base_cells[cell]["wbm"])
-    _write_manifest(fixture["manifest"], manifest)
-
-
+@pytest.mark.parametrize("g2_dem_fixture", [pytest.param(True, id="all-dged")], indirect=True)
 def test_g2_full_configured_dem_inventory_passes_with_64_geographic_dged_pairs(g2_dem_fixture):
-    _upgrade_fixture_to_64_geographic_dged_cells(g2_dem_fixture)
     result = validate_accessibility_dem_manifest(
         g2_dem_fixture["manifest"], g2_dem_fixture["cache"],
         "great_britain", "great-britain-g2-v1", geographic_config=g2_dem_fixture["config"],
     )
     assert len(result["tiles"]) == 64
     assert len({(tile["lat"], tile["lon"]) for tile in result["tiles"]}) == 64
+    assert result["tiles"][:56] == g2_dem_fixture["base"]["tiles"]
     for tile in result["tiles"]:
         lat, lon = tile["lat"], tile["lon"]
         factor = 1 if abs(lat + 0.5) < 50 else 1.5
@@ -412,21 +389,20 @@ def _rewrite_dged_raster(fixture, cell, layer, *, width=None, height=None, crs=N
     return data
 
 
-def _real_n49_w007_pair_relabelled_as_n55_w009(fixture):
-    original = json.loads((ROOT / "data/elevation/manifests/uk_ireland.json").read_text())
-    n49 = next(tile for tile in original["tiles"] if (tile["lat"], tile["lon"]) == (49, -7))
+def _relabel_n49_w007_as_n55_w009(fixture):
+    source_cache = fixture["cache"] / "relabel-source"
+    n49_dem, n49_wbm = _dged_cell_rasters(source_cache, 49, -7)
     data = json.loads(fixture["manifest"].read_text())
     n55 = next(tile for tile in data["tiles"] if (tile["lat"], tile["lon"]) == (55, -9))
     from src.elevation import sha256
 
-    for layer in ("dem", "wbm"):
-        source = ROOT / "input/elevation" / n49[layer]["path"]
+    for layer, original in (("dem", n49_dem), ("wbm", n49_wbm)):
+        source = source_cache / original["path"]
         target = fixture["cache"] / n55[layer]["path"]
         shutil.copyfile(source, target)
         n55[layer]["size"] = target.stat().st_size
         n55[layer]["sha256"] = sha256(target)
     _write_manifest(fixture["manifest"], data)
-    return data
 
 
 @pytest.mark.parametrize("mutation", [
@@ -518,11 +494,12 @@ def test_g2_rejects_mixed_cell_dem_wbm_and_contradictory_source_metadata(g2_dem_
         )
 
 
-def test_retained_n49_pair_relabelled_as_n55_is_rejected_in_preparation_and_qualification(
+def test_n49_pair_relabelled_as_n55_is_rejected_in_preparation_and_qualification(
     g2_dem_fixture, tmp_path, monkeypatch,
 ):
     fixture = g2_dem_fixture
-    _real_n49_w007_pair_relabelled_as_n55_w009(fixture)
+    _relabel_n49_w007_as_n55_w009(fixture)
+    rejection = r"G2 DEM geographic-grid mismatch for \(55, -9\): expected DGED dimensions 2401x3601; got 3601x3601"
 
     # Exercise the preparation entry point up to its first DEM validation. Its
     # output directory and every geographic preparation artifact must remain absent.
@@ -543,7 +520,7 @@ def test_retained_n49_pair_relabelled_as_n55_is_rejected_in_preparation_and_qual
     spec = replace(original_spec, dem_manifest=str(fixture["manifest"]), source=source)
     monkeypatch.setattr(GeographicSpecification, "load", lambda *_args, **_kwargs: spec)
     output_dir = tmp_path / "must-not-be-created"
-    with pytest.raises(ValueError, match="dimensions|grid"):
+    with pytest.raises(ValueError, match=rejection):
         accessibility_prepare.prepare_accessibility(
             pbf, source["source_url"], "great_britain", fixture["manifest"], output_dir,
             coverage_polygon=polygon, dem_cache_dir=fixture["cache"],
@@ -559,7 +536,7 @@ def test_retained_n49_pair_relabelled_as_n55_is_rejected_in_preparation_and_qual
     sample_calls = []
     monkeypatch.setattr(prepare_elevation, "_sample_accessibility_halo",
                         lambda *_args, **_kwargs: sample_calls.append(True))
-    with pytest.raises(ValueError, match="dimensions|grid"):
+    with pytest.raises(ValueError, match=rejection):
         prepare_elevation.validate_accessibility_halo_samples(
             fixture["manifest"], fixture["cache"], "unused-baseline",
             geographic_config=fixture["config"],
@@ -684,16 +661,14 @@ def test_runtime_g2_sampler_initialization_uses_the_same_geographic_validator(
 
 
 def test_multi_scope_audit_validates_each_g2_profile_before_resolver_and_output(
-    g2_dem_fixture, tmp_path, monkeypatch,
+    g2_dem_fixture, synthetic_baseline, tmp_path, monkeypatch,
 ):
     from tools import audit_accessibility
     from src.accessibility_scope import GeographicSpecification
     import src.accessibility_resolver as accessibility_resolver
 
     fixture = g2_dem_fixture
-    baseline_root, audit_spots, external_inventory = _baseline_copy(tmp_path)
-    audit_inventory = baseline_root / "source-inventory.json"
-    shutil.copyfile(external_inventory, audit_inventory)
+    baseline_root, audit_inventory, inventory_pin, _ = synthetic_baseline
     configured_specs = {
         scope: replace(
             GeographicSpecification.load(fixture["config"], scope),
@@ -729,14 +704,14 @@ def test_multi_scope_audit_validates_each_g2_profile_before_resolver_and_output(
 
     def run_controlled_audit(output_dir):
         return audit_accessibility.run_audit(
-            spots_dir=audit_spots,
+            spots_dir=baseline_root / "spots",
             clusters_dir=baseline_root / "clusters",
             accessibility_datasets={
                 "great_britain": Path("unused-gb-index.json"),
                 "ireland_northern_ireland": Path("unused-ie-index.json"),
             },
             baseline_inventory=audit_inventory,
-            baseline_inventory_sha256=APPROVED_G2_INVENTORY_SHA256,
+            baseline_inventory_sha256=inventory_pin,
             dem_manifest=fixture["manifest"], dem_cache_dir=fixture["cache"],
             radius_m=1000, output_dir=output_dir, geographic_config=fixture["config"],
         )
@@ -753,10 +728,10 @@ def test_multi_scope_audit_validates_each_g2_profile_before_resolver_and_output(
     assert not (accepted_output / "audit.json").exists()
 
     validator_calls.clear()
-    _real_n49_w007_pair_relabelled_as_n55_w009(fixture)
+    _relabel_n49_w007_as_n55_w009(fixture)
     rejected_parent = tmp_path / "must-not-be-created"
     rejected_output = rejected_parent / "audit"
-    with pytest.raises(ValueError, match="geographic-grid mismatch"):
+    with pytest.raises(ValueError, match=r"G2 DEM geographic-grid mismatch for \(55, -9\)"):
         run_controlled_audit(rejected_output)
     assert [call[0][2] for call in validator_calls] == ["great_britain"]
     assert len(resolver_calls) == 1
@@ -773,6 +748,8 @@ def test_legacy_g1_audit_dispatch_does_not_enter_g2_dem_validation(monkeypatch, 
 
     legacy_calls = []
     g2_calls = []
+    manifest = _write_manifest(tmp_path / "legacy.json", {"policies": {"radii_m": [1000]}})
+    output = tmp_path / "legacy-audit"
 
     def stop_at_legacy_validator(path):
         legacy_calls.append(Path(path))
@@ -786,13 +763,25 @@ def test_legacy_g1_audit_dispatch_does_not_enter_g2_dem_validation(monkeypatch, 
     with pytest.raises(LegacyValidationReached, match="legacy Canary audit"):
         audit_accessibility.run_audit(
             spots_dir=tmp_path / "spots", clusters_dir=tmp_path / "clusters",
-            accessibility_manifest=G1_MANIFEST,
-            dem_manifest=ROOT / "data/elevation/manifests/canaries.json",
-            dem_cache_dir=ROOT / "input/elevation", radius_m=1000,
-            output_dir=tmp_path / "legacy-audit",
+            accessibility_manifest=manifest,
+            dem_manifest=tmp_path / "unused-dem.json",
+            dem_cache_dir=tmp_path / "cache", radius_m=1000,
+            output_dir=output,
         )
-    assert legacy_calls == [G1_MANIFEST]
+    assert legacy_calls == [manifest]
     assert g2_calls == []
+    assert not output.exists()
+
+
+def test_g2_rejects_changes_to_pinned_base_manifest(g2_dem_fixture):
+    fixture = g2_dem_fixture
+    base_path = fixture["base_manifest"]
+    base_path.write_bytes(base_path.read_bytes() + b"\n")
+    with pytest.raises(ValueError, match="Approved G2 base DEM manifest hash mismatch"):
+        validate_accessibility_dem_manifest(
+            fixture["manifest"], fixture["cache"], "great_britain", "great-britain-g2-v1",
+            geographic_config=fixture["config"],
+        )
 
 
 def test_g2_rejects_bad_hash_wrong_profile_and_replaced_historical_pair(g2_dem_fixture):
@@ -831,6 +820,7 @@ def test_g2_rejects_bad_hash_wrong_profile_and_replaced_historical_pair(g2_dem_f
         )
 
 
+@pytest.mark.retained_artifacts
 def test_existing_uk_ireland_astronomical_manifest_and_g2_source_hash_are_retained():
     from src.elevation import ElevationSampler
 
@@ -843,16 +833,22 @@ def test_existing_uk_ireland_astronomical_manifest_and_g2_source_hash_are_retain
         assert len(sampler.tiles) == 56
 
 
-def _baseline_copy(tmp_path):
-    if not G2_BASELINE.is_dir() or not G2_INVENTORY.is_file():
-        pytest.skip("Retained approved G2 baseline package and trusted inventory are not present")
-    root = tmp_path / "baseline"
-    shutil.copytree(G2_BASELINE, root)
-    for directory in [root, *(path for path in root.rglob("*") if path.is_dir())]:
-        directory.chmod(0o755)
-    inventory = tmp_path / "approved-inventory.json"
-    shutil.copyfile(G2_INVENTORY, inventory)
-    return root, root / "spots", inventory
+@pytest.fixture(params=["synthetic", pytest.param("retained", marks=pytest.mark.retained_artifacts)])
+def baseline_package(request, tmp_path):
+    if request.param == "synthetic":
+        root, inventory, pin, _ = request.getfixturevalue("synthetic_baseline")
+    else:
+        if not G2_BASELINE.is_dir() or not G2_INVENTORY.is_file():
+            pytest.skip("Retained approved G2 baseline package and trusted inventory are not present")
+        root = tmp_path / "baseline"
+        shutil.copytree(G2_BASELINE, root)
+        for directory in [root, *(path for path in root.rglob("*") if path.is_dir())]:
+            directory.chmod(0o755)
+        inventory = tmp_path / "approved-inventory.json"
+        shutil.copyfile(G2_INVENTORY, inventory)
+        pin = APPROVED_G2_INVENTORY_SHA256
+    assert validate_approved_g2_baseline(root / "spots", inventory)["inventory_sha256"] == pin
+    return root, inventory, pin
 
 
 def _update_local_manifest(root, relative, payload):
@@ -867,6 +863,17 @@ def _update_local_manifest(root, relative, payload):
     manifest_path.write_text(json.dumps(manifest))
 
 
+def test_synthetic_baseline_authenticates_spots_and_cluster_inventory(synthetic_baseline):
+    root, inventory, pin, _ = synthetic_baseline
+    baseline = validate_approved_g2_baseline(root / "spots", inventory)
+    assert baseline["inventory_sha256"] == pin
+    assert [spot["id"] for spot in baseline["g2_spots"]] == ["a", "c"]
+    assert baseline["spot_tiles"] == ["spots/other.json", "spots/selected.json"]
+    assert len(baseline["cluster_files"]) == 7
+    assert "clusters/index.json" in baseline["cluster_files"]
+
+
+@pytest.mark.retained_artifacts
 def test_approved_baseline_authenticates_full_1217_spots_tiles_and_clusters():
     if not G2_BASELINE.is_dir() or not G2_INVENTORY.is_file():
         pytest.skip("Retained approved G2 baseline package and trusted inventory are not present")
@@ -879,13 +886,14 @@ def test_approved_baseline_authenticates_full_1217_spots_tiles_and_clusters():
     assert len({spot["id"] for spot in baseline["g2_spots"]}) == 1217
 
 
-def test_truncated_spot_tile_attack_fails_before_dem_sampler(tmp_path, monkeypatch):
+def test_truncated_spot_tile_attack_fails_before_dem_sampler(baseline_package, tmp_path, monkeypatch):
     from tools import prepare_elevation
 
-    root, spots_dir, inventory = _baseline_copy(tmp_path)
+    root, inventory, _ = baseline_package
+    spots_dir = root / "spots"
     relative = next(path for path in sorted(root.glob("spots/*.json"))
-                    if any(spot.get("country") in {"GB", "IE"}
-                           for spot in json.loads(path.read_text())["spots"]))
+                    if sum(spot.get("country") in {"GB", "IE"}
+                           for spot in json.loads(path.read_text())["spots"]) > 1)
     relative_name = relative.relative_to(root).as_posix()
     envelope = json.loads(relative.read_text())
     envelope["spots"] = [spot for spot in envelope["spots"] if spot.get("country") in {"GB", "IE"}][:1]
@@ -893,6 +901,8 @@ def test_truncated_spot_tile_attack_fails_before_dem_sampler(tmp_path, monkeypat
     sampler_calls = []
     monkeypatch.setattr(prepare_elevation, "ElevationSampler",
                         lambda *args, **kwargs: sampler_calls.append((args, kwargs)))
+    monkeypatch.setattr(prepare_elevation, "_sample_accessibility_halo",
+                        lambda *args, **kwargs: pytest.fail("truncated baseline reached halo sampling"))
     with pytest.raises(ValueError, match="trusted source inventory"):
         prepare_elevation.validate_accessibility_halo_samples(
             "unused-dem.json", tmp_path, spots_dir, inventory,
@@ -910,8 +920,9 @@ def test_truncated_spot_tile_attack_fails_before_dem_sampler(tmp_path, monkeypat
 
 
 @pytest.mark.parametrize("attack", ["missing_tile", "modified_property", "modified_hash", "missing_spot"])
-def test_approved_baseline_rejects_incomplete_or_altered_tiles(tmp_path, attack):
-    root, spots_dir, inventory = _baseline_copy(tmp_path)
+def test_approved_baseline_rejects_incomplete_or_altered_tiles(baseline_package, attack):
+    root, inventory, _ = baseline_package
+    spots_dir = root / "spots"
     tile_path = next(path for path in sorted(root.glob("spots/*.json"))
                      if any(spot.get("country") in {"GB", "IE"}
                             for spot in json.loads(path.read_text())["spots"]))
@@ -942,8 +953,8 @@ def test_approved_baseline_rejects_incomplete_or_altered_tiles(tmp_path, attack)
             validate_approved_g2_baseline(spots_dir, inventory)
 
 
-def test_approved_baseline_rejects_tampered_inventory_even_when_locally_consistent(tmp_path):
-    root, spots_dir, inventory = _baseline_copy(tmp_path)
+def test_approved_baseline_rejects_tampered_inventory_even_when_locally_consistent(baseline_package):
+    root, inventory, trusted_pin = baseline_package
     tile = next(path for path in sorted(root.glob("spots/*.json")))
     envelope = json.loads(tile.read_text())
     envelope["marker"] = "locally self-authorized"
@@ -953,8 +964,14 @@ def test_approved_baseline_rejects_tampered_inventory_even_when_locally_consiste
     trusted["files"][relative]["size"] = (root / relative).stat().st_size
     trusted["files"][relative]["sha256"] = hashlib.sha256((root / relative).read_bytes()).hexdigest()
     inventory.write_text(json.dumps(trusted))
+    forged_pin = hashlib.sha256(inventory.read_bytes()).hexdigest()
+    assert forged_pin != trusted_pin
+    manifest_path = root / "baseline.json"
+    manifest = json.loads(manifest_path.read_text())
+    manifest["inventory_sha256"] = forged_pin
+    manifest_path.write_text(json.dumps(manifest))
     with pytest.raises(ValueError, match="inventory SHA-256 mismatch"):
-        validate_approved_g2_baseline(spots_dir, inventory)
+        validate_approved_g2_baseline(root / "spots", inventory)
 
 
 def test_duplicate_published_ids_are_rejected_by_baseline_parser():

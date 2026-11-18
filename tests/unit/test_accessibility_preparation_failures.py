@@ -2,6 +2,7 @@
 import errno
 import json
 import sqlite3
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -145,21 +146,40 @@ def test_successful_staging_and_existing_output_protection(inputs):
 
 
 @pytest.mark.parametrize('coverage', ['complete', 'missing_buffer', 'hole'])
-@pytest.mark.parametrize('scope', ['canaries', 'great_britain', 'ireland_northern_ireland'])
-def test_direct_preparation_checks_full_domain(inputs, monkeypatch, coverage, scope):
-    domain = box(0, 0, 12000, 12000)
-    provider = box(-1, -1, 12001, 12001)
-    if coverage == 'missing_buffer':
-        provider = box(100, 100, 11900, 11900)
-    elif coverage == 'hole':
-        provider = provider.difference(box(5000, 5000, 5001, 5001))
-    spec = SimpleNamespace(source={'source_url': preparation.SOURCE_URL, 'pbf_path': str(inputs.source),
-                                  'coverage_polygon_path': str(inputs.polygon)},
-                           bbox=(0,0,1,1), preparation_buffer_m=6000, supported_radii_m=(1000,),
-                           public_search_radius_m=1000, metric_crs='EPSG:32628', profile='test',
-                           dem_manifest=str(inputs.dem),
-                           projected_geometries=lambda _: (box(6000,6000,6001,6001), domain, provider, None, None, 0))
+@pytest.mark.parametrize(('scope', 'lon', 'lat'), [
+    ('canaries', -16.65, 28.25),
+    ('great_britain', -2.0, 52.0),
+    ('ireland_northern_ireland', -7.0, 53.0),
+])
+def test_direct_preparation_checks_full_domain(inputs, monkeypatch, coverage, scope, lon, lat):
+    core = box(lon - 0.01, lat - 0.01, lon + 0.01, lat + 0.01)
+    margin = 0.02 if coverage == 'missing_buffer' else 0.2
+    outer = box(lon - margin, lat - margin, lon + margin, lat + margin)
+    rings = [('1', outer)]
+    if coverage == 'hole':
+        rings.append(('!2', box(lon + 0.02, lat - 0.005, lon + 0.03, lat + 0.005)))
+    lines = ['synthetic provider']
+    for name, polygon in rings:
+        lines.append(name)
+        lines.extend(f' {x} {y}' for x, y in polygon.exterior.coords)
+        lines.append('END')
+    inputs.polygon.write_text('\n'.join([*lines, 'END', '']), encoding='utf-8')
+
+    configured = GeographicSpecification.load('config/accessibility.yaml', scope)
+    spec = replace(
+        configured, dem_manifest=str(inputs.dem),
+        source={**configured.source, 'source_url': preparation.SOURCE_URL,
+                'pbf_path': str(inputs.source), 'coverage_polygon_path': str(inputs.polygon)},
+    )
     monkeypatch.setattr(GeographicSpecification, 'load', lambda *a: spec)
+    monkeypatch.setattr(GeographicSpecification, 'assignment_core', lambda self, provider: core)
+    projected_core, domain, provider, *_ = spec.projected_geometries(
+        preparation.parse_geofabrik_poly(inputs.polygon),
+    )
+    assert provider.covers(projected_core)
+    assert domain.equals(projected_core.buffer(6000))
+    assert provider.covers(domain) == (coverage == 'complete')
+
     def header(_):
         raise RuntimeError('coverage passed before PBF read')
     monkeypatch.setattr(preparation, '_read_pbf_header', header)
@@ -198,6 +218,7 @@ def test_cli_preserves_unexpected_diagnostics(monkeypatch, failure):
     assert result.value is exc
 
 
+@pytest.mark.retained_artifacts
 @pytest.mark.parametrize('scope', ['canaries', 'great_britain', 'ireland_northern_ireland'])
 def test_retained_approved_provider_coverage(scope):
     spec = GeographicSpecification.load('config/accessibility.yaml', scope)

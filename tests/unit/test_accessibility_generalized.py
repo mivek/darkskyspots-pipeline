@@ -1,8 +1,10 @@
 import hashlib
 import json
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+import yaml
 from pyproj import Transformer
 from shapely import to_wkb
 from shapely.geometry import Point, box
@@ -261,3 +263,53 @@ def test_configured_canary_scope_uses_distortion_checked_assignment_geometry():
     assert core.is_valid and not core.is_empty
     forward = Transformer.from_crs("EPSG:4326", specification.metric_crs, always_xy=True)
     assert specification.validate_distortion(core, forward) <= 0.005
+
+
+def test_synthetic_canary_index_opens_through_both_local_interfaces(tmp_path):
+    from src.accessibility_dem import validate_accessibility_dem_manifest
+    from src.accessibility_prepare import prepare_accessibility
+    from src.accessibility_resolver import AccessibilityResolver
+    from src.cli import parse_args
+    from src.elevation import ElevationSampler
+    from tests.unit.test_accessibility import _synthetic_osm
+
+    dem, cache = _write_valid_dem_manifest(tmp_path / "dem", "2024_1")
+    assert validate_accessibility_dem_manifest(dem, cache, "tenerife", "tenerife-legacy-v1")["region"] == "canaries"
+
+    source = tmp_path / "canary.osm"
+    source.write_text(_synthetic_osm(), encoding="utf-8")
+    polygon = tmp_path / "coverage.poly"
+    polygon.write_text("synthetic\n1\n -21 26\n -11 26\n -11 32\n -21 32\n -21 26\nEND\nEND\n", encoding="utf-8")
+    source_url = "https://example.invalid/canary.osm"
+    polygon_url = "https://example.invalid/coverage.poly"
+    source.with_suffix(".osm.http.json").write_text(json.dumps({
+        name: {"url": url, "retrieved_at_utc": "2026-01-01T00:00:00Z",
+               "sha256": sha256_file(path), "size": path.stat().st_size}
+        for name, path, url in (("pbf", source, source_url), ("coverage_polygon", polygon, polygon_url))
+    }), encoding="utf-8")
+    configured = yaml.safe_load(Path("config/accessibility.yaml").read_text(encoding="utf-8"))
+    scope = configured["scopes"]["canaries"]
+    scope["dem_manifest"] = str(dem)
+    scope["source"].update(
+        pbf_path=str(source), source_url=source_url,
+        coverage_polygon_path=str(polygon), coverage_polygon_url=polygon_url,
+    )
+    config = tmp_path / "accessibility.yaml"
+    config.write_text(yaml.safe_dump(configured), encoding="utf-8")
+    output = tmp_path / "canary-index"
+    manifest = prepare_accessibility(
+        source, source_url, "canaries", dem, output, coverage_polygon=polygon,
+        dem_cache_dir=cache, geographic_config=config,
+    )
+    assert manifest["profile"] == GENERALIZED_PROFILE
+    manifest_path = output / "manifest.json"
+    args = ["--year", "2025", "--region", "canaries", "--no-push"]
+    legacy = parse_args([*args, "--accessibility-manifest", str(manifest_path)])
+    scoped = parse_args([*args, "--accessibility-dataset", f"canaries={manifest_path}"])
+
+    with ElevationSampler(dem, cache) as sampler, AccessibilityIndex(legacy.accessibility_manifest) as index:
+        assert index.validate_dem_manifest(sampler.manifest_path) == sha256_file(dem)
+        assert index.source_id == manifest["dataset_id"]
+        with AccessibilityResolver(scoped.accessibility_datasets, sampler, geographic_config=config) as resolver:
+            assert resolver.indices["canaries"].source_id == index.source_id
+            assert resolver.resolve_scope({"id": "test", "lat": 28.25, "lon": -16.65}) == "canaries"

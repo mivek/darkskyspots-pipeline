@@ -139,44 +139,6 @@ def test_failure_retains_staging_and_does_not_finalize(tmp_path, monkeypatch):
     assert "injected query setup failure" in (stages[0] / "failure.txt").read_text()
 
 
-@pytest.fixture
-def synthetic_baseline(tmp_path, monkeypatch):
-    import hashlib
-    import src.accessibility_baseline as auth
-    root = tmp_path / "baseline"
-    spots, clusters = root / "spots", root / "clusters"
-    spots.mkdir(parents=True)
-    clusters.mkdir()
-    envelopes = {
-        "selected.json": {"version": 1, "tile": "selected", "spots": [{"id": "a", "country": "GB", "lat": 51.0, "lon": -1.0, "name": "Original"}]},
-        "other.json": {"version": 1, "tile": "other", "spots": [{"id": "b", "country": "FR", "lat": 45.0, "lon": 2.0}]},
-    }
-    for name, value in envelopes.items():
-        (spots / name).write_text(json.dumps(value))
-    for level in range(1, 7):
-        (clusters / f"L{level}.json").write_text("[]")
-    (clusters / "index.json").write_text("{}")
-    entries = {}
-    package = {}
-    for path in sorted(root.rglob("*.json")):
-        relative = path.relative_to(root).as_posix()
-        data = path.read_bytes()
-        info = {"size": len(data), "sha256": hashlib.sha256(data).hexdigest()}
-        entries[relative] = dict(info)
-        if relative.startswith("spots/"):
-            info["expected_spot_records"] = len(json.loads(data)["spots"])
-        elif relative != "clusters/index.json":
-            info["actual_records"] = 0
-        package[relative] = info
-    inventory = tmp_path / "inventory.json"
-    inventory.write_text(json.dumps({"repository": auth.APPROVED_BASELINE_REPOSITORY, "commit": auth.APPROVED_BASELINE_COMMIT, "files": entries}))
-    pin = hashlib.sha256(inventory.read_bytes()).hexdigest()
-    monkeypatch.setattr(auth, "APPROVED_G2_INVENTORY_SHA256", pin)
-    monkeypatch.setattr(auth, "APPROVED_G2_SPOT_COUNT", 1)
-    (root / "baseline.json").write_text(json.dumps({"repository": auth.APPROVED_BASELINE_REPOSITORY, "commit": auth.APPROVED_BASELINE_COMMIT, "inventory_sha256": pin, "g2_spot_records": 1, "files": package}))
-    return root, inventory, pin, envelopes
-
-
 def test_baseline_root_rejects_output_without_changing_authenticated_package(tmp_path, synthetic_baseline):
     from src.accessibility_baseline import validate_approved_g2_baseline
     from tools.audit_accessibility import _run_multi_scope_audit
@@ -261,8 +223,8 @@ def test_tile_only_orchestration_finalizes_without_clusters(tmp_path, monkeypatc
         def __enter__(self): return self
         def __exit__(self, *args): pass
         def audit_assignments(self, spots):
-            return {'assigned': 1, 'enriched': 0, 'excluded': 0, 'missing': 0,
-                    'by_scope': {'great_britain': {'assigned': 1, 'enriched': 0}, 'ireland_northern_ireland': {'assigned': 0, 'enriched': 0}}}
+            return {'assigned': len(spots), 'enriched': 0, 'excluded': 0, 'missing': 0,
+                    'by_scope': {'great_britain': {'assigned': len(spots), 'enriched': 0}, 'ireland_northern_ireland': {'assigned': 0, 'enriched': 0}}}
         def resolve_scope(self, spot): return 'great_britain'
     monkeypatch.setattr(audit, 'AccessibilityResolver', Resolver)
     datasets = {}
@@ -279,12 +241,13 @@ def test_tile_only_orchestration_finalizes_without_clusters(tmp_path, monkeypatc
     assert sorted(p.name for p in (output / 'tiles').iterdir()) == ['selected.json']
     actual = json.loads((output / 'tiles' / 'selected.json').read_text())
     assert {k: v for k, v in actual.items() if k != 'spots'} == {k: v for k, v in envelopes['selected.json'].items() if k != 'spots'}
-    assert {k: v for k, v in actual['spots'][0].items() if k != 'accessibility'} == envelopes['selected.json']['spots'][0]
-    audit.validate_accessibility_payload(actual['spots'][0]['accessibility'])
+    assert [{k: v for k, v in spot.items() if k != 'accessibility'} for spot in actual['spots']] == envelopes['selected.json']['spots']
+    for spot in actual['spots']:
+        audit.validate_accessibility_payload(spot['accessibility'])
     assert not (output / 'clusters').exists()
     assert not list(tmp_path.glob('.output-*'))
-    assert result['assignment']['enriched'] == 1
-    assert result['assignment']['by_scope']['great_britain']['enriched'] == 1
+    assert result['assignment']['enriched'] == 2
+    assert result['assignment']['by_scope']['great_britain']['enriched'] == 2
     assert result['preservation']['baseline_clusters_authenticated'] is True
     assert result['acceptance']['cluster_structure_preserved'] is None
     assert json.loads((output / 'audit.json').read_text())['assignment'] == result['assignment']

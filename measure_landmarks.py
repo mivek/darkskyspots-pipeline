@@ -888,11 +888,12 @@ def _archive_metadata(geonames_dir: Path, country_codes: Sequence[str]) -> dict:
 
 
 def _legacy_markdown_report(report: dict, *, country_code: str, bbox: Sequence[float], archives: dict) -> str:
+    archive_summary = ", ".join(f"`{code}` {archive['sha256'][:12]}" for code, archive in sorted(archives.items()))
     lines = ["# Mesure de la cascade de nommage GeoNames", "",
              f"- Pays : `{country_code}`",
              f"- Bbox région : `{list(map(float, bbox))}` ; import élargi à 40 km",
              f"- Spots mesurés : **{report['spot_count']}** (référence indicative : {report['expected_spots']})",
-             f"- Archives : {', '.join(f'`{c}` {v['sha256'][:12]}' for c, v in sorted(archives.items()))}", ""]
+             f"- Archives : {archive_summary}", ""]
     if report.get("spot_count_warning"):
         lines += [f"> **Avertissement :** {report['spot_count_warning']}", ""]
     lines += ["## Distribution", "", "| Tier | Spots |", "|---|---:|"]

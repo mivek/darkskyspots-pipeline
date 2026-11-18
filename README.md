@@ -285,6 +285,37 @@ The input must be:
 - **SSH key** loaded (`ssh-add -l`) for the publish step (uses `git push` over SSH). Use `--no-push` to skip.
 - **`TMPDIR`** controls temp file location (ALR slices, git clones). Override if disk space is limited.
 
+## Tests
+
+Install both requirement files, then run the portable suite from a clean checkout.
+It uses tracked inputs and test-owned fixtures.
+
+```bash
+python -m pip install -r requirements.txt -r requirements-accessibility.txt
+python -m pytest -m "not retained_artifacts" -W error::PendingDeprecationWarning
+```
+
+On Python 3.11, the requirements pin Affine 3.0.0 for warning-strict tests with
+Rasterio 1.4.4. Rasterio still uses deprecated Affine multiplication internally,
+which emits `PendingDeprecationWarning` with Affine 3.0.1. Python 3.12 and later
+allow Affine 3.0 or newer. Reassess the pin when Python 3.11 resolves a different
+Rasterio release, and relax it only when a newer Affine passes the warning-strict
+suite on Python 3.11.
+
+Run the retained-artifact checks separately to verify the original provider
+polygons, Tenerife and Canary indexes, Canary and UK/Ireland DEM manifests and
+cache, and the approved G2 baseline package with its trusted inventory. These
+checks expect the retained files at the paths in `config/accessibility.yaml`,
+`input/accessibility/`, `data/elevation/manifests/`, and `input/elevation/`.
+Some checks skip when their primary datasets are absent. Partial installations
+or missing dependent assets can fail, and corrupt or inconsistent artifacts
+remain failures. A successful retained-evidence run requires the complete set
+of prerequisites.
+
+```bash
+python -m pytest -m retained_artifacts -rs -W error::PendingDeprecationWarning
+```
+
 ## Troubleshooting
 
 | Symptom | Likely cause | Fix |
