@@ -4,12 +4,29 @@ import json
 from pathlib import Path
 import re
 import time
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest
 from src.tile_export import write_tile_file as real_write_tile_file
 from src.clusters import write_cluster_files as real_write_cluster_files
+
+
+def test_f01_run_audit_records_verified_e3_manifest_digest():
+    import run
+
+    spots = [{"id": "46.6729_5.5562", "label": True}]
+    document = run._f01_audit_document(
+        "france", 2025, "34cc9365f131d3c6a0abaf2d7c83e3bc74d38630cd6b9787ed278893e25caaa6", spots,
+    )
+    assert document == {
+        "schema": 1,
+        "region": "france",
+        "year": 2025,
+        "e3_manifest_sha256": "34cc9365f131d3c6a0abaf2d7c83e3bc74d38630cd6b9787ed278893e25caaa6",
+        "spots": spots,
+    }
 
 
 @pytest.fixture(autouse=True)
@@ -22,6 +39,10 @@ def mock_filtered_geonames_api(monkeypatch):
     """
     import run
 
+    monkeypatch.setattr(run, "measure_sky_darkness_area", lambda spot, *_args: (
+        None, {"id": spot.get("id"), "label": False, "radiusM": None}
+    ))
+
     monkeypatch.setattr(run, "validate_geonames_manifest", lambda **_kwargs: None)
     sampler = MagicMock()
     sampler.__enter__.return_value = sampler
@@ -32,6 +53,7 @@ def mock_filtered_geonames_api(monkeypatch):
     monkeypatch.setattr(run, "ElevationSampler", lambda *args, **kwargs: sampler)
     geographic = MagicMock()
     geographic.is_e3 = True
+    geographic.revision = "a" * 64
     geographic.classify.side_effect = lambda points, *_args: [
         dict(spot=dict(p), confidence='A', reasons=[], base_evidence={'wbm_class': 0}) for p in points
     ]
@@ -262,6 +284,9 @@ def test_local_dispatcher_does_not_export_clusters_outside_activated_package(tmp
     class Geography:
         def __init__(self, *_args, **_kwargs): pass
         def require_region(self, *_args): pass
+        def classify(self, *_args):
+            self._e3_engine = SimpleNamespace(for_region=lambda _region: object())
+        revision = "a" * 64
         def close(self): pass
     class Naming:
         def enrich_spots(self, spots): return spots

@@ -16,6 +16,9 @@ from src.accessibility import PUBLIC_CLASSES
 
 def test_uk_ireland_pipeline_routes_accessibility_and_closes_both_samplers(tmp_path, monkeypatch):
     import run as pipeline
+    monkeypatch.setattr(pipeline, "measure_sky_darkness_area", lambda spot, *_args: (
+        None, {"id": spot.get("id"), "label": False, "radiusM": None}
+    ))
 
     input_dir = tmp_path / "input"
     output_dir = tmp_path / "output"
@@ -78,12 +81,16 @@ def test_uk_ireland_pipeline_routes_accessibility_and_closes_both_samplers(tmp_p
 
     class GeographicDataset:
         is_e3 = True
+        revision = "a" * 64
 
         def __init__(self, *_args, **_kwargs):
             self.closed = False
 
         def require_region(self, *_args):
             return None
+
+        def classify(self, *_args):
+            self._e3_engine = SimpleNamespace(for_region=lambda _region: object())
 
         def close(self):
             self.closed = True
