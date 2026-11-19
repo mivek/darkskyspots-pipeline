@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Collection
 
 from .accessibility import validate_accessibility_payload
+from .sky_darkness_area import normalize_sky_darkness_area
 
 
 @dataclass(frozen=True)
@@ -83,6 +84,9 @@ def _normalize_spot(
                 f"Invalid spot in {tile_path}: spot {spot_index} has an invalid nameDistanceKm"
             )
     normalized = {field: source_spot[field] for field in SPOT_FIELDS}
+    sky_area = normalize_sky_darkness_area(source_spot.get("skyDarknessArea"))
+    if sky_area is not None:
+        normalized["skyDarknessArea"] = sky_area
     normalized["lat"] = lat
     normalized["lon"] = lon
     normalized["darkness"] = darkness

@@ -108,6 +108,15 @@ def test_cluster_copies_valid_optional_accessibility_payload(tmp_path):
     assert representative["accessibility"] == source["accessibility"]
 
 
+@pytest.mark.parametrize("area", [{"v": 1}, {"v": 1, "radiusM": 6000}])
+def test_cluster_representative_preserves_f01_v1(area, tmp_path):
+    source = spot("singleton", 48.6, 3.0, 0.7)
+    source["skyDarknessArea"] = area
+    write_tile(tmp_path, "N048E003", [source])
+    representative = aggregate_spot_files(tmp_path)[1][0]["rep"]
+    assert representative["skyDarknessArea"] == area
+
+
 def test_cluster_rejects_invalid_optional_accessibility_payload(tmp_path):
     source = spot("a", 28.2, -16.6, 0.8)
     source["accessibility"] = None

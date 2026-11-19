@@ -59,6 +59,7 @@ from src.tile_export import (
     enumerate_tiles_in_bbox,
     write_tile_file,
 )
+from src.sky_darkness_area import measure_sky_darkness_area
 
 logger = logging.getLogger("pipeline")
 
@@ -79,6 +80,17 @@ AUDIT_PROBLEM_KEYS = (
 def _audit_count(audit: dict, key: str) -> int:
     value = audit.get(key, 0)
     return value if isinstance(value, int) else len(value)
+
+
+def _f01_audit_document(region: str, year: int, manifest_sha256: str, spots: list[dict]) -> dict:
+    """Bind per-spot F01 evidence to the verified regional input package."""
+    return {
+        "schema": 1,
+        "region": region,
+        "year": year,
+        "e3_manifest_sha256": manifest_sha256,
+        "spots": spots,
+    }
 
 
 def _audit_has_problems(audit: dict) -> bool:
@@ -368,6 +380,33 @@ def run(args) -> int:
         named = naming_index.enrich_spots(covered)
         if any(not isinstance(spot.get("name"), str) or not spot["name"].strip() for spot in named):
             raise ValueError("GeoNames naming cascade produced an empty name")
+        # F01 is measured from the same un-clipped ALR that selected each
+        # anchor. Attach only its optional wire value; all detailed evidence
+        # stays in the local generation audit.
+        geographic_dataset.classify([], args.region, sampler)
+        f01_index = geographic_dataset._e3_engine.for_region(args.region)
+        f01_audit = []
+        for spot in named:
+            exported_id = spot_id(float(spot["lat"]), float(spot["lon"]))
+            payload, evidence = measure_sky_darkness_area(
+                {**spot, "id": exported_id}, alr_data, transform, sampler, f01_index
+            )
+            evidence["id"] = exported_id
+            if payload is not None:
+                spot["skyDarknessArea"] = payload
+            else:
+                spot.pop("skyDarknessArea", None)
+            f01_audit.append(evidence)
+        (attempt_dir / "sky-darkness-area-audit.json").write_text(
+            json.dumps(_f01_audit_document(args.region, args.year,
+                                           geographic_dataset.revision, f01_audit),
+                       indent=2, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
+        logger.info("  F01 measurement outcomes: %s",
+                    {outcome: sum(1 for item in f01_audit if
+                     ("halo" if item["radiusM"] else "label" if item["label"] else "none") == outcome)
+                     for outcome in ("halo", "label", "none")})
         if accessibility_resolver is not None or (
             accessibility_index is not None and accessibility_index.manifest.get("schema") == 2
         ):

@@ -150,6 +150,21 @@ def test_unreadable_and_missing_wbm_are_technical_errors(tmp_path):
         ElevationSampler(tmp_path / 'manifest.json', tmp_path)
 
 
+@pytest.mark.parametrize('failure', ['missing', 'corrupt'])
+def test_declared_wbm_tile_failure_keeps_integrity_error(tmp_path, failure):
+    with make_sampler(tmp_path, [[1, 1], [1, 1]], [[0, 0], [0, 0]]):
+        pass
+    p = tmp_path / 'wbm.tif'
+    if failure == 'missing':
+        p.unlink()
+        expected = 'Missing elevation wbm'
+    else:
+        p.write_bytes(b'corrupt declared WBM tile')
+        expected = 'Corrupt elevation wbm'
+    with pytest.raises(ValueError, match=expected):
+        ElevationSampler.water_masks(tmp_path / 'manifest.json', tmp_path)
+
+
 def test_unmasked_nan_is_invalid_wbm_not_declared_nodata(tmp_path):
     with make_sampler(tmp_path, [[1, 1], [1, 1]], [[0, 0], [0, 0]]):
         pass
