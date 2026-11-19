@@ -26,6 +26,7 @@ SUPPORT_RADIUS_M = 5_000
 MIN_SUPPORT_KM2 = 10.0
 RADIUS_CANDIDATES_M = range(2_000, 10_001, 250)
 MAX_NATIVE_EDGE_SEGMENT_DEG = 0.0005
+E3_QUERY_MARGIN_M = 100
 
 
 def _projected_union(native_geometries, project):
@@ -150,9 +151,17 @@ def _halo_footprint(index, sampler, project, inverse, disk):
     # densifying after inverse projection would curve each chord away from disk.
     frame = inverse(segmentize(disk, max_segment_length=20))
     left, bottom, right, top = frame.bounds
+
+    # Inverse-projecting the exact disk and clipping E3 to that boundary, then
+    # projecting the clipped polygon back, can create a small apparent gap due
+    # to PROJ's transform chord approximation. Query and clip E3 against a
+    # conservative WGS84 envelope around the disk instead. All eligibility
+    # areas below are still intersected with the original metric disk, so the
+    # margin cannot add coverage or water outside the measured radius.
+    e3_envelope = box(*inverse(disk.buffer(E3_QUERY_MARGIN_M)).bounds)
     evidence = {k: [] for k in ("marine_land", "inland_coverage", "water")}
-    for _, feature_id in index.query([frame]):
-        geometry, props = index.clipped(feature_id, frame)
+    for _, feature_id in index.query([e3_envelope]):
+        geometry, props = index.clipped(feature_id, e3_envelope)
         kind = props["kind"]
         if kind in evidence and not geometry.is_empty:
             if kind != "water" or not (

@@ -500,6 +500,60 @@ def test_real_builder_unions_adjoining_e3_coverage_before_projection(layer):
     assert incomplete is False
 
 
+def test_production_measurement_tolerates_e3_disk_round_trip_sliver(monkeypatch):
+    center = (2.5, 46.67)
+    sampler = RealWBMSampler(owners={(46, 2), (46, 3), (47, 2), (47, 3)})
+    # Source coverage extends beyond the measured disk. On pyproj 3.7.2 /
+    # PROJ 9.5.1, clipping it to the exact inverse-projected disk and
+    # projecting it back leaves a 3.397 m² apparent gap. The production
+    # measurement must use a conservative native query frame and retain the
+    # original metric disk as its final decision domain.
+    index = SyntheticIndex(e3_coverage_records(center))
+    spot, alr, grid, sampler, index = synthetic_measurement(
+        monkeypatch, center=center, sampler=sampler, index=index
+    )
+    field, audit = measure_sky_darkness_area(spot, alr, grid, sampler, index)
+    assert field == {"v": 1, "radiusM": 3750}
+    check = next(row for row in audit["haloRadiusChecks"] if row["radiusM"] == 3750)
+    assert check["waterCoverage"] is True
+
+    # A real coverage gap remains larger than the approved tolerance and
+    # rejects the halo; the expanded E3 query frame must not fill it.
+    gap = box(center[0] - .0001, center[1] - .1,
+              center[0] + .1, center[1] + .1)
+    gap_records = [
+        {"kind": kind, "geometry": gap if kind == "marine_land" else box(
+            center[0] - .5, center[1] - .5, center[0] + .5, center[1] + .5
+        )}
+        for kind in ("marine_land", "inland_coverage")
+    ]
+    gap_spot, gap_alr, gap_grid, _, gap_index = synthetic_measurement(
+        monkeypatch, center=center, sampler=sampler, index=SyntheticIndex(gap_records)
+    )
+    gap_field, gap_audit = measure_sky_darkness_area(
+        gap_spot, gap_alr, gap_grid, sampler, gap_index
+    )
+    assert gap_field == {"v": 1}
+    assert any(row["shapePass"] and row["waterCoverage"] is False
+               for row in gap_audit["haloRadiusChecks"])
+
+    # Permanent E3 water still vetoes a halo even when both coverage layers
+    # are complete beyond the disk.
+    wet = box(center[0] - .5, center[1] - .5,
+              center[0] + .5, center[1] + .5)
+    wet_spot, wet_alr, wet_grid, _, wet_index = synthetic_measurement(
+        monkeypatch, center=center, sampler=sampler,
+        index=SyntheticIndex(e3_coverage_records(center, water=[(wet, {})])),
+    )
+    wet_field, wet_audit = measure_sky_darkness_area(
+        wet_spot, wet_alr, wet_grid, sampler, wet_index
+    )
+    assert wet_field == {"v": 1}
+    assert any(row["shapePass"] and row["waterCoverage"] is True
+               and row["waterFraction"] >= .01
+               for row in wet_audit["haloRadiusChecks"])
+
+
 def test_rim_cell_water_uses_clipped_numerator_and_full_cell_in_production(monkeypatch):
     spot, alr, grid, sampler, _ = synthetic_measurement(monkeypatch)
     center = (spot["lon"], spot["lat"])
